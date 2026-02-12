@@ -1,0 +1,256 @@
+version: 2.1
+
+orbs:
+  python: circleci/python@2.3.0
+  docker: circleci/docker@2.4.0
+  slack: circleci/slack@4.12.5
+
+commands:
+  setup_venomqa:
+    description: "Install VenomQA and dependencies"
+    steps:
+      - run:
+          name: Install VenomQA
+          command: |
+            pip install --upgrade pip
+            pip install -e ".[dev]"
+  
+  wait_for_service:
+    description: "Wait for a service to be healthy"
+    parameters:
+      url:
+        type: string
+        default: "http://localhost:8000/health"
+      timeout:
+        type: integer
+        default: 60
+    steps:
+      - run:
+          name: Wait for service
+          command: |
+            for i in $(seq 1 << parameters.timeout >>); do
+              if curl -sf << parameters.url >> >/dev/null 2>&1; then
+                echo "Service is ready"
+                exit 0
+              fi
+              echo "Waiting... ($i/<< parameters.timeout >>)"
+              sleep 2
+            done
+            echo "Service did not become ready in time"
+            exit 1
+
+executors:
+  python-executor:
+    docker:
+      - image: cimg/python:3.12
+    resource_class: medium
+    
+  python-postgres-executor:
+    docker:
+      - image: cimg/python:3.12
+      - image: cimg/postgres:15.4
+        environment:
+          POSTGRES_USER: venomqa
+          POSTGRES_PASSWORD: venomqa_pass
+          POSTGRES_DB: venomqa_test
+      - image: cimg/redis:7.2
+
+jobs:
+  lint:
+    executor: python-executor
+    steps:
+      - checkout
+      - python/install-packages:
+          pkg-manager: pip
+          args: "ruff mypy"
+      - run:
+          name: Run Ruff
+          command: ruff check . --output-format=junit > reports/ruff-junit.xml || true
+      - run:
+          name: Run MyPy
+          command: mypy . --ignore-missing-imports --junit-xml reports/mypy-junit.xml || true
+      - store_test_results:
+          path: reports/
+      - store_artifacts:
+          path: reports/
+
+  unit-tests:
+    executor: python-executor
+    steps:
+      - checkout
+      - setup_venomqa
+      - run:
+          name: Run unit tests
+          command: |
+            pytest tests/unit \
+              -v \
+              --junitxml=reports/unit-junit.xml \
+              --cov=venomqa \
+              --cov-report=xml:reports/coverage.xml \
+              --cov-report=html:reports/coverage-html
+      - store_test_results:
+          path: reports/
+      - store_artifacts:
+          path: reports/coverage-html/
+          destination: coverage-report
+
+  api-tests:
+    executor: python-postgres-executor
+    environment:
+      DATABASE_URL: postgresql://venomqa:venomqa_pass@localhost:5432/venomqa_test
+      REDIS_URL: redis://localhost:6379/0
+      API_BASE_URL: http://localhost:8000
+    steps:
+      - checkout
+      - setup_venomqa
+      - run:
+          name: Start mock API
+          command: python -m http.server 8000 --directory tests/fixtures/mock_api
+          background: true
+      - wait_for_service:
+          url: http://localhost:8000/health
+          timeout: 30
+      - run:
+          name: Run VenomQA
+          command: |
+            venomqa run \
+              --config venomqa.yaml \
+              --output-dir reports \
+              --format html json junit \
+              --parallel 4
+      - store_test_results:
+          path: reports/
+      - store_artifacts:
+          path: reports/
+          destination: api-test-reports
+
+  e2e-tests:
+    executor: python-executor
+    resource_class: large
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 24.0
+          docker_layer_caching: true
+      - setup_venomqa
+      - run:
+          name: Start services
+          command: |
+            docker-compose -f docker-compose.qa.yml up -d
+      - wait_for_service:
+          url: http://localhost:8000/health
+          timeout: 120
+      - run:
+          name: Run E2E tests
+          command: |
+            venomqa run \
+              --config venomqa.yaml \
+              --journeys-dir journeys \
+              --output-dir reports \
+              --format html json junit sarif \
+              --tags e2e \
+              --parallel 2
+      - run:
+          name: Cleanup
+          command: docker-compose -f docker-compose.qa.yml down -v
+          when: always
+      - store_test_results:
+          path: reports/
+      - store_artifacts:
+          path: reports/
+          destination: e2e-test-reports
+
+  performance-tests:
+    executor: python-executor
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run:
+          name: Install with performance extras
+          command: pip install -e ".[dev,performance]"
+      - run:
+          name: Run performance tests
+          command: |
+            venomqa run \
+              --config venomqa.yaml \
+              --journeys-dir journeys \
+              --output-dir reports \
+              --tags performance \
+              --parallel 8 \
+              --iterations 100
+      - store_artifacts:
+          path: reports/
+          destination: performance-reports
+
+  notify:
+    executor: python-executor
+    steps:
+      - slack/notify:
+          event: pass
+          template: success_tagged_deploy_1
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+workflows:
+  version: 2
+  
+  pr-checks:
+    jobs:
+      - lint:
+          filters:
+            branches:
+              ignore: main
+      - unit-tests:
+          requires:
+            - lint
+      - api-tests:
+          requires:
+            - lint
+
+  main-branch:
+    jobs:
+      - lint:
+          filters:
+            branches:
+              only: main
+      - unit-tests:
+          requires:
+            - lint
+      - api-tests:
+          requires:
+            - lint
+      - e2e-tests:
+          requires:
+            - unit-tests
+            - api-tests
+      - notify:
+          requires:
+            - e2e-tests
+          filters:
+            branches:
+              only: main
+
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 6 * * *"
+          filters:
+            branches:
+              only: main
+    jobs:
+      - lint
+      - unit-tests:
+          requires:
+            - lint
+      - performance-tests:
+          requires:
+            - unit-tests
+      - notify:
+          requires:
+            - performance-tests
+
+  manual-performance:
+    jobs:
+      - performance-tests:
+          type: approval

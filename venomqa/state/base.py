@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Protocol
 
+from venomqa.errors import StateNotConnectedError
+
 
 class StateManager(Protocol):
     """Protocol for state managers - enables different backends."""
@@ -81,4 +83,6 @@ class BaseStateManager(ABC):
 
     def _ensure_connected(self) -> None:
         if not self._connected:
-            raise RuntimeError("StateManager not connected. Call connect() first.")
+            raise StateNotConnectedError(
+                message="StateManager not connected. Call connect() first."
+            )

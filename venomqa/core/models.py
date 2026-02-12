@@ -8,10 +8,10 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from venomqa.core.context import ExecutionContext
+from venomqa.errors import ErrorContext, JourneyValidationError
 
 if TYPE_CHECKING:
-    from venomqa.client import Client
+    pass
 
 
 class Severity(Enum):
@@ -24,7 +24,7 @@ class Severity(Enum):
     INFO = "info"
 
 
-ActionCallable = Callable[["Client", ExecutionContext], Any]
+ActionCallable = Callable[..., Any]
 
 
 @dataclass
@@ -32,11 +32,22 @@ class Step:
     """A single action in a journey with assertions."""
 
     name: str
-    action: ActionCallable
+    action: ActionCallable | str
     description: str = ""
     expect_failure: bool = False
     timeout: float | None = None
     retries: int = 0
+    requires_ports: list[str] | None = None
+    args: dict[str, Any] = field(default_factory=dict)
+
+    def get_action_callable(self) -> ActionCallable:
+        """Resolve action to callable, handling string references."""
+        if callable(self.action):
+            return self.action
+        from venomqa.plugins.registry import get_registry
+
+        registry = get_registry()
+        return registry.resolve_action(self.action)
 
 
 @dataclass
@@ -129,6 +140,7 @@ class Issue:
             "422": "Validation error - check request body schema",
             "500": "Server error - check backend logs for exception traceback",
             "timeout": "Operation timed out - check if service is healthy",
+            "timed out": "Operation timed out - check if service is healthy",
             "connection refused": "Service not running - check Docker or network",
             "connection reset": "Connection closed - check service stability",
         }
@@ -179,6 +191,7 @@ class Journey:
     description: str = ""
     tags: list[str] = field(default_factory=list)
     timeout: float | None = None
+    requires: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self._validate_checkpoints()
@@ -196,7 +209,31 @@ class Journey:
 
         missing = branch_refs - checkpoint_names
         if missing:
-            raise ValueError(
-                f"Branch references undefined checkpoint(s): {missing}. "
-                f"Available: {checkpoint_names}"
+            raise JourneyValidationError(
+                message=f"Branch references undefined checkpoint(s): {missing}",
+                field="steps",
+                context=ErrorContext(
+                    extra={
+                        "missing_checkpoints": list(missing),
+                        "available_checkpoints": list(checkpoint_names),
+                    }
+                ),
             )
+
+    def get_steps(self) -> list[Step]:
+        """Get all Step objects (not Checkpoints or Branches)."""
+        result: list[Step] = []
+        for step in self.steps:
+            if isinstance(step, Step):
+                result.append(step)
+        return result
+
+    def invariants(self) -> list[Any]:
+        """Return list of invariants to check after journey execution.
+
+        Override this method in subclasses to define custom invariants.
+
+        Returns:
+            List of invariant objects (e.g., SQLInvariant instances).
+        """
+        return []

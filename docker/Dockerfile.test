@@ -1,0 +1,30 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml ./
+
+RUN pip install --no-cache-dir \
+    pytest>=7.0.0 \
+    pytest-asyncio>=0.21.0 \
+    pytest-cov>=4.0.0 \
+    pytest-timeout>=2.0.0 \
+    mypy>=1.0.0 \
+    ruff>=0.1.0 \
+    black>=23.0.0
+
+COPY . .
+
+RUN pip install --no-cache-dir -e .
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV TEST_MODE=1
+
+ENTRYPOINT ["pytest"]
+CMD ["tests/", "-v", "--tb=short", "--cov=venomqa", "--cov-report=term-missing"]

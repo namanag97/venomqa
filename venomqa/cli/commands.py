@@ -12,6 +12,113 @@ import click
 from venomqa.config import QAConfig, load_config
 from venomqa.runner import JourneyRunner
 
+VENVOMQA_YAML_TEMPLATE = """# VenomQA Configuration
+# See documentation: https://github.com/your-org/venomqa
+
+base_url: "http://localhost:8000"
+timeout: 30
+verbose: false
+fail_fast: false
+capture_logs: true
+log_lines: 50
+report_dir: "reports"
+
+# Port configurations for dependency injection
+ports: []
+  # - name: database
+  #   adapter_type: postgres
+  #   config:
+  #     host: localhost
+  #     port: 5432
+  #     database: test_db
+  # - name: time
+  #   adapter_type: controllable_time
+"""
+
+DOCKER_COMPOSE_QA_TEMPLATE = """# VenomQA Docker Compose for QA environment
+# Override this file with your service configurations
+
+version: "3.8"
+
+services:
+  # Add your test services here
+  # app:
+  #   image: your-app:latest
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - DATABASE_URL=postgresql://user:pass@db:5432/testdb
+
+  # db:
+  #   image: postgres:15
+  #   environment:
+  #     POSTGRES_USER: user
+  #     POSTGRES_PASSWORD: pass
+  #     POSTGRES_DB: testdb
+  #   ports:
+  #     - "5432:5432"
+"""
+
+ACTIONS_INIT_PY = '''"""Reusable actions for QA tests.
+
+Actions are functions decorated with @action that can be reused across journeys.
+They receive (client, ctx, **args) as parameters.
+
+Example:
+    from venomqa.plugins import action
+
+    @action("cart.add_to_cart")
+    def add_to_cart(client, ctx, product_id: int, quantity: int = 1):
+        return client.post("/api/cart/items", json={
+            "product_id": product_id,
+            "quantity": quantity
+        })
+"""
+'''
+
+FIXTURES_INIT_PY = '''"""Test fixtures for QA tests.
+
+Fixtures provide test data and dependencies using dependency injection.
+Use the @fixture decorator with optional `depends` for dependencies.
+
+Example:
+    from venomqa.plugins import fixture
+
+    @fixture
+    def db():
+        from venomqa.adapters import get_adapter
+        return get_adapter("postgres")(host="localhost", database="test")
+
+    @fixture(depends=["db"])
+    def user(db):
+        return db.insert("users", {"email": "test@example.com", "name": "Test User"})
+"""
+'''
+
+JOURNEYS_INIT_PY = '''"""Journey definitions for QA tests.
+
+Journeys define complete user scenarios using steps, checkpoints, and branches.
+
+Example:
+    from venomqa import Journey, Step, Checkpoint, Branch, Path
+    from venomqa.plugins import journey
+
+    @journey("user_checkout")
+    def create_checkout_journey():
+        return Journey(
+            name="user_checkout",
+            description="Test the complete checkout flow",
+            requires=["db", "user"],  # Fixtures this journey needs
+            steps=[
+                Step(name="login", action="auth.login", args={"email": "test@example.com"}),
+                Checkpoint(name="authenticated"),
+                Step(name="add_item", action="cart.add_to_cart", args={"product_id": 1}),
+                # ... more steps
+            ]
+        )
+"""
+'''
+
 
 def setup_logging(verbose: bool) -> None:
     """Configure logging based on verbosity level."""
@@ -72,6 +179,12 @@ def cli(ctx: click.Context, verbose: bool, config: str | None) -> None:
     help="Output format",
 )
 @click.option("--fail-fast", is_flag=True, help="Stop on first failure")
+@click.option(
+    "--port",
+    "ports",
+    multiple=True,
+    help="Port configuration in format: name=adapter_type (e.g., database=postgres)",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -79,6 +192,7 @@ def run(
     no_infra: bool,
     output_format: str,
     fail_fast: bool,
+    ports: tuple[str, ...],
 ) -> None:
     """Run journeys (optionally filtered by name).
 
@@ -86,6 +200,8 @@ def run(
     """
     config: QAConfig = ctx.obj["config"]
     config.fail_fast = fail_fast
+
+    parsed_ports = _parse_ports(ports, config)
 
     journeys = discover_journeys()
 
@@ -114,7 +230,7 @@ def run(
             all_passed = False
             continue
 
-        result = _execute_journey(journey_data, config, no_infra)
+        result = _execute_journey(journey_data, config, no_infra, parsed_ports)
         results.append(result)
 
         if result.get("success"):
@@ -137,6 +253,34 @@ def run(
         _print_summary(results)
 
     sys.exit(0 if all_passed else 1)
+
+
+def _parse_ports(ports: tuple[str, ...], config: QAConfig) -> dict[str, Any]:
+    """Parse port configuration from CLI args and config."""
+    result: dict[str, Any] = {}
+
+    for port_config in config.ports:
+        name = port_config.get("name")
+        adapter_type = port_config.get("adapter_type")
+        if name and adapter_type:
+            result[name] = _create_port_adapter(name, adapter_type, port_config.get("config", {}))
+
+    for port_str in ports:
+        if "=" in port_str:
+            name, adapter_type = port_str.split("=", 1)
+            result[name] = _create_port_adapter(name, adapter_type, {})
+
+    return result
+
+
+def _create_port_adapter(name: str, adapter_type: str, config: dict[str, Any]) -> Any:
+    """Create a port adapter instance."""
+    from venomqa.adapters import get_adapter
+
+    adapter_cls = get_adapter(adapter_type)
+    if adapter_cls is None:
+        raise ValueError(f"Unknown adapter type: {adapter_type}")
+    return adapter_cls(**config)
 
 
 def _load_journey(name: str, path: str) -> Any:
@@ -168,7 +312,9 @@ def _load_journey(name: str, path: str) -> Any:
         return None
 
 
-def _execute_journey(journey: Any, config: QAConfig, no_infra: bool) -> dict[str, Any]:
+def _execute_journey(
+    journey: Any, config: QAConfig, no_infra: bool, ports: dict[str, Any]
+) -> dict[str, Any]:
     """Execute a journey and return results."""
     from venomqa import Client
 
@@ -179,6 +325,7 @@ def _execute_journey(journey: Any, config: QAConfig, no_infra: bool) -> dict[str
         fail_fast=config.fail_fast,
         capture_logs=config.capture_logs,
         log_lines=config.log_lines,
+        ports=ports,
     )
 
     try:
@@ -227,6 +374,67 @@ def _print_summary(results: list[dict[str, Any]]) -> None:
                 click.echo(f"  - {r.get('journey_name', 'unknown')}")
                 for issue in r.get("issues", []):
                     click.echo(f"    • {issue.get('step')}: {issue.get('error')}")
+
+
+@cli.command()
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
+@click.option(
+    "--path", "-p", "base_path", default="qa", help="Base path for QA directory (default: qa)"
+)
+@click.pass_context
+def init(ctx: click.Context, force: bool, base_path: str) -> None:
+    """Initialize a new VenomQA project structure.
+
+    Creates the following structure:
+        qa/
+        ├── venomqa.yaml        # Configuration file
+        ├── docker-compose.qa.yml # Docker Compose for QA environment
+        ├── actions/
+        │   └── __init__.py     # Reusable actions
+        ├── fixtures/
+        │   └── __init__.py     # Test fixtures
+        └── journeys/
+            └── __init__.py     # Journey definitions
+    """
+    base = Path(base_path)
+
+    if base.exists() and not force:
+        click.echo(f"Directory '{base}' already exists. Use --force to overwrite.", err=True)
+        sys.exit(1)
+
+    dirs_to_create = [
+        base,
+        base / "actions",
+        base / "fixtures",
+        base / "journeys",
+    ]
+
+    files_to_create = [
+        (base / "venomqa.yaml", VENVOMQA_YAML_TEMPLATE),
+        (base / "docker-compose.qa.yml", DOCKER_COMPOSE_QA_TEMPLATE),
+        (base / "actions" / "__init__.py", ACTIONS_INIT_PY),
+        (base / "fixtures" / "__init__.py", FIXTURES_INIT_PY),
+        (base / "journeys" / "__init__.py", JOURNEYS_INIT_PY),
+    ]
+
+    for dir_path in dirs_to_create:
+        dir_path.mkdir(parents=True, exist_ok=True)
+        click.echo(f"  ✓ Created directory: {dir_path}")
+
+    for file_path, content in files_to_create:
+        if file_path.exists() and not force:
+            click.echo(f"  ⊘ Skipped (exists): {file_path}")
+            continue
+        file_path.write_text(content)
+        click.echo(f"  ✓ Created file: {file_path}")
+
+    click.echo(f"\n✓ VenomQA project initialized in '{base}/'")
+    click.echo("\nNext steps:")
+    click.echo(f"  1. Edit {base}/venomqa.yaml to configure your environment")
+    click.echo(f"  2. Add actions in {base}/actions/")
+    click.echo(f"  3. Define fixtures in {base}/fixtures/")
+    click.echo(f"  4. Create journeys in {base}/journeys/")
+    click.echo(f"  5. Run with: venomqa run --config {base}/venomqa.yaml")
 
 
 @cli.command("list")

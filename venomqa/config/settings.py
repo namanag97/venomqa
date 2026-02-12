@@ -10,6 +10,8 @@ import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from venomqa.errors import ConfigValidationError, ErrorContext
+
 
 class QAConfig(BaseSettings):
     """Configuration for VenomQA framework."""
@@ -35,6 +37,8 @@ class QAConfig(BaseSettings):
     report_formats: list[str] = Field(default_factory=lambda: ["markdown"])
     verbose: bool = False
     fail_fast: bool = False
+    ports: list[dict[str, Any]] = Field(default_factory=list)
+    adapters: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("db_url", mode="before")
     @classmethod
@@ -42,7 +46,12 @@ class QAConfig(BaseSettings):
         if v is None:
             return None
         if not v.startswith(("postgresql://", "postgres://")):
-            raise ValueError("db_url must be a PostgreSQL connection string")
+            raise ConfigValidationError(
+                message="db_url must be a PostgreSQL connection string",
+                field="db_url",
+                value=v,
+                context=ErrorContext(extra={"expected_prefix": "postgresql://"}),
+            )
         return v
 
     @field_validator("report_formats", mode="before")
@@ -51,7 +60,12 @@ class QAConfig(BaseSettings):
         valid = {"markdown", "json", "junit", "html"}
         invalid = set(v) - valid
         if invalid:
-            raise ValueError(f"Invalid report formats: {invalid}. Valid: {valid}")
+            raise ConfigValidationError(
+                message=f"Invalid report formats: {invalid}. Valid: {valid}",
+                field="report_formats",
+                value=v,
+                context=ErrorContext(extra={"valid_formats": list(valid)}),
+            )
         return v
 
 

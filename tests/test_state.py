@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from venomqa.errors import RollbackError, StateNotConnectedError
 from venomqa.state import BaseStateManager, PostgreSQLStateManager, StateManager
 from venomqa.state.base import StateManager as StateManagerProtocol
 
@@ -105,7 +106,7 @@ class TestBaseStateManager:
 
         manager = ConcreteStateManager(connection_url="postgresql://localhost/test")
 
-        with pytest.raises(RuntimeError, match="not connected"):
+        with pytest.raises(StateNotConnectedError, match="not connected"):
             manager.checkpoint("test")
 
 
@@ -295,7 +296,7 @@ class TestPostgreSQLStateManager:
         manager._in_transaction = True
         manager._checkpoints = ["chk_existing"]
 
-        with pytest.raises(ValueError, match="Checkpoint.*not found"):
+        with pytest.raises(RollbackError, match="Checkpoint.*not found"):
             manager.rollback("nonexistent")
 
     def test_release_checkpoint(self) -> None:

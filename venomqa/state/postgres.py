@@ -8,6 +8,13 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
+from venomqa.errors import (
+    CheckpointError,
+    ConnectionError,
+    ErrorContext,
+    ResetError,
+    RollbackError,
+)
 from venomqa.state.base import BaseStateManager
 
 logger = logging.getLogger(__name__)
@@ -37,7 +44,13 @@ class PostgreSQLStateManager(BaseStateManager):
             logger.info("Connected to PostgreSQL database")
         except Exception as e:
             logger.error(f"Failed to connect to PostgreSQL: {e}")
-            raise
+            raise ConnectionError(
+                message=f"Failed to connect to PostgreSQL: {e}",
+                context=ErrorContext(
+                    extra={"connection_url": self._sanitize_url(self.connection_url)}
+                ),
+                cause=e,
+            ) from e
 
     def disconnect(self) -> None:
         """Close PostgreSQL connection."""
@@ -66,10 +79,18 @@ class PostgreSQLStateManager(BaseStateManager):
         self._ensure_transaction()
         safe_name = self._sanitize_name(name)
 
-        if self._conn:
-            self._conn.execute(f"SAVEPOINT {safe_name}")
-            self._checkpoints.append(safe_name)
-            logger.debug(f"Created checkpoint: {safe_name}")
+        try:
+            if self._conn:
+                self._conn.execute(f"SAVEPOINT {safe_name}")
+                self._checkpoints.append(safe_name)
+                logger.debug(f"Created checkpoint: {safe_name}")
+        except Exception as e:
+            logger.error(f"Failed to create checkpoint '{name}': {e}")
+            raise CheckpointError(
+                message=f"Failed to create checkpoint '{name}': {e}",
+                context=ErrorContext(extra={"checkpoint_name": name}),
+                cause=e,
+            ) from e
 
     def rollback(self, name: str) -> None:
         """Rollback to a SAVEPOINT."""
@@ -77,41 +98,65 @@ class PostgreSQLStateManager(BaseStateManager):
         safe_name = self._sanitize_name(name)
 
         if safe_name not in self._checkpoints:
-            raise ValueError(f"Checkpoint '{name}' not found")
+            raise RollbackError(
+                message=f"Checkpoint '{name}' not found",
+                context=ErrorContext(
+                    extra={"checkpoint_name": name, "available_checkpoints": self._checkpoints}
+                ),
+            )
 
-        if self._conn:
-            self._conn.execute(f"ROLLBACK TO SAVEPOINT {safe_name}")
-            logger.debug(f"Rolled back to checkpoint: {safe_name}")
+        try:
+            if self._conn:
+                self._conn.execute(f"ROLLBACK TO SAVEPOINT {safe_name}")
+                logger.debug(f"Rolled back to checkpoint: {safe_name}")
+        except Exception as e:
+            logger.error(f"Failed to rollback to checkpoint '{name}': {e}")
+            raise RollbackError(
+                message=f"Failed to rollback to checkpoint '{name}': {e}",
+                context=ErrorContext(extra={"checkpoint_name": name}),
+                cause=e,
+            ) from e
 
     def release(self, name: str) -> None:
         """Release a SAVEPOINT."""
         self._ensure_transaction()
         safe_name = self._sanitize_name(name)
 
-        if self._conn:
-            self._conn.execute(f"RELEASE SAVEPOINT {safe_name}")
-            if safe_name in self._checkpoints:
-                self._checkpoints.remove(safe_name)
-            logger.debug(f"Released checkpoint: {safe_name}")
+        try:
+            if self._conn:
+                self._conn.execute(f"RELEASE SAVEPOINT {safe_name}")
+                if safe_name in self._checkpoints:
+                    self._checkpoints.remove(safe_name)
+                logger.debug(f"Released checkpoint: {safe_name}")
+        except Exception as e:
+            logger.warning(f"Failed to release checkpoint '{name}': {e}")
 
     def reset(self) -> None:
         """Reset database by truncating specified tables."""
         self._ensure_connected()
 
-        if self._conn:
-            if self._in_transaction:
-                self._conn.rollback()
-                self._in_transaction = False
+        try:
+            if self._conn:
+                if self._in_transaction:
+                    self._conn.rollback()
+                    self._in_transaction = False
 
-            tables = self._get_tables_to_reset()
-            if tables:
-                self._conn.execute("BEGIN")
-                for table in tables:
-                    self._conn.execute(f"TRUNCATE TABLE {table} CASCADE")
-                self._conn.commit()
-                logger.info(f"Reset {len(tables)} tables: {', '.join(tables)}")
+                tables = self._get_tables_to_reset()
+                if tables:
+                    self._conn.execute("BEGIN")
+                    for table in tables:
+                        self._conn.execute(f"TRUNCATE TABLE {table} CASCADE")
+                    self._conn.commit()
+                    logger.info(f"Reset {len(tables)} tables: {', '.join(tables)}")
 
-            self._checkpoints.clear()
+                self._checkpoints.clear()
+        except Exception as e:
+            logger.error(f"Failed to reset database: {e}")
+            raise ResetError(
+                message=f"Failed to reset database: {e}",
+                context=ErrorContext(extra={"tables_to_reset": self.tables_to_reset}),
+                cause=e,
+            ) from e
 
     def commit(self) -> None:
         """Commit current transaction."""
@@ -145,3 +190,13 @@ class PostgreSQLStateManager(BaseStateManager):
         if safe and safe[0].isdigit():
             safe = "sp_" + safe
         return f"chk_{safe}"[:63]
+
+    @staticmethod
+    def _sanitize_url(url: str) -> str:
+        """Sanitize connection URL for logging (hide password)."""
+        if "@" in url:
+            parts = url.split("@")
+            if ":" in parts[0]:
+                prefix = parts[0].rsplit(":", 1)[0]
+                return f"{prefix}:***@{parts[1]}"
+        return url

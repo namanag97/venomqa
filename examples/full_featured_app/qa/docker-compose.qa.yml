@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  qa-runner:
+    build:
+      context: ../../../
+      dockerfile: examples/full_featured_app/qa/Dockerfile.qa
+    environment:
+      - BASE_URL=http://app:8000
+      - DATABASE_URL=postgresql://appuser:apppass@postgres:5432/appdb
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - MAILHOG_HOST=mailhog
+      - MAILHOG_API_PORT=8025
+      - REPORT_OUTPUT=/reports
+    volumes:
+      - ./reports:/reports
+      - ./journeys:/app/journeys:ro
+      - ./actions:/app/actions:ro
+    depends_on:
+      - app
+    networks:
+      - app-network
+
+  app:
+    extends:
+      file: ../docker/docker-compose.yml
+      service: app
+
+  worker:
+    extends:
+      file: ../docker/docker-compose.yml
+      service: worker
+
+  postgres:
+    extends:
+      file: ../docker/docker-compose.yml
+      service: postgres
+
+  redis:
+    extends:
+      file: ../docker/docker-compose.yml
+      service: redis
+
+  elasticsearch:
+    extends:
+      file: ../docker/docker-compose.yml
+      service: elasticsearch
+
+  mailhog:
+    extends:
+      file: ../docker/docker-compose.yml
+      service: mailhog
+
+  minio:
+    extends:
+      file: ../docker/docker-compose.yml
+      service: minio
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+  minio_data:
+
+networks:
+  app-network:
+    driver: bridge

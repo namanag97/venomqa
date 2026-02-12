@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -12,15 +12,18 @@ from venomqa.client import Client, RequestRecord
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (
     Branch,
+    BranchResult,
     Checkpoint,
     Issue,
     Journey,
     JourneyResult,
     Path,
+    PathResult,
     Severity,
     Step,
     StepResult,
 )
+from venomqa.runner import JourneyRunner
 from venomqa.state.base import BaseStateManager, StateManager
 
 
@@ -276,3 +279,169 @@ def sample_issue() -> Issue:
         response={"status_code": 404, "body": {"error": "Not found"}},
         logs=["Request failed"],
     )
+
+
+@pytest.fixture
+def sample_journey_result(sample_journey: Journey) -> JourneyResult:
+    """Create a sample journey result."""
+    now = datetime.now()
+    return JourneyResult(
+        journey_name=sample_journey.name,
+        success=True,
+        started_at=now,
+        finished_at=now,
+        step_results=[
+            StepResult(
+                step_name="create_user",
+                success=True,
+                started_at=now,
+                finished_at=now,
+                duration_ms=50.0,
+            ),
+            StepResult(
+                step_name="get_user",
+                success=True,
+                started_at=now,
+                finished_at=now,
+                duration_ms=25.0,
+            ),
+        ],
+        branch_results=[],
+        issues=[],
+        duration_ms=75.0,
+    )
+
+
+@pytest.fixture
+def sample_step_result() -> StepResult:
+    """Create a sample step result."""
+    now = datetime.now()
+    return StepResult(
+        step_name="test_step",
+        success=True,
+        started_at=now,
+        finished_at=now,
+        response={"status_code": 200, "body": {"id": 1}},
+        request={"method": "GET", "url": "/users/1"},
+        duration_ms=10.0,
+    )
+
+
+@pytest.fixture
+def sample_branch_result() -> BranchResult:
+    """Create a sample branch result."""
+    now = datetime.now()
+    return BranchResult(
+        checkpoint_name="after_create",
+        path_results=[
+            PathResult(
+                path_name="happy_path",
+                success=True,
+                step_results=[
+                    StepResult(
+                        step_name="step_in_path",
+                        success=True,
+                        started_at=now,
+                        finished_at=now,
+                        duration_ms=5.0,
+                    ),
+                ],
+            ),
+        ],
+        all_passed=True,
+    )
+
+
+@pytest.fixture
+def sample_path_result() -> PathResult:
+    """Create a sample path result."""
+    now = datetime.now()
+    return PathResult(
+        path_name="test_path",
+        success=True,
+        step_results=[
+            StepResult(
+                step_name="step1",
+                success=True,
+                started_at=now,
+                finished_at=now,
+                duration_ms=10.0,
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def journey_runner(mock_client: MockClient) -> JourneyRunner:
+    """Create a journey runner with mock client."""
+    return JourneyRunner(client=mock_client)
+
+
+@pytest.fixture
+def journey_runner_with_state(
+    mock_client: MockClient, mock_state_manager: MockStateManager
+) -> JourneyRunner:
+    """Create a journey runner with mock client and state manager."""
+    return JourneyRunner(client=mock_client, state_manager=mock_state_manager)
+
+
+class TestDataFactory:
+    """Factory class for creating test data."""
+
+    @staticmethod
+    def create_step(name: str = "test_step", **kwargs: Any) -> Step:
+        def default_action(client, ctx):
+            return client.get("/test")
+
+        return Step(
+            name=name,
+            action=kwargs.get("action", default_action),
+            description=kwargs.get("description", ""),
+            expect_failure=kwargs.get("expect_failure", False),
+            timeout=kwargs.get("timeout"),
+            retries=kwargs.get("retries", 0),
+        )
+
+    @staticmethod
+    def create_checkpoint(name: str = "test_checkpoint") -> Checkpoint:
+        return Checkpoint(name=name)
+
+    @staticmethod
+    def create_path(name: str = "test_path", steps: list | None = None) -> Path:
+        return Path(name=name, steps=steps or [], description="")
+
+    @staticmethod
+    def create_journey(
+        name: str = "test_journey", steps: list | None = None, **kwargs: Any
+    ) -> Journey:
+        return Journey(
+            name=name,
+            steps=steps or [],
+            description=kwargs.get("description", ""),
+            tags=kwargs.get("tags", []),
+            timeout=kwargs.get("timeout"),
+        )
+
+    @staticmethod
+    def create_journey_result(
+        journey_name: str = "test_journey",
+        success: bool = True,
+        **kwargs: Any,
+    ) -> JourneyResult:
+        now = datetime.now()
+        return JourneyResult(
+            journey_name=journey_name,
+            success=success,
+            started_at=kwargs.get("started_at", now),
+            finished_at=kwargs.get("finished_at", now),
+            step_results=kwargs.get("step_results", []),
+            branch_results=kwargs.get("branch_results", []),
+            issues=kwargs.get("issues", []),
+            duration_ms=kwargs.get("duration_ms", 0.0),
+        )
+
+
+@pytest.fixture
+def test_data_factory() -> type[TestDataFactory]:
+    """Provide access to test data factory."""
+    return TestDataFactory

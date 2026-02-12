@@ -1,0 +1,237 @@
+stages:
+  - lint
+  - test
+  - integration
+  - e2e
+  - report
+
+variables:
+  PYTHON_VERSION: "3.12"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  VENOMQA_REPORT_DIR: "reports"
+  POSTGRES_USER: "venomqa"
+  POSTGRES_PASSWORD: "venomqa_pass"
+  POSTGRES_DB: "venomqa_test"
+
+.default_rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+
+.cache_template: &cache_template
+  cache:
+    key:
+      files:
+        - pyproject.toml
+        - requirements.txt
+    paths:
+      - .cache/pip
+      - .venv/
+
+.install_template: &install_template
+  before_script:
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -e ".[dev]"
+
+lint:
+  stage: lint
+  extends: .default_rules
+  <<: *cache_template
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pip install ruff mypy
+    - ruff check . --output-format=gitlab
+    - mypy . --ignore-missing-imports || true
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    expire_in: 1 week
+
+test-unit:
+  stage: test
+  extends: .default_rules
+  <<: [*cache_template, *install_template]
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pytest tests/unit -v --junitxml=reports/unit-junit.xml --cov=venomqa --cov-report=xml
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+      junit: reports/unit-junit.xml
+    expire_in: 1 week
+
+test-api:
+  stage: integration
+  extends: .default_rules
+  <<: [*cache_template, *install_template]
+  image: python:${PYTHON_VERSION}-slim
+  services:
+    - name: postgres:15-alpine
+      alias: postgres
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+    REDIS_URL: "redis://redis:6379/0"
+    API_BASE_URL: "http://localhost:8000"
+  script:
+    - |
+      python -m http.server 8000 --directory tests/fixtures/mock_api &
+      MOCK_PID=$!
+      sleep 5
+    - |
+      venomqa run \
+        --config venomqa.yaml \
+        --output-dir ${VENOMQA_REPORT_DIR} \
+        --format html json junit \
+        --parallel 4
+    - kill $MOCK_PID || true
+  artifacts:
+    paths:
+      - reports/*.html
+      - reports/*.json
+      - reports/*.xml
+    expire_in: 1 week
+    when: always
+
+test-e2e:
+  stage: e2e
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  <<: [*cache_template, *install_template]
+  image: docker:${DOCKER_VERSION}
+  services:
+    - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_VERSION: "24.0"
+  before_script:
+    - apk add --no-cache python3 py3-pip docker-compose
+    - pip3 install -e ".[dev]"
+  script:
+    - docker-compose -f docker-compose.qa.yml up -d
+    - |
+      for i in $(seq 1 60); do
+        if curl -sf http://localhost:8000/health >/dev/null 2>&1; then
+          echo "API ready"
+          break
+        fi
+        echo "Waiting... ($i/60)"
+        sleep 5
+      done
+    - |
+      venomqa run \
+        --config venomqa.yaml \
+        --journeys-dir journeys \
+        --output-dir ${VENOMQA_REPORT_DIR} \
+        --format html json junit sarif \
+        --tags e2e \
+        --parallel 2
+    - docker-compose -f docker-compose.qa.yml down -v
+  artifacts:
+    paths:
+      - reports/
+    expire_in: 1 week
+    when: always
+
+performance:
+  stage: e2e
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_TAG
+  <<: [*cache_template, *install_template]
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pip install -e ".[dev,performance]"
+    - |
+      venomqa run \
+        --config venomqa.yaml \
+        --journeys-dir journeys \
+        --output-dir ${VENOMQA_REPORT_DIR} \
+        --tags performance \
+        --parallel 8 \
+        --iterations 100
+  artifacts:
+    paths:
+      - reports/
+    expire_in: 30 days
+
+pages:
+  stage: report
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - test-api
+    - test-e2e
+  image: alpine:latest
+  script:
+    - mkdir -p public
+    - cp -r reports/*.html public/ 2>/dev/null || true
+    - cp -r reports/*.json public/ 2>/dev/null || true
+    - |
+      cat > public/index.html << 'EOF'
+      <!DOCTYPE html>
+      <html>
+      <head><title>VenomQA Reports</title></head>
+      <body><h1>Test Reports</h1><ul>
+      <li><a href="report.html">HTML Report</a></li>
+      <li><a href="results.json">JSON Results</a></li>
+      </ul></body>
+      </html>
+      EOF
+  artifacts:
+    paths:
+      - public
+  allow_failure: true
+
+notify-slack:
+  stage: report
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_failure
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: on_success
+  needs:
+    - test-api
+    - test-e2e
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      if [ -f "reports/results.json" ]; then
+        FAILED=$(jq '.failed // 0' reports/results.json)
+        PASSED=$(jq '.passed // 0' reports/results.json)
+        STATUS="success"
+        COLOR="good"
+        if [ "$FAILED" -gt 0 ]; then
+          STATUS="failed"
+          COLOR="danger"
+        fi
+      else
+        STATUS="unknown"
+        COLOR="warning"
+      fi
+    - |
+      curl -X POST "${SLACK_WEBHOOK}" \
+        -H 'Content-Type: application/json' \
+        -d '{
+          "attachments": [{
+            "color": "'"${COLOR}"'",
+            "title": "VenomQA Pipeline '"${STATUS}"'",
+            "fields": [
+              {"title": "Project", "value": "'"${CI_PROJECT_NAME}"'", "short": true},
+              {"title": "Branch", "value": "'"${CI_COMMIT_REF_NAME}"'", "short": true},
+              {"title": "Commit", "value": "'"${CI_COMMIT_SHA:0:8}"'", "short": true},
+              {"title": "Results", "value": "'"${PASSED:-0} passed, ${FAILED:-0} failed"'", "short": true}
+            ],
+            "footer": "GitLab CI",
+            "footer_icon": "https://gitlab.com/favicon.ico"
+          }]
+        }'

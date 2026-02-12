@@ -1,0 +1,81 @@
+version: "3.8"
+
+services:
+  venomqa:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.test
+    container_name: venomqa-test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api-mock:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://venomqa:venomqa_secret@postgres:5432/venomqa_test
+      - REDIS_URL=redis://redis:6379/0
+      - API_BASE_URL=http://api-mock:8080
+      - TEST_MODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ../tests:/app/tests:ro
+      - ../venomqa:/app/venomqa:ro
+      - ../journeys:/app/journeys:ro
+      - coverage-data:/app/.coverage
+    networks:
+      - test-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: venomqa-postgres
+    environment:
+      - POSTGRES_USER=venomqa
+      - POSTGRES_PASSWORD=venomqa_secret
+      - POSTGRES_DB=venomqa_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U venomqa -d venomqa_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - test-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: venomqa-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - test-network
+
+  api-mock:
+    image: wiremock/wiremock:3.5.2
+    container_name: venomqa-api-mock
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./wiremock:/home/wiremock
+    networks:
+      - test-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  coverage-data:
+
+networks:
+  test-network:
+    driver: bridge

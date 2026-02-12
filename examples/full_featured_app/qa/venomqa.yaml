@@ -1,0 +1,72 @@
+base_url: "http://localhost:8000"
+
+database:
+  url: "postgresql://appuser:apppass@localhost:5432/appdb"
+  pool_size: 5
+
+redis:
+  url: "redis://localhost:6379/0"
+
+elasticsearch:
+  url: "http://localhost:9200"
+
+mailhog:
+  host: "localhost"
+  smtp_port: 1025
+  api_port: 8025
+
+minio:
+  endpoint: "localhost:9000"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+  secure: false
+
+timeout: 30
+
+retry:
+  max_attempts: 3
+  delay: 1
+  backoff_multiplier: 2
+
+report:
+  formats:
+    - html
+    - json
+    - junit
+  output_dir: "./reports"
+
+parallel_paths: 4
+verbose: true
+
+ports:
+  client:
+    base_url: "http://localhost:8000"
+    timeout: 30
+  
+  database:
+    url: "postgresql://appuser:apppass@localhost:5432/appdb"
+  
+  cache:
+    url: "redis://localhost:6379/0"
+  
+  queue:
+    broker_url: "redis://localhost:6379/1"
+    backend_url: "redis://localhost:6379/1"
+  
+  search:
+    url: "http://localhost:9200"
+  
+  mail:
+    host: "localhost"
+    api_port: 8025
+  
+  websocket:
+    base_url: "ws://localhost:8000"
+
+hooks:
+  before_journey:
+    - "qa.hooks.clear_database"
+  after_journey:
+    - "qa.hooks.cleanup_resources"
+  on_failure:
+    - "qa.hooks.capture_screenshot"

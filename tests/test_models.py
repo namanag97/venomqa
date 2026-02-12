@@ -20,6 +20,7 @@ from venomqa.core.models import (
     Step,
     StepResult,
 )
+from venomqa.errors import JourneyValidationError
 from .conftest import MockClient, MockHTTPResponse
 
 
@@ -181,7 +182,7 @@ class TestJourney:
     ) -> None:
         branch = Branch(checkpoint_name="nonexistent", paths=[])
 
-        with pytest.raises(ValueError, match="undefined checkpoint"):
+        with pytest.raises(JourneyValidationError, match="undefined checkpoint"):
             Journey(name="invalid", steps=[branch])
 
     def test_journey_accepts_valid_checkpoint_reference(

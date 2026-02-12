@@ -1,0 +1,297 @@
+name: VenomQA Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      tags:
+        description: 'Test tags to run (comma-separated)'
+        required: false
+        default: ''
+
+env:
+  PYTHON_VERSION: '3.12'
+  VENOMQA_REPORT_DIR: reports
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy pytest
+      
+      - name: Run Ruff
+        run: ruff check . --output-format=github
+      
+      - name: Run MyPy
+        run: mypy . --ignore-missing-imports || true
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: services/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+      
+      - name: Run unit tests
+        run: pytest tests/unit -v --junitxml=reports/unit-junit.xml
+      
+      - name: Upload unit test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: reports/unit-junit.xml
+
+  test-api:
+    name: API Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: venomqa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install VenomQA
+        run: pip install -e ".[dev]"
+      
+      - name: Start mock API server
+        run: |
+          python -c "
+          import subprocess
+          import time
+          import httpx
+          from pathlib import Path
+          
+          mock_server = subprocess.Popen(['python', '-m', 'http.server', '8000'], cwd='tests/fixtures/mock_api')
+          for _ in range(30):
+              try:
+                  httpx.get('http://localhost:8000/health', timeout=1)
+                  break
+              except:
+                  time.sleep(1)
+          " &
+      
+      - name: Run VenomQA journeys
+        env:
+          API_BASE_URL: http://localhost:8000
+          DATABASE_URL: postgresql://test:testpass@localhost:5432/venomqa_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          venomqa run \
+            --config venomqa.yaml \
+            --output-dir ${{ env.VENOMQA_REPORT_DIR }} \
+            --format html json junit \
+            --parallel 4 \
+            ${{ github.event.inputs.tags != '' && format('--tags {0}', github.event.inputs.tags) || '' }}
+      
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-reports
+          path: |
+            reports/*.html
+            reports/*.json
+            reports/*.xml
+      
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: reports/*-junit.xml
+
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-api]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install VenomQA
+        run: pip install -e ".[dev]"
+      
+      - name: Deploy test environment
+        run: |
+          docker-compose -f docker-compose.qa.yml up -d
+          sleep 30
+      
+      - name: Wait for services
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "API is ready"
+              break
+            fi
+            echo "Waiting for API... ($i/60)"
+            sleep 5
+          done
+      
+      - name: Run E2E journeys
+        env:
+          API_BASE_URL: http://localhost:8000
+          ENVIRONMENT: staging
+        run: |
+          venomqa run \
+            --config venomqa.yaml \
+            --journeys-dir journeys \
+            --output-dir ${{ env.VENOMQA_REPORT_DIR }} \
+            --format html json junit sarif \
+            --tags e2e \
+            --parallel 2
+      
+      - name: Upload E2E reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-reports
+          path: reports/
+      
+      - name: Cleanup
+        if: always()
+        run: docker-compose -f docker-compose.qa.yml down -v
+
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: test-api
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install VenomQA
+        run: pip install -e ".[dev,performance]"
+      
+      - name: Run performance tests
+        env:
+          API_BASE_URL: ${{ secrets.PERF_API_URL }}
+        run: |
+          venomqa run \
+            --config venomqa.yaml \
+            --journeys-dir journeys \
+            --output-dir ${{ env.VENOMQA_REPORT_DIR }} \
+            --tags performance \
+            --parallel 8 \
+            --iterations 100
+      
+      - name: Upload performance reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-reports
+          path: reports/
+
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-api, test-e2e]
+    if: always() && (github.event_name == 'push' || github.event_name == 'schedule')
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+      
+      - name: Check test results
+        id: check
+        run: |
+          if [ -f "all-reports/api-test-reports/results.json" ]; then
+            FAILED=$(jq '.failed // 0' all-reports/api-test-reports/results.json)
+            PASSED=$(jq '.passed // 0' all-reports/api-test-reports/results.json)
+            echo "summary=Tests: $PASSED passed, $FAILED failed" >> $GITHUB_OUTPUT
+            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          else
+            echo "summary=Test results not found" >> $GITHUB_OUTPUT
+            echo "failed=1" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Slack notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL }}
+          slack-message: |
+            VenomQA Test Results for ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            ${{ steps.check.outputs.summary }}
+            Reports: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

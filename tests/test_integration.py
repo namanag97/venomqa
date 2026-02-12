@@ -14,6 +14,7 @@ from venomqa.core.models import (
     Severity,
     Step,
 )
+from venomqa.errors import JourneyValidationError
 from venomqa.runner import JourneyRunner
 from venomqa.state import PostgreSQLStateManager
 from .conftest import MockClient, MockHTTPResponse, MockStateManager
@@ -418,7 +419,7 @@ class TestJourneyValidation:
     """Tests for journey validation."""
 
     def test_invalid_checkpoint_reference(self) -> None:
-        with pytest.raises(ValueError, match="undefined checkpoint"):
+        with pytest.raises(JourneyValidationError, match="undefined checkpoint"):
             Journey(
                 name="invalid",
                 steps=[
