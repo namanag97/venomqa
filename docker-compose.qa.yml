@@ -1,0 +1,71 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://qa:qapass@postgres:5432/venomqa_qa
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=qa
+      - LOG_LEVEL=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=qa
+      - POSTGRES_PASSWORD=qapass
+      - POSTGRES_DB=venomqa_qa
+    volumes:
+      - postgres_qa_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qa -d venomqa_qa"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_qa_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  venomqa-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.qa
+    environment:
+      - API_BASE_URL=http://api:8000
+      - REPORT_OUTPUT=/reports
+    volumes:
+      - ./reports:/reports
+      - ./journeys:/app/journeys:ro
+      - ./actions:/app/actions:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_qa_data:
+  redis_qa_data:

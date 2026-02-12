@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "venomqa"
+version = "0.1.0"
+description = "Stateful Journey QA Framework for end-to-end testing with state exploration"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Naman Agarwal", email = "naman@example.com" }
+]
+keywords = ["testing", "qa", "e2e", "api-testing", "stateful"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "httpx>=0.25.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "click>=8.0.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0",
+    "psycopg[binary]>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "black>=23.0.0",
+]
+
+[project.scripts]
+venomqa = "venomqa.cli:main"
+
+[project.entry-points."venomqa.state_backends"]
+postgresql = "venomqa.state.postgres:PostgreSQLStateManager"
+
+[project.entry-points."venomqa.reporters"]
+markdown = "venomqa.reporters.markdown:MarkdownReporter"
+json = "venomqa.reporters.json_report:JSONReporter"
+junit = "venomqa.reporters.junit:JUnitReporter"
+
+[tool.hatch.build.targets.wheel]
+packages = ["venomqa"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

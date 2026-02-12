@@ -1,0 +1,443 @@
+"""Tests for core domain models."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+import pytest
+
+from venomqa.core.context import ExecutionContext
+from venomqa.core.models import (
+    Branch,
+    BranchResult,
+    Checkpoint,
+    Issue,
+    Journey,
+    JourneyResult,
+    Path,
+    PathResult,
+    Severity,
+    Step,
+    StepResult,
+)
+from .conftest import MockClient, MockHTTPResponse
+
+
+class TestStep:
+    """Tests for Step model."""
+
+    def test_step_creation(self) -> None:
+        def action(client, ctx):
+            return client.get("/test")
+
+        step = Step(name="test_step", action=action, description="Test step")
+
+        assert step.name == "test_step"
+        assert step.description == "Test step"
+        assert step.expect_failure is False
+        assert step.timeout is None
+        assert step.retries == 0
+
+    def test_step_with_options(self) -> None:
+        def action(client, ctx):
+            return client.get("/test")
+
+        step = Step(
+            name="test_step",
+            action=action,
+            description="Test step",
+            expect_failure=True,
+            timeout=30.0,
+            retries=3,
+        )
+
+        assert step.expect_failure is True
+        assert step.timeout == 30.0
+        assert step.retries == 3
+
+    def test_step_action_execution(
+        self, mock_client: MockClient, context: ExecutionContext
+    ) -> None:
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={"id": 1})])
+
+        def action(client, ctx):
+            return client.get("/users/1")
+
+        step = Step(name="get_user", action=action)
+        result = step.action(mock_client, context)
+
+        assert result.status_code == 200
+        assert len(mock_client.history) == 1
+
+
+class TestCheckpoint:
+    """Tests for Checkpoint model."""
+
+    def test_checkpoint_creation(self) -> None:
+        checkpoint = Checkpoint(name="after_setup")
+        assert checkpoint.name == "after_setup"
+
+    def test_checkpoint_is_dataclass(self) -> None:
+        checkpoint = Checkpoint(name="test")
+        assert hasattr(checkpoint, "__dataclass_fields__")
+
+
+class TestPath:
+    """Tests for Path model."""
+
+    def test_path_creation(self, sample_step: Step) -> None:
+        path = Path(name="test_path", steps=[sample_step], description="Test path")
+
+        assert path.name == "test_path"
+        assert len(path.steps) == 1
+        assert path.description == "Test path"
+
+    def test_path_with_multiple_steps(self) -> None:
+        def action1(client, ctx):
+            return client.get("/users")
+
+        def action2(client, ctx):
+            return client.post("/users")
+
+        steps = [
+            Step(name="list_users", action=action1),
+            Step(name="create_user", action=action2),
+        ]
+        path = Path(name="multi_step", steps=steps)
+
+        assert len(path.steps) == 2
+
+    def test_path_with_checkpoint(self, sample_step: Step, sample_checkpoint: Checkpoint) -> None:
+        path = Path(
+            name="path_with_checkpoint",
+            steps=[sample_step, sample_checkpoint],
+        )
+
+        assert len(path.steps) == 2
+        assert isinstance(path.steps[1], Checkpoint)
+
+
+class TestBranch:
+    """Tests for Branch model."""
+
+    def test_branch_creation(self, sample_checkpoint: Checkpoint, sample_path: Path) -> None:
+        branch = Branch(
+            checkpoint_name=sample_checkpoint.name,
+            paths=[sample_path],
+        )
+
+        assert branch.checkpoint_name == sample_checkpoint.name
+        assert len(branch.paths) == 1
+
+    def test_branch_with_multiple_paths(self, sample_checkpoint: Checkpoint) -> None:
+        def action1(client, ctx):
+            return client.get("/users")
+
+        def action2(client, ctx):
+            return client.delete("/users/1")
+
+        path1 = Path(name="read_path", steps=[Step(name="read", action=action1)])
+        path2 = Path(name="delete_path", steps=[Step(name="delete", action=action2)])
+
+        branch = Branch(
+            checkpoint_name=sample_checkpoint.name,
+            paths=[path1, path2],
+        )
+
+        assert len(branch.paths) == 2
+        assert branch.paths[0].name == "read_path"
+        assert branch.paths[1].name == "delete_path"
+
+
+class TestJourney:
+    """Tests for Journey model."""
+
+    def test_journey_creation(self, sample_step: Step) -> None:
+        journey = Journey(
+            name="test_journey",
+            steps=[sample_step],
+            description="Test journey",
+            tags=["test", "smoke"],
+        )
+
+        assert journey.name == "test_journey"
+        assert len(journey.steps) == 1
+        assert journey.description == "Test journey"
+        assert "test" in journey.tags
+        assert "smoke" in journey.tags
+        assert journey.timeout is None
+
+    def test_journey_with_timeout(self, sample_step: Step) -> None:
+        journey = Journey(
+            name="timed_journey",
+            steps=[sample_step],
+            timeout=60.0,
+        )
+
+        assert journey.timeout == 60.0
+
+    def test_journey_validates_checkpoint_references(
+        self, sample_step: Step, sample_checkpoint: Checkpoint
+    ) -> None:
+        branch = Branch(checkpoint_name="nonexistent", paths=[])
+
+        with pytest.raises(ValueError, match="undefined checkpoint"):
+            Journey(name="invalid", steps=[branch])
+
+    def test_journey_accepts_valid_checkpoint_reference(
+        self, sample_checkpoint: Checkpoint, sample_path: Path
+    ) -> None:
+        branch = Branch(checkpoint_name=sample_checkpoint.name, paths=[sample_path])
+
+        journey = Journey(
+            name="valid",
+            steps=[sample_checkpoint, branch],
+        )
+
+        assert journey.name == "valid"
+        assert len(journey.steps) == 2
+
+    def test_journey_default_tags(self, sample_step: Step) -> None:
+        journey = Journey(name="no_tags", steps=[sample_step])
+        assert journey.tags == []
+
+
+class TestStepResult:
+    """Tests for StepResult model."""
+
+    def test_step_result_creation(self) -> None:
+        now = datetime.now()
+        result = StepResult(
+            step_name="test_step",
+            success=True,
+            started_at=now,
+            finished_at=now,
+            response={"status_code": 200},
+            duration_ms=100.0,
+        )
+
+        assert result.step_name == "test_step"
+        assert result.success is True
+        assert result.response == {"status_code": 200}
+        assert result.error is None
+        assert result.duration_ms == 100.0
+
+    def test_step_result_with_error(self) -> None:
+        now = datetime.now()
+        result = StepResult(
+            step_name="failed_step",
+            success=False,
+            started_at=now,
+            finished_at=now,
+            error="HTTP 500",
+            duration_ms=50.0,
+        )
+
+        assert result.success is False
+        assert result.error == "HTTP 500"
+
+
+class TestPathResult:
+    """Tests for PathResult model."""
+
+    def test_path_result_creation(self) -> None:
+        result = PathResult(path_name="test_path", success=True)
+
+        assert result.path_name == "test_path"
+        assert result.success is True
+        assert result.step_results == []
+        assert result.error is None
+
+    def test_path_result_with_step_results(self) -> None:
+        now = datetime.now()
+        step_result = StepResult(
+            step_name="step1",
+            success=True,
+            started_at=now,
+            finished_at=now,
+        )
+        result = PathResult(
+            path_name="test_path",
+            success=True,
+            step_results=[step_result],
+        )
+
+        assert len(result.step_results) == 1
+
+
+class TestBranchResult:
+    """Tests for BranchResult model."""
+
+    def test_branch_result_creation(self) -> None:
+        result = BranchResult(checkpoint_name="after_setup")
+
+        assert result.checkpoint_name == "after_setup"
+        assert result.path_results == []
+        assert result.all_passed is True
+
+    def test_branch_result_with_failed_paths(self) -> None:
+        failed_path = PathResult(path_name="failed", success=False)
+        result = BranchResult(
+            checkpoint_name="test",
+            path_results=[failed_path],
+        )
+
+        assert result.all_passed is False
+
+
+class TestIssue:
+    """Tests for Issue model."""
+
+    def test_issue_creation(self) -> None:
+        issue = Issue(
+            journey="test_journey",
+            path="main",
+            step="get_user",
+            error="HTTP 404",
+        )
+
+        assert issue.journey == "test_journey"
+        assert issue.path == "main"
+        assert issue.step == "get_user"
+        assert issue.error == "HTTP 404"
+        assert issue.severity == Severity.HIGH
+
+    def test_issue_auto_generates_suggestion(self) -> None:
+        issue_401 = Issue(
+            journey="test",
+            path="main",
+            step="auth",
+            error="HTTP 401 Unauthorized",
+        )
+        assert "authentication" in issue_401.suggestion.lower()
+
+        issue_404 = Issue(
+            journey="test",
+            path="main",
+            step="get",
+            error="HTTP 404 Not Found",
+        )
+        assert "route" in issue_404.suggestion.lower() or "found" in issue_404.suggestion.lower()
+
+        issue_500 = Issue(
+            journey="test",
+            path="main",
+            step="get",
+            error="HTTP 500 Internal Server Error",
+        )
+        assert "server" in issue_500.suggestion.lower()
+
+    def test_issue_custom_suggestion(self) -> None:
+        issue = Issue(
+            journey="test",
+            path="main",
+            step="custom",
+            error="Custom error",
+            suggestion="Check the config file",
+        )
+
+        assert issue.suggestion == "Check the config file"
+
+    def test_issue_default_values(self) -> None:
+        issue = Issue(
+            journey="test",
+            path="main",
+            step="test",
+            error="Error",
+        )
+
+        assert issue.logs == []
+        assert issue.request is None
+        assert issue.response is None
+
+
+class TestJourneyResult:
+    """Tests for JourneyResult model."""
+
+    def test_journey_result_creation(self) -> None:
+        now = datetime.now()
+        result = JourneyResult(
+            journey_name="test_journey",
+            success=True,
+            started_at=now,
+            finished_at=now,
+        )
+
+        assert result.journey_name == "test_journey"
+        assert result.success is True
+        assert result.step_results == []
+        assert result.branch_results == []
+        assert result.issues == []
+
+    def test_journey_result_total_steps(self) -> None:
+        now = datetime.now()
+        step_results = [
+            StepResult(step_name="s1", success=True, started_at=now, finished_at=now),
+            StepResult(step_name="s2", success=False, started_at=now, finished_at=now),
+            StepResult(step_name="s3", success=True, started_at=now, finished_at=now),
+        ]
+        result = JourneyResult(
+            journey_name="test",
+            success=False,
+            started_at=now,
+            finished_at=now,
+            step_results=step_results,
+        )
+
+        assert result.total_steps == 3
+        assert result.passed_steps == 2
+
+    def test_journey_result_total_paths(self) -> None:
+        now = datetime.now()
+        branch_results = [
+            BranchResult(
+                checkpoint_name="cp1",
+                path_results=[
+                    PathResult(path_name="p1", success=True),
+                    PathResult(path_name="p2", success=False),
+                ],
+            ),
+            BranchResult(
+                checkpoint_name="cp2",
+                path_results=[
+                    PathResult(path_name="p3", success=True),
+                ],
+            ),
+        ]
+        result = JourneyResult(
+            journey_name="test",
+            success=False,
+            started_at=now,
+            finished_at=now,
+            branch_results=branch_results,
+        )
+
+        assert result.total_paths == 3
+        assert result.passed_paths == 2
+
+    def test_journey_result_duration(self) -> None:
+        now = datetime.now()
+        later = datetime.now()
+        result = JourneyResult(
+            journey_name="test",
+            success=True,
+            started_at=now,
+            finished_at=later,
+            duration_ms=500.0,
+        )
+
+        assert result.duration_ms == 500.0
+
+
+class TestSeverity:
+    """Tests for Severity enum."""
+
+    def test_severity_values(self) -> None:
+        assert Severity.CRITICAL.value == "critical"
+        assert Severity.HIGH.value == "high"
+        assert Severity.MEDIUM.value == "medium"
+        assert Severity.LOW.value == "low"
+        assert Severity.INFO.value == "info"
+
+    def test_severity_comparison(self) -> None:
+        assert Severity.CRITICAL.value != Severity.LOW.value

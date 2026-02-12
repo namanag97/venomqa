@@ -1,0 +1,31 @@
+# VenomQA Configuration File
+# =========================
+
+# Base URL for the application under test
+base_url: "http://localhost:3000"
+
+# Database connection URL (optional - uncomment if needed)
+# db_url: "postgresql://user:password@localhost:5432/venomqa_test"
+
+# Request timeout in seconds
+timeout: 30
+
+# Retry configuration
+retry:
+  max_attempts: 3
+  delay: 1
+  backoff_multiplier: 2
+
+# Reporting configuration
+report:
+  formats:
+    - html
+    - json
+    - junit
+  output_dir: "./reports"
+
+# Number of parallel test paths to execute
+parallel_paths: 4
+
+# Enable verbose output
+verbose: false
