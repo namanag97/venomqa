@@ -440,6 +440,11 @@ from venomqa.cli.doctor import doctor
 
 cli.add_command(doctor)
 
+# Register docker subcommands
+from venomqa.cli.docker import docker
+
+cli.add_command(docker)
+
 
 @cli.command()
 @click.option(
