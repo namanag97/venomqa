@@ -165,11 +165,14 @@ def get_venv_activate(venv_path: Path) -> str:
     return str(venv_path / "bin" / "activate")
 
 
-def install_package(python_cmd: str, package: str, dev: bool = False) -> bool:
+def install_package(python_cmd: str, package: str, dev: bool = False, user: bool = False) -> bool:
     """Install a package using pip."""
     try:
         extras = "[dev]" if dev else ""
-        cmd = [python_cmd, "-m", "pip", "install", "-q", f"{package}{extras}"]
+        cmd = [python_cmd, "-m", "pip", "install", "-q"]
+        if user:
+            cmd.append("--user")
+        cmd.append(f"{package}{extras}")
         subprocess.run(cmd, check=True, capture_output=True)
         return True
     except subprocess.CalledProcessError:
