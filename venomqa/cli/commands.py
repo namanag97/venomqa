@@ -207,10 +207,7 @@ journey = Journey(
             args={"name": "My Test Item"},
             description="Create a new item",
         ),
-        Checkpoint(
-            name="item_created",
-            description="Item has been created",
-        ),
+        Checkpoint(name="item_created"),
     ],
 )
 '''
