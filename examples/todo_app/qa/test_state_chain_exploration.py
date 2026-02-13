@@ -263,38 +263,43 @@ def test_substitute_path_params():
     print("=" * 70)
 
     # Test 1: Simple substitution
-    ctx = {"todo_id": 42}
+    ctx = ExplorationContext()
+    ctx.set("todo_id", 42)
     endpoint = "/todos/{todoId}"
     result = substitute_path_params(endpoint, ctx)
     print(f"\nTest 1: Simple {endpoint}")
-    print(f"  Context: {ctx}")
+    print(f"  Context: {ctx.to_dict()}")
     print(f"  Result: {result}")
     assert result == "/todos/42", f"Expected /todos/42, got {result}"
     print("  PASS")
 
     # Test 2: Multiple params
-    ctx = {"todo_id": 42, "attachment_id": "abc-123"}
+    ctx = ExplorationContext()
+    ctx.set("todo_id", 42)
+    ctx.set("file_id", "abc-123")
     endpoint = "/todos/{todoId}/attachments/{fileId}"
     result = substitute_path_params(endpoint, ctx)
     print(f"\nTest 2: Multiple params {endpoint}")
-    print(f"  Context: {ctx}")
+    print(f"  Context: {ctx.to_dict()}")
     print(f"  Result: {result}")
     assert result == "/todos/42/attachments/abc-123", f"Expected full path, got {result}"
     print("  PASS")
 
     # Test 3: Missing param returns None
-    ctx = {"todo_id": 42}
+    ctx = ExplorationContext()
+    ctx.set("todo_id", 42)
     endpoint = "/users/{userId}"
     result = substitute_path_params(endpoint, ctx)
     print(f"\nTest 3: Missing param {endpoint}")
-    print(f"  Context: {ctx}")
+    print(f"  Context: {ctx.to_dict()}")
     print(f"  Result: {result}")
     assert result is None, f"Expected None for missing param, got {result}"
     print("  PASS")
 
     # Test 4: No params needed
+    ctx = ExplorationContext()
     endpoint = "/todos"
-    result = substitute_path_params(endpoint, {})
+    result = substitute_path_params(endpoint, ctx)
     print(f"\nTest 4: No params {endpoint}")
     print(f"  Result: {result}")
     assert result == "/todos", f"Expected /todos, got {result}"
