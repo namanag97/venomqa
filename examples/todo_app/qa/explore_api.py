@@ -148,22 +148,23 @@ def main():
     output_dir = Path(__file__).parent / "reports"
     output_dir.mkdir(exist_ok=True)
 
-    visualizer = GraphVisualizer()
+    visualizer = GraphVisualizer(graph=graph, issues=issues)
 
     # Generate Mermaid diagram
-    mermaid = visualizer.to_mermaid(graph)
+    mermaid = visualizer.to_mermaid()
     mermaid_path = output_dir / "state_graph.mmd"
     mermaid_path.write_text(mermaid)
     print(f"\nMermaid diagram: {mermaid_path}")
 
     # Generate DOT format
-    dot = visualizer.to_dot(graph)
+    dot = visualizer.to_dot()
     dot_path = output_dir / "state_graph.dot"
     dot_path.write_text(dot)
     print(f"DOT format: {dot_path}")
 
     # Generate JSON for web visualization
-    json_data = visualizer.render_json(graph)
+    import json
+    json_data = json.dumps(visualizer.render_json(), indent=2)
     json_path = output_dir / "state_graph.json"
     json_path.write_text(json_data)
     print(f"JSON data: {json_path}")
