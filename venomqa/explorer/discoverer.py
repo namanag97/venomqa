@@ -138,6 +138,39 @@ class APIDiscoverer:
 
         return self.parse_openapi_spec(spec_data)
 
+    def from_openapi(self, spec_path: str) -> List[Action]:
+        """
+        Parse an OpenAPI specification from a file path and extract API actions.
+
+        This is a convenience method that loads an OpenAPI 3.0.x/3.1.x spec
+        from a file (JSON or YAML) and returns all discovered actions.
+
+        Args:
+            spec_path: Path to the OpenAPI specification file (.json, .yaml, .yml)
+
+        Returns:
+            List of Action objects representing all API endpoints
+
+        Raises:
+            FileNotFoundError: If the spec file does not exist
+            ValueError: If the spec is invalid or cannot be parsed
+
+        Example:
+            discoverer = APIDiscoverer(base_url="http://api.example.com")
+            actions = discoverer.from_openapi("./openapi.yaml")
+            for action in actions:
+                print(f"{action.method} {action.endpoint}")
+                if action.body:
+                    print(f"  Body: {action.body}")
+        """
+        path = Path(spec_path)
+        if not path.exists():
+            raise FileNotFoundError(f"OpenAPI spec file not found: {spec_path}")
+        if not path.is_file():
+            raise ValueError(f"Path is not a file: {spec_path}")
+
+        return self.parse_openapi_spec(path)
+
     def parse_openapi_spec(
         self,
         spec: Union[Dict[str, Any], str, Path],
