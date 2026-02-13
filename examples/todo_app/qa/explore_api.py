@@ -151,22 +151,22 @@ def main():
     visualizer = GraphVisualizer()
 
     # Generate Mermaid diagram
-    mermaid = visualizer.to_mermaid(graph, issues=issues)
+    mermaid = visualizer.to_mermaid(graph)
     mermaid_path = output_dir / "state_graph.mmd"
     mermaid_path.write_text(mermaid)
     print(f"\nMermaid diagram: {mermaid_path}")
 
     # Generate DOT format
-    dot = visualizer.to_dot(graph, issues=issues)
+    dot = visualizer.to_dot(graph)
     dot_path = output_dir / "state_graph.dot"
     dot_path.write_text(dot)
     print(f"DOT format: {dot_path}")
 
-    # Generate interactive HTML
-    html = visualizer.render_html(graph, issues=issues, title="Todo App State Graph")
-    html_path = output_dir / "state_graph.html"
-    html_path.write_text(html)
-    print(f"Interactive HTML: {html_path}")
+    # Generate JSON for web visualization
+    json_data = visualizer.render_json(graph)
+    json_path = output_dir / "state_graph.json"
+    json_path.write_text(json_data)
+    print(f"JSON data: {json_path}")
 
     # Step 6: Coverage report
     print("\n" + "=" * 70)
