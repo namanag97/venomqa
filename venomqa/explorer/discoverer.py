@@ -580,10 +580,10 @@ class APIDiscoverer:
         Returns:
             List of parameter names
         """
-        # TODO: Implement path parameter extraction
-        # 1. Find {param} patterns in the path
-        # 2. Return list of parameter names
-        raise NotImplementedError("_extract_path_params() not yet implemented")
+        # Find {param} patterns in the path
+        pattern = r"\{([^}]+)\}"
+        matches = re.findall(pattern, endpoint)
+        return matches
 
     def get_discovered_actions(self) -> List[Action]:
         """
