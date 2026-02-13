@@ -55,6 +55,7 @@ import httpx
 
 from venomqa.explorer.models import (
     Action,
+    ChainState,
     CoverageReport,
     ExplorationConfig,
     Issue,
@@ -63,6 +64,11 @@ from venomqa.explorer.models import (
     StateGraph,
     StateID,
     Transition,
+)
+from venomqa.explorer.detector import (
+    extract_context,
+    substitute_path_params,
+    generate_state_name,
 )
 
 logger = logging.getLogger(__name__)
