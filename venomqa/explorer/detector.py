@@ -272,11 +272,31 @@ class StateDetector:
         Returns:
             List of Action objects from discovered links
         """
-        # TODO: Implement link extraction
-        # 1. Look for _links, links, href fields
-        # 2. Parse HAL, JSON:API formats
-        # 3. Build Action objects from links
-        raise NotImplementedError("_extract_links() not yet implemented")
+        actions: List[Action] = []
+
+        # Look for _links (HAL format)
+        if "_links" in response and isinstance(response["_links"], dict):
+            for rel, link_data in response["_links"].items():
+                if isinstance(link_data, dict) and "href" in link_data:
+                    method = link_data.get("method", "GET").upper()
+                    actions.append(Action(
+                        method=method,
+                        endpoint=link_data["href"],
+                        description=rel,
+                    ))
+
+        # Look for links array (JSON:API format)
+        if "links" in response and isinstance(response["links"], list):
+            for link in response["links"]:
+                if isinstance(link, dict) and "href" in link:
+                    method = link.get("method", "GET").upper()
+                    actions.append(Action(
+                        method=method,
+                        endpoint=link["href"],
+                        description=link.get("rel", ""),
+                    ))
+
+        return actions
 
     def _infer_state_name(
         self,
