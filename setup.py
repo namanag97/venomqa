@@ -228,8 +228,15 @@ def install_venomqa(python_cmd: str, editable: bool = False, dev: bool = False, 
 def run_preflight_checks(python_cmd: str) -> bool:
     """Run VenomQA preflight checks."""
     try:
+        # Use the venomqa module directly since CLI may not be in PATH yet
+        script = '''
+import sys
+sys.argv = ["venomqa", "doctor"]
+from venomqa.cli import main
+main()
+'''
         result = subprocess.run(
-            [python_cmd, "-m", "venomqa.cli", "doctor"],
+            [python_cmd, "-c", script],
             capture_output=True,
             text=True,
             timeout=60,
