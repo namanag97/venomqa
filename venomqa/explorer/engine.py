@@ -1626,7 +1626,7 @@ class ExplorationEngine:
 
                     # Add to queue for further exploration (only if new state)
                     if is_new_state and success:
-                        queue.append((new_chain_state, new_context.copy()))
+                        queue.append((new_chain_state, new_context))
 
                     # Record issues for errors
                     if not success:
