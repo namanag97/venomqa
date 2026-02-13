@@ -199,12 +199,33 @@ class StateDetector:
         Returns:
             A unique state identifier
         """
-        # TODO: Implement state ID generation
-        # 1. Extract relevant fields based on state_key_fields
-        # 2. Create a canonical representation
-        # 3. Generate a hash-based ID
-        # 4. Handle deduplication
-        raise NotImplementedError("_generate_state_id() not yet implemented")
+        # Extract relevant fields based on state_key_fields
+        key_values = {}
+        if self.state_key_fields:
+            for field in self.state_key_fields:
+                if field in response:
+                    key_values[field] = response[field]
+        else:
+            # Use the whole response for hashing if no key fields defined
+            key_values = response
+
+        # Create a canonical representation
+        canonical = json.dumps(key_values, sort_keys=True, default=str)
+
+        # Add endpoint context if provided
+        if endpoint:
+            canonical = f"{endpoint}:{canonical}"
+
+        # Generate a hash-based ID
+        hash_id = hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+        # Handle deduplication via hash lookup
+        if canonical in self._state_hashes:
+            return self._state_hashes[canonical]
+
+        state_id = f"state_{hash_id}"
+        self._state_hashes[canonical] = state_id
+        return state_id
 
     def _extract_state_properties(
         self,
