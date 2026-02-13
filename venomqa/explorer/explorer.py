@@ -306,13 +306,41 @@ class StateExplorer:
         Raises:
             ActionExecutionError: If action execution fails
         """
-        # TODO: Implement action execution
-        # 1. Call pre-action hooks
-        # 2. Build HTTP request
-        # 3. Execute request
-        # 4. Call post-action hooks
-        # 5. Return response data
-        raise NotImplementedError("execute_action() not yet implemented")
+        import httpx
+
+        # Call pre-action hooks
+        for hook in self._pre_action_hooks:
+            hook(action)
+
+        # Build headers
+        headers = dict(self._auth_headers)
+        if action.headers:
+            headers.update(action.headers)
+
+        # Build URL
+        url = f"{self.base_url}{action.endpoint}"
+
+        # Execute request
+        async with httpx.AsyncClient(
+            timeout=self.config.request_timeout_seconds,
+            verify=self.config.verify_ssl,
+            follow_redirects=self.config.follow_redirects,
+        ) as client:
+            response = await client.request(
+                method=action.method,
+                url=url,
+                params=action.params,
+                json=action.body if action.body else None,
+                headers=headers,
+            )
+            response.raise_for_status()
+            response_data = response.json() if response.content else {}
+
+        # Call post-action hooks
+        for hook in self._post_action_hooks:
+            hook(action, response_data)
+
+        return response_data
 
     def generate_report(
         self,
