@@ -1002,11 +1002,109 @@ class APIDiscoverer:
         Returns:
             List of discovered Action objects
         """
-        # TODO: Implement HAR file parsing
-        # 1. Load and parse HAR file
-        # 2. Extract unique request patterns
-        # 3. Build Action objects for each pattern
-        raise NotImplementedError("discover_from_har() not yet implemented")
+        from pathlib import Path
+
+        har_file = Path(har_path)
+        if not har_file.exists():
+            raise FileNotFoundError(f"HAR file not found: {har_path}")
+
+        # Load and parse HAR file
+        with open(har_file, "r", encoding="utf-8") as f:
+            har_data = json.load(f)
+
+        actions: List[Action] = []
+
+        # HAR structure: { log: { entries: [ { request: {...}, response: {...} } ] } }
+        entries = har_data.get("log", {}).get("entries", [])
+
+        seen_patterns: Set[Tuple[str, str]] = set()
+
+        for entry in entries:
+            request = entry.get("request", {})
+            method = request.get("method", "GET").upper()
+            url = request.get("url", "")
+
+            if not url:
+                continue
+
+            # Parse URL to get endpoint
+            from urllib.parse import urlparse, parse_qs
+
+            parsed = urlparse(url)
+
+            # Skip if not matching our base URL
+            full_base = f"{parsed.scheme}://{parsed.netloc}"
+            if self.base_url and not url.startswith(self.base_url) and full_base != self.base_url:
+                continue
+
+            endpoint = parsed.path
+            if not endpoint:
+                continue
+
+            # Normalize endpoint and remove IDs to create patterns
+            # Replace numeric segments with {id} placeholder
+            import re
+            endpoint_pattern = re.sub(r'/\d+(?=/|$)', '/{id}', endpoint)
+            endpoint_pattern = re.sub(r'/[a-f0-9-]{36}(?=/|$)', '/{uuid}', endpoint_pattern)
+
+            normalized = self._normalize_endpoint(endpoint_pattern)
+
+            # Check if we should include this endpoint
+            if not self._should_include_endpoint(normalized):
+                continue
+
+            # Skip duplicate patterns
+            pattern_key = (method, normalized)
+            if pattern_key in seen_patterns:
+                continue
+            seen_patterns.add(pattern_key)
+
+            # Extract query parameters
+            params: Optional[Dict[str, Any]] = None
+            query_string = request.get("queryString", [])
+            if query_string:
+                params = {qs["name"]: qs.get("value", "") for qs in query_string}
+
+            # Extract body for POST/PUT/PATCH
+            body: Optional[Dict[str, Any]] = None
+            post_data = request.get("postData", {})
+            if post_data and method in ("POST", "PUT", "PATCH"):
+                mime_type = post_data.get("mimeType", "")
+                text = post_data.get("text", "")
+                if "json" in mime_type and text:
+                    try:
+                        body = json.loads(text)
+                    except json.JSONDecodeError:
+                        pass
+                elif post_data.get("params"):
+                    body = {p["name"]: p.get("value", "") for p in post_data["params"]}
+
+            # Extract headers (only non-standard ones)
+            headers: Optional[Dict[str, str]] = None
+            request_headers = request.get("headers", [])
+            custom_headers = {}
+            skip_headers = {"host", "connection", "content-length", "accept", "user-agent", "content-type", "cookie"}
+            for header in request_headers:
+                name = header.get("name", "").lower()
+                if name not in skip_headers and not name.startswith("sec-"):
+                    custom_headers[header["name"]] = header.get("value", "")
+            if custom_headers:
+                headers = custom_headers
+
+            action = Action(
+                method=method,
+                endpoint=normalized,
+                params=params,
+                body=body,
+                headers=headers,
+            )
+
+            if action not in self.discovered_actions:
+                self.discovered_actions.add(action)
+                self.discovered_endpoints.add(normalized)
+                actions.append(action)
+
+        return actions
 
     def add_seed_endpoints(
         self,
