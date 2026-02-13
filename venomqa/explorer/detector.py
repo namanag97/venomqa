@@ -13,9 +13,125 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Callable, Dict, List, Optional, Set
+import re
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from venomqa.explorer.models import Action, State, StateID
+
+
+# Common authentication-related field names
+AUTH_TOKEN_FIELDS = {
+    "token",
+    "access_token",
+    "accessToken",
+    "auth_token",
+    "authToken",
+    "jwt",
+    "bearer",
+    "id_token",
+    "idToken",
+    "refresh_token",
+    "refreshToken",
+    "session_token",
+    "sessionToken",
+    "api_key",
+    "apiKey",
+}
+
+# Common user/identity field names
+USER_FIELDS = {
+    "user",
+    "user_id",
+    "userId",
+    "username",
+    "email",
+    "name",
+    "displayName",
+    "display_name",
+    "account",
+    "profile",
+    "identity",
+    "sub",  # JWT subject claim
+    "uid",
+}
+
+# Common entity identifier field names
+ENTITY_ID_FIELDS = {
+    "id",
+    "_id",
+    "uuid",
+    "guid",
+    "pk",
+    "key",
+    "slug",
+}
+
+# Common status/state field names
+STATUS_FIELDS = {
+    "status",
+    "state",
+    "phase",
+    "stage",
+    "condition",
+    "lifecycle",
+}
+
+
+class AuthState:
+    """Represents detected authentication state."""
+
+    def __init__(
+        self,
+        is_authenticated: bool = False,
+        has_token: bool = False,
+        token_type: Optional[str] = None,
+        user_info: Optional[Dict[str, Any]] = None,
+        roles: Optional[List[str]] = None,
+        permissions: Optional[List[str]] = None,
+    ) -> None:
+        self.is_authenticated = is_authenticated
+        self.has_token = has_token
+        self.token_type = token_type
+        self.user_info = user_info or {}
+        self.roles = roles or []
+        self.permissions = permissions or []
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "is_authenticated": self.is_authenticated,
+            "has_token": self.has_token,
+            "token_type": self.token_type,
+            "user_info": self.user_info,
+            "roles": self.roles,
+            "permissions": self.permissions,
+        }
+
+
+class EntityState:
+    """Represents detected entity state."""
+
+    def __init__(
+        self,
+        entity_type: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        status: Optional[str] = None,
+        properties: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.entity_type = entity_type
+        self.entity_id = entity_id
+        self.status = status
+        self.properties = properties or {}
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "status": self.status,
+            "properties": self.properties,
+        }
 
 
 class StateDetector:
