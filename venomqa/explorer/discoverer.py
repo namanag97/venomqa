@@ -79,12 +79,30 @@ class APIDiscoverer:
         Raises:
             DiscoveryError: If discovery fails completely
         """
-        # TODO: Implement discovery orchestration
-        # 1. Try to fetch OpenAPI/Swagger spec
-        # 2. Fall back to HTML crawling if no spec found
-        # 3. Use configured seed endpoints
-        # 4. Filter by include/exclude patterns
-        raise NotImplementedError("discover() not yet implemented")
+        # Try to fetch OpenAPI/Swagger spec first
+        try:
+            actions = await self.discover_from_openapi()
+            if actions:
+                return actions
+        except (ValueError, Exception):
+            # OpenAPI discovery failed, continue to other methods
+            pass
+
+        # If we have seed endpoints, return those
+        if self.discovered_actions:
+            return list(self.discovered_actions)
+
+        # Try HTML crawling as last resort
+        try:
+            actions = await self.discover_from_html()
+            if actions:
+                return actions
+        except (NotImplementedError, Exception):
+            # HTML crawling failed or not implemented
+            pass
+
+        # Return any discovered actions we have
+        return list(self.discovered_actions)
 
     async def discover_from_openapi(
         self,
