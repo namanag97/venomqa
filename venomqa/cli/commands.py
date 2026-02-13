@@ -78,27 +78,45 @@ ports: []
 """
 
 DOCKER_COMPOSE_QA_TEMPLATE = """# VenomQA Docker Compose for QA environment
-# Override this file with your service configurations
-
-version: "3.8"
+# Documentation: https://venomqa.dev/docs/docker
 
 services:
-  # Add your test services here
+  # Example: Test database
+  # db:
+  #   image: postgres:16
+  #   environment:
+  #     POSTGRES_USER: test
+  #     POSTGRES_PASSWORD: test
+  #     POSTGRES_DB: testdb
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U test"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
+  # Example: Your application under test
   # app:
   #   image: your-app:latest
   #   ports:
   #     - "8000:8000"
   #   environment:
-  #     - DATABASE_URL=postgresql://user:pass@db:5432/testdb
+  #     DATABASE_URL: postgresql://test:test@db:5432/testdb
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
 
-  # db:
-  #   image: postgres:15
-  #   environment:
-  #     POSTGRES_USER: user
-  #     POSTGRES_PASSWORD: pass
-  #     POSTGRES_DB: testdb
+  # Example: Redis cache for testing
+  # redis:
+  #   image: redis:7-alpine
   #   ports:
-  #     - "5432:5432"
+  #     - "6379:6379"
+
+  # Add your test services here
+  placeholder:
+    image: alpine:latest
+    command: ["echo", "Add your services above"]
 """
 
 ACTIONS_INIT_PY = '''"""Reusable actions for QA tests.
