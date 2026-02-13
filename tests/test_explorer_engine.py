@@ -1131,5 +1131,564 @@ class TestGraphBuilding:
         assert engine.graph.has_path("s1", "s3")
 
 
+class TestSyncBFSExploration:
+    """Test synchronous BFS exploration with real HTTP calls."""
+
+    def test_explore_bfs_returns_state_graph(self):
+        """Test that explore_bfs returns a StateGraph."""
+        engine = ExplorationEngine(base_url="http://test.local")
+
+        initial_state = State(
+            id="initial",
+            name="Initial State",
+            available_actions=[],  # No actions = just returns graph with initial state
+        )
+
+        graph = engine.explore_bfs(initial_state)
+
+        assert isinstance(graph, StateGraph)
+        assert "initial" in graph.states
+        assert graph.initial_state == "initial"
+
+    def test_explore_bfs_resets_state(self):
+        """Test that explore_bfs resets engine state before starting."""
+        engine = ExplorationEngine()
+
+        # Add some pre-existing state
+        engine.visited_states.add("old_state")
+        engine.issues.append(Issue(severity=IssueSeverity.LOW, error="Old issue"))
+
+        initial_state = State(id="initial", name="Initial", available_actions=[])
+
+        engine.explore_bfs(initial_state)
+
+        # Old state should be cleared, only initial state remains
+        assert "old_state" not in engine.visited_states
+        assert "initial" in engine.visited_states
+        # Old issues should be cleared
+        assert not any(i.error == "Old issue" for i in engine.issues)
+
+    def test_explore_bfs_with_custom_state_detector(self):
+        """Test explore_bfs with a custom state detector."""
+        engine = ExplorationEngine(base_url="http://test.local")
+
+        # Use a mock state detector
+        def custom_detector(response, endpoint, status):
+            return State(
+                id=f"custom_state_{endpoint.replace('/', '_')}",
+                name=f"Custom State for {endpoint}",
+                properties={"custom": True},
+            )
+
+        engine.set_state_detector(custom_detector)
+
+        # Mock the HTTP execution to avoid real network calls
+        original_execute = engine._execute_action_sync
+
+        def mock_execute(action):
+            return {
+                "data": {"mocked": True},
+                "status_code": 200,
+                "duration_ms": 10.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[Action(method="GET", endpoint="/api/test")],
+        )
+
+        graph = engine.explore_bfs(initial_state)
+
+        # Should have used the custom detector
+        state_ids = list(graph.states.keys())
+        assert any("custom_state" in sid for sid in state_ids)
+
+        # Restore
+        engine._execute_action_sync = original_execute
+
+    def test_explore_bfs_respects_max_states(self):
+        """Test that explore_bfs respects max_states limit."""
+        config = ExplorationConfig(max_states=3, max_depth=10)
+        engine = ExplorationEngine(config=config)
+
+        state_counter = [0]
+
+        def mock_execute(action):
+            state_counter[0] += 1
+            return {
+                "data": {},
+                "status_code": 200,
+                "duration_ms": 5.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        def mock_detector(response, endpoint, status):
+            return State(
+                id=f"state_{state_counter[0]}",
+                name=f"State {state_counter[0]}",
+                available_actions=[
+                    Action(method="GET", endpoint=f"/next_{state_counter[0]}")
+                ],
+            )
+
+        engine.set_state_detector(mock_detector)
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[Action(method="GET", endpoint="/start")],
+        )
+
+        graph = engine.explore_bfs(initial_state)
+
+        # Should not exceed max_states
+        assert len(graph.states) <= 3
+
+    def test_explore_bfs_respects_max_depth(self):
+        """Test that explore_bfs respects max_depth limit."""
+        config = ExplorationConfig(max_states=100, max_depth=2)
+        engine = ExplorationEngine(config=config)
+
+        depth_tracker = [0]
+
+        def mock_execute(action):
+            # Track depth from endpoint
+            depth = int(action.endpoint.split("_")[-1])
+            depth_tracker[0] = max(depth_tracker[0], depth)
+            return {
+                "data": {},
+                "status_code": 200,
+                "duration_ms": 5.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        def mock_detector(response, endpoint, status):
+            depth = int(endpoint.split("_")[-1])
+            return State(
+                id=f"state_depth_{depth}",
+                name=f"State at depth {depth}",
+                available_actions=[
+                    Action(method="GET", endpoint=f"/depth_{depth + 1}")
+                ] if depth < 10 else [],
+            )
+
+        engine.set_state_detector(mock_detector)
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[Action(method="GET", endpoint="/depth_1")],
+        )
+
+        engine.explore_bfs(initial_state)
+
+        # Should not go deeper than max_depth
+        assert depth_tracker[0] <= 2
+
+    def test_explore_bfs_records_transitions(self):
+        """Test that explore_bfs records all transitions."""
+        engine = ExplorationEngine()
+
+        def mock_execute(action):
+            return {
+                "data": {"action": action.endpoint},
+                "status_code": 200,
+                "duration_ms": 10.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        def mock_detector(response, endpoint, status):
+            return State(id=f"state_{endpoint.replace('/', '_')}", name=f"State {endpoint}")
+
+        engine.set_state_detector(mock_detector)
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[
+                Action(method="GET", endpoint="/api/a"),
+                Action(method="GET", endpoint="/api/b"),
+                Action(method="GET", endpoint="/api/c"),
+            ],
+        )
+
+        graph = engine.explore_bfs(initial_state)
+
+        # Should have 3 transitions
+        assert len(graph.transitions) == 3
+
+        # All transitions should be from initial state
+        for t in graph.transitions:
+            assert t.from_state == "initial"
+            assert t.action is not None
+            assert t.to_state is not None
+
+    def test_explore_bfs_handles_http_errors(self):
+        """Test that explore_bfs handles HTTP errors gracefully."""
+        engine = ExplorationEngine()
+
+        error_endpoints = ["/api/error1", "/api/error2"]
+
+        def mock_execute(action):
+            if action.endpoint in error_endpoints:
+                return {
+                    "data": {"error": "Server error"},
+                    "status_code": 500,
+                    "duration_ms": 5.0,
+                    "success": False,
+                    "error": "HTTP 500",
+                }
+            return {
+                "data": {},
+                "status_code": 200,
+                "duration_ms": 5.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[
+                Action(method="GET", endpoint="/api/ok"),
+                Action(method="GET", endpoint="/api/error1"),
+                Action(method="GET", endpoint="/api/error2"),
+            ],
+        )
+
+        # Should not raise, should handle errors gracefully
+        graph = engine.explore_bfs(initial_state)
+
+        # Should still have transitions (even failed ones are recorded)
+        assert len(graph.transitions) == 3
+
+        # Check that failed transitions are marked correctly
+        failed = [t for t in graph.transitions if not t.success]
+        assert len(failed) == 2
+
+    def test_explore_bfs_exclude_patterns(self):
+        """Test that explore_bfs respects exclude patterns."""
+        config = ExplorationConfig(exclude_patterns=["/admin/", "/internal/"])
+        engine = ExplorationEngine(config=config)
+
+        executed_endpoints = []
+
+        def mock_execute(action):
+            executed_endpoints.append(action.endpoint)
+            return {
+                "data": {},
+                "status_code": 200,
+                "duration_ms": 5.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[
+                Action(method="GET", endpoint="/api/public"),
+                Action(method="GET", endpoint="/admin/secret"),
+                Action(method="GET", endpoint="/internal/debug"),
+            ],
+        )
+
+        engine.explore_bfs(initial_state)
+
+        # Only /api/public should be executed
+        assert "/api/public" in executed_endpoints
+        assert "/admin/secret" not in executed_endpoints
+        assert "/internal/debug" not in executed_endpoints
+
+    def test_explore_bfs_include_patterns(self):
+        """Test that explore_bfs respects include patterns."""
+        config = ExplorationConfig(include_patterns=["/api/v1/"])
+        engine = ExplorationEngine(config=config)
+
+        executed_endpoints = []
+
+        def mock_execute(action):
+            executed_endpoints.append(action.endpoint)
+            return {
+                "data": {},
+                "status_code": 200,
+                "duration_ms": 5.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[
+                Action(method="GET", endpoint="/api/v1/users"),
+                Action(method="GET", endpoint="/api/v2/users"),
+                Action(method="GET", endpoint="/other/endpoint"),
+            ],
+        )
+
+        engine.explore_bfs(initial_state)
+
+        # Only /api/v1/users should be executed
+        assert "/api/v1/users" in executed_endpoints
+        assert "/api/v2/users" not in executed_endpoints
+        assert "/other/endpoint" not in executed_endpoints
+
+
+class TestExecuteActionSync:
+    """Test synchronous action execution."""
+
+    def test_execute_action_sync_returns_state_and_transition(self):
+        """Test that execute_action_sync returns a State and Transition."""
+        engine = ExplorationEngine(base_url="http://test.local")
+
+        # Mock the HTTP execution
+        def mock_execute(action):
+            return {
+                "data": {"id": 1, "name": "Test"},
+                "status_code": 200,
+                "duration_ms": 15.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        action = Action(method="GET", endpoint="/api/users/1")
+
+        state, transition = engine.execute_action_sync(action)
+
+        assert isinstance(state, State)
+        assert isinstance(transition, Transition)
+        assert transition.success is True
+        assert transition.status_code == 200
+        assert transition.duration_ms == 15.0
+
+    def test_execute_action_sync_with_from_state(self):
+        """Test execute_action_sync with explicit from_state."""
+        engine = ExplorationEngine()
+
+        def mock_execute(action):
+            return {
+                "data": {},
+                "status_code": 200,
+                "duration_ms": 10.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        from_state = State(id="my_state", name="My State")
+        action = Action(method="GET", endpoint="/test")
+
+        _, transition = engine.execute_action_sync(action, from_state=from_state)
+
+        assert transition.from_state == "my_state"
+
+    def test_execute_action_sync_creates_synthetic_state_if_none(self):
+        """Test that execute_action_sync creates synthetic state when no from_state given."""
+        engine = ExplorationEngine()
+
+        def mock_execute(action):
+            return {
+                "data": {},
+                "status_code": 200,
+                "duration_ms": 10.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        action = Action(method="GET", endpoint="/test")
+
+        _, transition = engine.execute_action_sync(action)
+
+        assert transition.from_state == "synthetic_start"
+
+    def test_execute_action_sync_handles_failure(self):
+        """Test execute_action_sync handles failures correctly."""
+        engine = ExplorationEngine()
+
+        def mock_execute(action):
+            return {
+                "data": {"error": "Not found"},
+                "status_code": 404,
+                "duration_ms": 5.0,
+                "success": False,
+                "error": "HTTP 404",
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        action = Action(method="GET", endpoint="/api/missing")
+
+        state, transition = engine.execute_action_sync(action)
+
+        assert transition.success is False
+        assert transition.status_code == 404
+        assert transition.error is not None
+
+
+class TestExploreBFSWithHTTPMocking:
+    """Test explore_bfs with HTTP mocking via respx."""
+
+    @pytest.fixture
+    def mock_api(self):
+        """Set up mock API responses."""
+        import respx
+        from httpx import Response
+
+        with respx.mock:
+            respx.get("http://test.local/api/users").mock(
+                return_value=Response(200, json={"users": [{"id": 1}]})
+            )
+            respx.get("http://test.local/api/items").mock(
+                return_value=Response(200, json={"items": []})
+            )
+            respx.post("http://test.local/api/users").mock(
+                return_value=Response(201, json={"id": 2, "name": "New"})
+            )
+            respx.get("http://test.local/api/error").mock(
+                return_value=Response(500, json={"error": "Server Error"})
+            )
+            yield
+
+    def test_explore_bfs_with_real_http_mocking(self, mock_api):
+        """Test explore_bfs with mocked HTTP endpoints."""
+        config = ExplorationConfig(max_states=10, max_depth=3)
+        engine = ExplorationEngine(config=config, base_url="http://test.local")
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[
+                Action(method="GET", endpoint="/api/users"),
+                Action(method="GET", endpoint="/api/items"),
+            ],
+        )
+
+        graph = engine.explore_bfs(initial_state)
+
+        # Should have explored the endpoints
+        assert len(graph.transitions) >= 2
+
+        # Check transitions exist for each endpoint
+        endpoints = {t.action.endpoint for t in graph.transitions}
+        assert "/api/users" in endpoints
+        assert "/api/items" in endpoints
+
+    def test_explore_bfs_handles_500_errors(self, mock_api):
+        """Test that explore_bfs handles 500 errors from mocked API."""
+        config = ExplorationConfig(max_states=10, max_depth=3)
+        engine = ExplorationEngine(config=config, base_url="http://test.local")
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[
+                Action(method="GET", endpoint="/api/users"),
+                Action(method="GET", endpoint="/api/error"),
+            ],
+        )
+
+        graph = engine.explore_bfs(initial_state)
+
+        # Should have recorded both transitions
+        assert len(graph.transitions) == 2
+
+        # Should have recorded issue for the error
+        assert len(engine.issues) >= 1
+
+        # The error transition should be marked as failed
+        error_transition = next(
+            (t for t in graph.transitions if t.action.endpoint == "/api/error"),
+            None
+        )
+        assert error_transition is not None
+        assert error_transition.success is False
+
+
+class TestCoverageReportSync:
+    """Test coverage report with synchronous exploration."""
+
+    def test_coverage_report_after_sync_exploration(self):
+        """Test coverage report generation after sync BFS exploration."""
+        engine = ExplorationEngine()
+
+        executed = []
+
+        def mock_execute(action):
+            executed.append(action.endpoint)
+            return {
+                "data": {},
+                "status_code": 200,
+                "duration_ms": 5.0,
+                "success": True,
+                "error": None,
+            }
+
+        engine._execute_action_sync = mock_execute
+
+        initial_state = State(
+            id="initial",
+            name="Initial",
+            available_actions=[
+                Action(method="GET", endpoint="/api/a"),
+                Action(method="GET", endpoint="/api/b"),
+            ],
+        )
+
+        engine.explore_bfs(initial_state)
+
+        report = engine.get_coverage_report()
+
+        assert isinstance(report, CoverageReport)
+        assert report.states_found >= 1
+        assert report.transitions_found >= 2
+        assert report.endpoints_tested >= 2
+        assert report.coverage_percent > 0
+
+
+class TestMaxStatesProperty:
+    """Test max_states property."""
+
+    def test_max_states_getter(self):
+        """Test max_states property getter."""
+        config = ExplorationConfig(max_states=50)
+        engine = ExplorationEngine(config=config)
+
+        assert engine.max_states == 50
+
+    def test_max_states_setter(self):
+        """Test max_states property setter."""
+        engine = ExplorationEngine()
+        engine.max_states = 75
+
+        assert engine.max_states == 75
+        assert engine.config.max_states == 75
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
