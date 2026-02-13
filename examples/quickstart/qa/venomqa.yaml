@@ -4,6 +4,9 @@
 # Base URL for the API under test
 base_url: "http://localhost:8000"
 
+# Skip Docker infrastructure management (we handle it in run.sh)
+skip_infra: true
+
 # Request timeout in seconds
 timeout: 30
 
