@@ -141,9 +141,9 @@ if [ "$DEBUG" = true ]; then
 fi
 
 if [ "$WATCH" = true ]; then
-    venomqa watch $VENOMQA_ARGS
+    venomqa watch --no-infra $VENOMQA_ARGS
 else
-    venomqa run $VENOMQA_ARGS
+    venomqa run --no-infra $VENOMQA_ARGS
 fi
 
 EXIT_CODE=$?
