@@ -80,8 +80,14 @@ __all__ = [
     "ExplorationReporter",
     "ReportFormat",
     "StateExplorer",
-    # Context functions
+    # Context functions (legacy from detector)
     "extract_context",
+    # Context utilities (new robust implementation)
+    "ExplorationContext",
+    "extract_context_from_response",
     "substitute_path_params",
     "generate_state_name",
+    "has_unresolved_placeholders",
+    "get_required_placeholders",
+    "can_resolve_endpoint",
 ]
