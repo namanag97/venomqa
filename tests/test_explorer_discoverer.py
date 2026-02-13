@@ -260,8 +260,8 @@ class TestParseOpenAPISpec:
 
         # Should have endpoints: GET/POST /users, GET/PUT/DELETE /users/{userId},
         # GET/POST /items, GET /health, GET /internal/admin
-        # That's 10 total endpoints
-        assert len(actions) == 10
+        # That's 9 total endpoints
+        assert len(actions) == 9
 
     def test_parse_extracts_methods(self):
         """Test that all HTTP methods are extracted."""
