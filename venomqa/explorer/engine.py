@@ -1568,7 +1568,7 @@ class ExplorationEngine:
 
                     # Generate unique state ID
                     state_id = self._generate_chain_state_id(
-                        new_context,
+                        new_context.to_dict(),
                         resolved_endpoint,
                         action.method,
                         status_code,
@@ -1579,7 +1579,7 @@ class ExplorationEngine:
                         response_data,
                         resolved_endpoint,
                         action.method,
-                        new_context,
+                        new_context.to_dict(),
                         initial_actions,
                     )
 
@@ -1587,7 +1587,7 @@ class ExplorationEngine:
                     new_chain_state = ChainState(
                         id=state_id,
                         name=state_name,
-                        context=new_context.copy(),
+                        context=new_context.to_dict(),
                         response=response_data,
                         available_actions=new_actions,
                         depth=current_state.depth + 1,
