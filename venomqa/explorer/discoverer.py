@@ -492,6 +492,13 @@ class APIDiscoverer:
         """
         Extract an example request body from OpenAPI requestBody.
 
+        Supports multiple content types with preference order:
+        1. application/json
+        2. application/x-www-form-urlencoded
+        3. multipart/form-data
+        4. text/plain
+        5. Any other content type
+
         Args:
             request_body: OpenAPI requestBody object
 
@@ -500,24 +507,58 @@ class APIDiscoverer:
         """
         content = request_body.get("content", {})
 
-        # Prefer application/json
-        json_content = content.get("application/json", {})
-        if json_content:
-            # Check for direct example
-            if "example" in json_content:
-                return json_content["example"]
+        # Priority order for content types
+        content_type_priority = [
+            "application/json",
+            "application/x-www-form-urlencoded",
+            "multipart/form-data",
+            "text/plain",
+        ]
 
-            # Check for examples (multiple)
-            examples = json_content.get("examples", {})
-            if examples:
-                first_example = next(iter(examples.values()), {})
-                if "value" in first_example:
-                    return first_example["value"]
+        # Find the best content type
+        selected_content = None
+        selected_type = None
 
-            # Try to build from schema
-            schema = json_content.get("schema", {})
-            if schema:
-                return self._build_example_from_schema(schema)
+        for ct in content_type_priority:
+            if ct in content:
+                selected_content = content[ct]
+                selected_type = ct
+                break
+
+        # Fall back to first available content type
+        if not selected_content and content:
+            selected_type = next(iter(content.keys()))
+            selected_content = content[selected_type]
+
+        if not selected_content:
+            return None
+
+        # Check for direct example
+        if "example" in selected_content:
+            return selected_content["example"]
+
+        # Check for examples (multiple)
+        examples = selected_content.get("examples", {})
+        if examples:
+            first_example = next(iter(examples.values()), {})
+            if "value" in first_example:
+                return first_example["value"]
+
+        # Try to build from schema
+        schema = selected_content.get("schema", {})
+        if schema:
+            # Resolve schema ref if present
+            if "$ref" in schema:
+                schema = self._resolve_ref(schema["$ref"])
+
+            result = self._build_example_from_schema(schema)
+
+            # For form data types, ensure we return a dict-like structure
+            if selected_type in ("application/x-www-form-urlencoded", "multipart/form-data"):
+                if not isinstance(result, dict):
+                    result = {"data": result}
+
+            return result
 
         return None
 
