@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint typecheck format build clean docker-build docker-test publish run
+.PHONY: help install dev test lint typecheck format build clean docker-build docker-test publish run docs docs-serve docs-build setup quickstart preflight doctor init
 
 PYTHON := python
 PIP := pip
@@ -11,6 +11,13 @@ VERSION := $(shell $(PYTHON) -c "import tomllib; print(tomllib.load(open('pyproj
 
 help:
 	@echo "VenomQA - Available targets:"
+	@echo ""
+	@echo "  Quick Start:"
+	@echo "    setup          One-click setup (Python script)"
+	@echo "    quickstart     Quick setup (Bash script)"
+	@echo "    init           Initialize a new VenomQA project"
+	@echo "    preflight      Run preflight checks"
+	@echo "    doctor         Run system health checks"
 	@echo ""
 	@echo "  Development:"
 	@echo "    install        Install dependencies"
@@ -29,6 +36,11 @@ help:
 	@echo "    typecheck      Run mypy type checking"
 	@echo "    format         Format code with black"
 	@echo "    format-check   Check code formatting"
+	@echo ""
+	@echo "  Documentation:"
+	@echo "    docs           Serve documentation locally"
+	@echo "    docs-serve     Serve documentation locally (http://localhost:8000)"
+	@echo "    docs-build     Build documentation"
 	@echo ""
 	@echo "  Build & Package:"
 	@echo "    build          Build package"
@@ -139,6 +151,17 @@ report:
 
 run:
 	$(PYTHON) -m venomqa.cli
+
+docs: docs-serve
+
+docs-serve:
+	mkdocs serve
+
+docs-build:
+	mkdocs build --strict
+
+docs-deploy:
+	mkdocs gh-deploy
 
 ci: lint typecheck test-coverage
 	@echo "CI checks passed!"
