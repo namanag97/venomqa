@@ -1,6 +1,8 @@
 # Medusa E-commerce QA with VenomQA
 
-Complete QA test suite for [Medusa](https://medusajs.com/) e-commerce platform using VenomQA's stateful journey testing and state exploration.
+Complete QA test suite for a Medusa-style e-commerce API using VenomQA's stateful journey testing and state exploration.
+
+> **Note**: This example uses a FastAPI-based mock Medusa API for quick testing and demonstration. The API structure mimics the real [Medusa](https://medusajs.com/) e-commerce platform.
 
 ## Overview
 
