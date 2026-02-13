@@ -1774,8 +1774,12 @@ class ExplorationEngine:
             ))
 
         # Add initial actions that might now be resolvable
+        # Convert dict context to ExplorationContext for substitution
+        exp_context = ExplorationContext()
+        exp_context.update(context)
+
         for action in initial_actions:
-            resolved = substitute_path_params(action.endpoint, context)
+            resolved = substitute_path_params(action.endpoint, exp_context)
             if resolved:
                 add_action(Action(
                     method=action.method,
