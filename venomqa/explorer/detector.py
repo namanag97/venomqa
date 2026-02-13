@@ -914,3 +914,344 @@ class StateDetector:
             List of all cached State objects
         """
         return list(self.known_states.values())
+
+
+def extract_context(
+    response_json: Dict[str, Any],
+    endpoint: Optional[str] = None,
+    existing_context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Extract relevant context data from an API response.
+
+    This function extracts IDs, tokens, and other relevant data that can be
+    used to parameterize subsequent API calls in the exploration chain.
+
+    Rules:
+    1. Extract any field named "id" or ending in "_id" or "Id"
+    2. Extract tokens (access_token, token, auth_token, etc.)
+    3. Infer context key from endpoint when field is just "id"
+    4. Preserve existing context and add new values
+
+    Args:
+        response_json: The API response data to extract from
+        endpoint: The endpoint that was called (for inferring context keys)
+        existing_context: Existing context to extend
+
+    Returns:
+        Updated context dictionary with extracted values
+
+    Example:
+        >>> response = {"id": 42, "title": "Test", "completed": False}
+        >>> ctx = extract_context(response, endpoint="/todos")
+        >>> print(ctx)
+        {'todo_id': 42}
+
+        >>> response = {"id": "abc-123", "filename": "doc.pdf", "todo_id": 42}
+        >>> ctx = extract_context(response, endpoint="/todos/42/attachments")
+        >>> print(ctx)
+        {'attachment_id': 'abc-123', 'todo_id': 42}
+    """
+    context = dict(existing_context) if existing_context else {}
+
+    if not isinstance(response_json, dict):
+        return context
+
+    def _flatten_dict(d: Dict[str, Any], prefix: str = "") -> List[Tuple[str, Any]]:
+        """Flatten a nested dictionary into key-value pairs."""
+        items: List[Tuple[str, Any]] = []
+        for key, value in d.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                items.extend(_flatten_dict(value, full_key))
+            elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
+                # For arrays of objects, extract from first item as example
+                items.extend(_flatten_dict(value[0], f"{full_key}[0]"))
+            else:
+                items.append((full_key, value))
+        return items
+
+    # Infer entity type from endpoint
+    entity_type = _infer_entity_type_from_endpoint(endpoint) if endpoint else None
+
+    # Flatten response to handle nested structures
+    flat_items = _flatten_dict(response_json)
+
+    for key, value in flat_items:
+        # Get the simple key (last part after dots)
+        simple_key = key.split(".")[-1].replace("[0]", "")
+
+        # Skip null/None values
+        if value is None:
+            continue
+
+        # Handle ID fields
+        if simple_key == "id" or simple_key == "_id":
+            # Infer context key from endpoint entity type
+            if entity_type:
+                context_key = f"{entity_type}_id"
+            else:
+                context_key = "id"
+            context[context_key] = value
+
+        elif simple_key.endswith("_id"):
+            # Field already has _id suffix
+            context[simple_key] = value
+
+        elif simple_key.endswith("Id"):
+            # Convert camelCase to snake_case
+            # e.g., todoId -> todo_id
+            snake_key = _camel_to_snake(simple_key)
+            context[snake_key] = value
+
+        # Handle token fields
+        elif simple_key.lower() in {"token", "access_token", "auth_token", "bearer", "jwt"}:
+            context["auth_token"] = value
+
+        elif simple_key.lower() == "refresh_token":
+            context["refresh_token"] = value
+
+        elif simple_key.lower() == "api_key":
+            context["api_key"] = value
+
+        # Handle status fields (useful for state naming)
+        elif simple_key.lower() in {"status", "state", "completed"}:
+            context[f"_{simple_key}"] = value
+
+    return context
+
+
+def substitute_path_params(
+    endpoint: str,
+    context: Dict[str, Any],
+) -> Optional[str]:
+    """
+    Substitute path parameters with actual values from context.
+
+    Handles various naming conventions for path parameters:
+    - {todoId} -> looks for todo_id in context
+    - {todo_id} -> looks for todo_id in context
+    - {id} -> looks for most recently extracted ID based on endpoint
+
+    Args:
+        endpoint: The endpoint with path parameters (e.g., "/todos/{todoId}")
+        context: Context dictionary with extracted values
+
+    Returns:
+        The endpoint with substituted values, or None if any param can't be resolved
+
+    Example:
+        >>> ctx = {"todo_id": 42, "attachment_id": "abc-123"}
+        >>> substitute_path_params("/todos/{todoId}", ctx)
+        '/todos/42'
+
+        >>> substitute_path_params("/todos/{todoId}/attachments/{fileId}", ctx)
+        '/todos/42/attachments/abc-123'
+
+        >>> substitute_path_params("/users/{userId}", ctx)
+        None  # Can't resolve userId
+    """
+    if "{" not in endpoint:
+        return endpoint
+
+    result = endpoint
+    params = re.findall(r"\{(\w+)\}", endpoint)
+
+    for param in params:
+        value = None
+
+        # Try exact match first
+        if param in context:
+            value = context[param]
+
+        # Try snake_case version
+        elif _camel_to_snake(param) in context:
+            value = context[_camel_to_snake(param)]
+
+        # Try with _id suffix
+        elif param.lower() + "_id" in context:
+            value = context[param.lower() + "_id"]
+
+        # Try converting camelCase param to snake_case with _id
+        # e.g., {todoId} -> todo_id
+        elif param.endswith("Id"):
+            snake_key = _camel_to_snake(param)
+            if snake_key in context:
+                value = context[snake_key]
+            # Also try without the _id suffix replaced
+            # e.g., {fileId} -> might be attachment_id
+            base = param[:-2].lower()  # Remove "Id"
+            if f"{base}_id" in context:
+                value = context[f"{base}_id"]
+
+        # Special case: {id} - try to infer from endpoint
+        elif param == "id":
+            entity_type = _infer_entity_type_from_endpoint(endpoint)
+            if entity_type and f"{entity_type}_id" in context:
+                value = context[f"{entity_type}_id"]
+            elif "id" in context:
+                value = context["id"]
+
+        # Handle fileId -> attachment_id mapping
+        elif param.lower() in {"fileid", "file_id"}:
+            if "attachment_id" in context:
+                value = context["attachment_id"]
+            elif "file_id" in context:
+                value = context["file_id"]
+
+        if value is None:
+            # Can't resolve this parameter
+            return None
+
+        result = result.replace(f"{{{param}}}", str(value))
+
+    return result
+
+
+def generate_state_name(
+    context: Dict[str, Any],
+    response: Optional[Dict[str, Any]] = None,
+    status_code: Optional[int] = None,
+) -> str:
+    """
+    Generate a human-readable state name based on context.
+
+    Creates meaningful state names like:
+    - "Anonymous"
+    - "Anonymous | Todo:42"
+    - "Anonymous | Todo:42 | Completed"
+    - "Authenticated | User:1 | Todo:42"
+    - "Error:404"
+
+    Args:
+        context: The accumulated context dictionary
+        response: Optional response data for additional state info
+        status_code: HTTP status code if available
+
+    Returns:
+        A human-readable state name
+
+    Example:
+        >>> ctx = {"todo_id": 42, "_completed": True}
+        >>> generate_state_name(ctx)
+        'Anonymous | Todo:42 | Completed'
+    """
+    parts: List[str] = []
+
+    # Authentication status
+    if context.get("auth_token") or context.get("user_id"):
+        if context.get("user_id"):
+            parts.append(f"User:{context['user_id']}")
+        else:
+            parts.append("Authenticated")
+    else:
+        parts.append("Anonymous")
+
+    # Entity IDs in order of typical creation
+    entity_order = [
+        ("user_id", "User"),
+        ("todo_id", "Todo"),
+        ("order_id", "Order"),
+        ("item_id", "Item"),
+        ("attachment_id", "Attachment"),
+        ("file_id", "File"),
+    ]
+
+    for key, label in entity_order:
+        if key in context and key != "user_id":  # user_id already handled above
+            parts.append(f"{label}:{context[key]}")
+
+    # Status indicators
+    if context.get("_completed") is True:
+        parts.append("Completed")
+    elif context.get("_status"):
+        parts.append(str(context["_status"]).title())
+
+    # Error status
+    if status_code and status_code >= 400:
+        parts.append(f"Error:{status_code}")
+
+    return " | ".join(parts) if parts else "Initial"
+
+
+def _infer_entity_type_from_endpoint(endpoint: Optional[str]) -> Optional[str]:
+    """
+    Infer entity type from endpoint path.
+
+    Args:
+        endpoint: The API endpoint (e.g., "/todos", "/users/123")
+
+    Returns:
+        Inferred entity type (singular) or None
+
+    Example:
+        >>> _infer_entity_type_from_endpoint("/todos")
+        'todo'
+        >>> _infer_entity_type_from_endpoint("/api/v1/users/123")
+        'user'
+        >>> _infer_entity_type_from_endpoint("/todos/42/attachments")
+        'attachment'
+    """
+    if not endpoint:
+        return None
+
+    # Remove leading slash and split
+    path = endpoint.lstrip("/")
+    segments = path.split("/")
+
+    # Skip common prefixes
+    skip_prefixes = {"api", "v1", "v2", "v3", "rest", "graphql"}
+
+    # Find the last entity segment (not an ID)
+    entity_type = None
+    for segment in segments:
+        # Skip version numbers and common prefixes
+        if segment.lower() in skip_prefixes:
+            continue
+        if re.match(r"^v\d+$", segment.lower()):
+            continue
+
+        # Skip IDs (numeric, UUID-like, or path params)
+        if re.match(r"^\d+$", segment):
+            continue
+        if re.match(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            segment.lower()
+        ):
+            continue
+        if segment.startswith("{") and segment.endswith("}"):
+            continue
+
+        # Found a likely entity type
+        entity_type = segment
+
+    if entity_type:
+        # Singularize if ends with 's' (simple heuristic)
+        if entity_type.endswith("ies"):
+            return entity_type[:-3] + "y"  # e.g., "categories" -> "category"
+        elif entity_type.endswith("s") and len(entity_type) > 2:
+            return entity_type[:-1]  # e.g., "todos" -> "todo"
+        return entity_type
+
+    return None
+
+
+def _camel_to_snake(name: str) -> str:
+    """
+    Convert camelCase to snake_case.
+
+    Args:
+        name: camelCase string
+
+    Returns:
+        snake_case string
+
+    Example:
+        >>> _camel_to_snake("todoId")
+        'todo_id'
+        >>> _camel_to_snake("userId")
+        'user_id'
+    """
+    # Insert underscore before uppercase letters and convert to lowercase
+    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
