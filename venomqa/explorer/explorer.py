@@ -120,8 +120,21 @@ class StateExplorer:
         self._pre_action_hooks: List[Callable[[Action], None]] = []
         self._post_action_hooks: List[Callable[[Action, Any], None]] = []
 
-        # TODO: Initialize HTTP client
-        # TODO: Set up engine callbacks
+        # Discovered actions cache
+        self._discovered_actions: List[Action] = []
+
+        # Initialize HTTP client (lazy - created on first use)
+        import httpx
+        self._http_client = httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=self.config.request_timeout_seconds,
+            follow_redirects=self.config.follow_redirects,
+            verify=self.config.verify_ssl,
+            headers=self.config.headers,
+        )
+
+        # Set up engine callbacks
+        self.engine.set_state_detector(self.detector.detect_state)
 
     async def explore(
         self,
