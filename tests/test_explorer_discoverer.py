@@ -509,6 +509,34 @@ class TestDiscovererClearAndState:
         assert discoverer.get_endpoint_count() == 2
 
 
+class TestFromOpenAPI:
+    """Test the from_openapi convenience method."""
+
+    def test_from_openapi_loads_file(self):
+        """Test from_openapi loads a spec file."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+        actions = discoverer.from_openapi(str(TEST_OPENAPI_JSON))
+
+        assert len(actions) == 9
+        methods = {a.method for a in actions}
+        assert "GET" in methods
+        assert "POST" in methods
+
+    def test_from_openapi_nonexistent_file_raises_error(self):
+        """Test from_openapi raises FileNotFoundError for missing files."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        with pytest.raises(FileNotFoundError):
+            discoverer.from_openapi("/nonexistent/path/openapi.json")
+
+    def test_from_openapi_directory_raises_error(self):
+        """Test from_openapi raises ValueError for directories."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        with pytest.raises(ValueError, match="not a file"):
+            discoverer.from_openapi(str(FIXTURES_DIR))
+
+
 class TestParseOpenAPIYAML:
     """Test parsing YAML OpenAPI specs."""
 
