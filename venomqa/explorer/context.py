@@ -110,16 +110,21 @@ def _normalize_key(key: str) -> str:
     if key.isupper():
         return key.lower()
 
-    # Convert camelCase to snake_case
-    # Insert underscore before uppercase letters, then lowercase everything
-    result = re.sub(r'([A-Z])', r'_\1', key).lower()
+    # Handle consecutive uppercase letters (e.g., "userID" -> "user_id", "APIKey" -> "api_key")
+    # First, handle sequences of uppercase followed by lowercase (e.g., "APIKey" -> "API_Key")
+    result = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1_\2', key)
 
-    # Remove leading underscore if present
-    if result.startswith('_'):
-        result = result[1:]
+    # Then handle lowercase followed by uppercase (e.g., "userId" -> "user_Id")
+    result = re.sub(r'([a-z\d])([A-Z])', r'\1_\2', result)
+
+    # Lowercase everything
+    result = result.lower()
 
     # Handle double underscores
     result = re.sub(r'_+', '_', result)
+
+    # Remove leading/trailing underscores
+    result = result.strip('_')
 
     return result
 
