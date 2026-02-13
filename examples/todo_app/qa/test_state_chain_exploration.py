@@ -24,7 +24,8 @@ from venomqa.explorer import (
     ExplorationEngine,
     ExplorationConfig,
     Action,
-    extract_context,
+    ExplorationContext,
+    extract_context_from_response,
     substitute_path_params,
     generate_state_name,
 )
