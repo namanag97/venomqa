@@ -296,7 +296,10 @@ def get_health_checks() -> list[HealthCheck]:
         HealthCheck("Journeys Directory", check_journeys_directory, required=False),
         HealthCheck("Graphviz", check_graphviz, required=False),
         HealthCheck("PostgreSQL Client", check_postgresql_client, required=False),
+        HealthCheck("Redis Client", check_redis_client, required=False),
         HealthCheck("Git", check_git, required=False),
+        HealthCheck("Disk Space", check_disk_space, required=False),
+        HealthCheck("Port Scan", check_common_ports, required=False),
     ]
 
 
