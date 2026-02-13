@@ -512,11 +512,29 @@ class APIDiscoverer:
         Args:
             endpoints: List of (method, path) tuples to use as seeds
         """
-        # TODO: Implement seed endpoint registration
-        # 1. Validate endpoint format
-        # 2. Create Action objects
-        # 3. Add to discovered_actions
-        raise NotImplementedError("add_seed_endpoints() not yet implemented")
+        valid_methods = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}
+
+        for method, path in endpoints:
+            # Validate method
+            method_upper = method.upper()
+            if method_upper not in valid_methods:
+                continue
+
+            # Normalize path
+            normalized_path = self._normalize_endpoint(path)
+
+            # Check include/exclude patterns
+            if not self._should_include_endpoint(normalized_path):
+                continue
+
+            # Create Action
+            action = Action(
+                method=method_upper,
+                endpoint=normalized_path,
+            )
+
+            self.discovered_actions.add(action)
+            self.discovered_endpoints.add(normalized_path)
 
     def _should_include_endpoint(self, endpoint: str) -> bool:
         """
