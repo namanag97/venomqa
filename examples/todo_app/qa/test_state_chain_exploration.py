@@ -313,36 +313,42 @@ def test_generate_state_name():
     print("=" * 70)
 
     # Test 1: Anonymous state
-    ctx = {}
-    name = generate_state_name(ctx)
+    ctx = ExplorationContext()
+    name = generate_state_name(ctx, {})
     print(f"\nTest 1: Empty context")
     print(f"  Result: {name}")
     assert "Anonymous" in name, f"Expected Anonymous, got {name}"
     print("  PASS")
 
     # Test 2: With todo_id
-    ctx = {"todo_id": 42}
-    name = generate_state_name(ctx)
+    ctx = ExplorationContext()
+    ctx.set("todo_id", 42)
+    name = generate_state_name(ctx, {})
     print(f"\nTest 2: With todo_id")
-    print(f"  Context: {ctx}")
+    print(f"  Context: {ctx.to_dict()}")
     print(f"  Result: {name}")
     assert "Todo:42" in name, f"Expected Todo:42, got {name}"
     print("  PASS")
 
     # Test 3: With completed status
-    ctx = {"todo_id": 42, "_completed": True}
-    name = generate_state_name(ctx)
+    ctx = ExplorationContext()
+    ctx.set("todo_id", 42)
+    ctx.set("completed", True)
+    name = generate_state_name(ctx, {"completed": True})
     print(f"\nTest 3: With completed status")
-    print(f"  Context: {ctx}")
+    print(f"  Context: {ctx.to_dict()}")
     print(f"  Result: {name}")
     assert "Todo:42" in name and "Completed" in name, f"Expected Todo:42 | Completed, got {name}"
     print("  PASS")
 
     # Test 4: Authenticated user
-    ctx = {"auth_token": "abc", "user_id": 1, "todo_id": 42}
-    name = generate_state_name(ctx)
+    ctx = ExplorationContext()
+    ctx.set("auth_token", "abc")
+    ctx.set("user_id", 1)
+    ctx.set("todo_id", 42)
+    name = generate_state_name(ctx, {})
     print(f"\nTest 4: Authenticated user")
-    print(f"  Context: {ctx}")
+    print(f"  Context: {ctx.to_dict()}")
     print(f"  Result: {name}")
     assert "User:1" in name and "Todo:42" in name, f"Expected User:1 | Todo:42, got {name}"
     print("  PASS")
