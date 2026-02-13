@@ -14,7 +14,7 @@ services:
         python mock_medusa_api.py
       "
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:9000/health\")' || exit 1"]
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9000/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 5
