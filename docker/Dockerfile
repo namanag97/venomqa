@@ -58,11 +58,11 @@ WORKDIR /app
 RUN groupadd -r venomqa && useradd -r -g venomqa venomqa
 
 # Copy and install VenomQA
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY venomqa/ ./venomqa/
 
 # Install VenomQA with minimal dependencies
-RUN pip install --no-cache-dir -e . && \
+RUN pip install --no-cache-dir . && \
     # Verify installation
     venomqa --version
 
