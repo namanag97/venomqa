@@ -177,10 +177,9 @@ class TestInferContextKeyFromEndpoint:
 
     def test_singular_ending_in_s(self):
         """Test resources that end in s but are singular."""
-        # 'address' ends in 's' but is singular
-        # Our heuristic will still convert to addres_id, which is a known limitation
+        # 'addresses' -> removes 'es' -> 'address' -> 'address_id'
         result = _infer_context_key_from_endpoint("/addresses")
-        assert result == "addresse_id"  # Known limitation with -es ending
+        assert result == "address_id"
 
     def test_special_plural_forms(self):
         """Test special plural forms."""
