@@ -2,12 +2,23 @@
 
 This module provides programmatic preflight checks that can be run
 before executing tests to ensure the environment is properly configured.
+
+Preflight checks include:
+- Python version validation (>= 3.10)
+- Required dependencies installed
+- Docker availability (optional)
+- Configuration file validation
+- Target API reachability
+- Database connection (if configured)
+- Journeys directory validation
 """
 
 from __future__ import annotations
 
+import shutil
 import socket
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from enum import Enum
