@@ -1407,3 +1407,473 @@ class ExplorationEngine:
     def max_states(self, value: int) -> None:
         """Set the maximum number of states to explore."""
         self.config.max_states = value
+
+    # =========================================================================
+    # CONTEXT-AWARE STATE CHAIN EXPLORATION
+    # =========================================================================
+
+    def explore_with_context(
+        self,
+        initial_actions: List[Action],
+        initial_context: Optional[Dict[str, Any]] = None,
+    ) -> "ChainExplorationResult":
+        """
+        Context-aware BFS exploration that passes context through the chain.
+
+        This is the REAL exploration that mimics how a human QA would test:
+        1. Execute an action (e.g., POST /todos)
+        2. Extract context from response (e.g., todo_id=42)
+        3. Use that context in next actions (e.g., GET /todos/42)
+        4. Build a deep, connected state graph
+
+        Key features:
+        - Context accumulates through the chain (IDs, tokens, etc.)
+        - Path parameters are substituted with real values from context
+        - Actions with unresolved path params are skipped (not 404'd)
+        - State names are meaningful (e.g., "Anonymous | Todo:42 | Completed")
+        - Parent-child relationships are tracked
+
+        Args:
+            initial_actions: Actions to start exploration with
+            initial_context: Optional initial context (e.g., auth token)
+
+        Returns:
+            ChainExplorationResult with the explored graph and chain states
+
+        Example:
+            >>> engine = ExplorationEngine(base_url="http://localhost:5001")
+            >>> initial_actions = [
+            ...     Action(method="GET", endpoint="/health"),
+            ...     Action(method="GET", endpoint="/todos"),
+            ...     Action(method="POST", endpoint="/todos", body={"title": "Test"}),
+            ... ]
+            >>> result = engine.explore_with_context(initial_actions)
+            >>> for state in result.chain_states.values():
+            ...     print(f"{state.name} (depth={state.depth})")
+        """
+        # Reset state
+        self.reset()
+
+        # Initialize context
+        context = dict(initial_context) if initial_context else {}
+
+        # Create initial chain state
+        initial_state = ChainState(
+            id="initial",
+            name=generate_state_name(context),
+            context=context.copy(),
+            response=None,
+            available_actions=initial_actions,
+            depth=0,
+            parent_state=None,
+            parent_action=None,
+            discovered_at=datetime.now(),
+        )
+
+        # Add to graph
+        self.graph.add_state(initial_state.to_state())
+        self.graph.initial_state = initial_state.id
+
+        # Track chain states separately (with full context)
+        chain_states: Dict[StateID, ChainState] = {initial_state.id: initial_state}
+
+        # BFS queue: (ChainState, context_copy)
+        queue: Deque[Tuple[ChainState, Dict[str, Any]]] = deque()
+        queue.append((initial_state, context.copy()))
+
+        # Track visited (state_id, action_key) to avoid loops
+        visited_actions: Set[Tuple[StateID, str]] = set()
+
+        # Track skipped actions for reporting
+        skipped_actions: List[Tuple[Action, str]] = []
+
+        max_states = self.config.max_states
+        max_depth = self.config.max_depth
+
+        while queue and len(chain_states) < max_states:
+            current_state, current_context = queue.popleft()
+
+            # Skip if at max depth
+            if current_state.depth >= max_depth:
+                continue
+
+            for action in current_state.available_actions:
+                # Check if we should explore this action
+                if not self._should_explore_action(action):
+                    continue
+
+                # Create action key
+                action_key = f"{action.method}:{action.endpoint}"
+                visit_key = (current_state.id, action_key)
+
+                if visit_key in visited_actions:
+                    continue
+                visited_actions.add(visit_key)
+
+                # Substitute path parameters with context values
+                resolved_endpoint = substitute_path_params(action.endpoint, current_context)
+
+                if resolved_endpoint is None:
+                    # Can't resolve path params - skip this action
+                    skipped_actions.append((action, "Unresolved path parameters"))
+                    logger.debug(
+                        f"Skipping {action.method} {action.endpoint} - "
+                        f"can't resolve path params with context: {current_context}"
+                    )
+                    continue
+
+                # Check state limit
+                if len(chain_states) >= max_states:
+                    break
+
+                # Create a copy of the action with resolved endpoint
+                resolved_action = Action(
+                    method=action.method,
+                    endpoint=resolved_endpoint,
+                    params=action.params,
+                    body=action.body,
+                    headers=action.headers,
+                    description=action.description,
+                    requires_auth=action.requires_auth,
+                )
+
+                try:
+                    # Execute the action
+                    response = self._execute_action_sync(resolved_action)
+                    response_data = response.get("data", {})
+                    status_code = response.get("status_code")
+                    success = response.get("success", True)
+
+                    # Extract new context from response
+                    new_context = extract_context(
+                        response_data,
+                        endpoint=resolved_endpoint,
+                        existing_context=current_context,
+                    )
+
+                    # Add status to context for state naming
+                    if status_code:
+                        new_context["_status_code"] = status_code
+
+                    # Generate state name from context
+                    state_name = generate_state_name(
+                        new_context,
+                        response=response_data,
+                        status_code=status_code,
+                    )
+
+                    # Generate unique state ID
+                    state_id = self._generate_chain_state_id(
+                        new_context,
+                        resolved_endpoint,
+                        action.method,
+                        status_code,
+                    )
+
+                    # Determine available actions for the new state
+                    new_actions = self._get_actions_for_state(
+                        response_data,
+                        resolved_endpoint,
+                        action.method,
+                        new_context,
+                        initial_actions,
+                    )
+
+                    # Create chain state
+                    new_chain_state = ChainState(
+                        id=state_id,
+                        name=state_name,
+                        context=new_context.copy(),
+                        response=response_data,
+                        available_actions=new_actions,
+                        depth=current_state.depth + 1,
+                        parent_state=current_state.id,
+                        parent_action=resolved_action,
+                        metadata={
+                            "status_code": status_code,
+                            "success": success,
+                            "original_endpoint": action.endpoint,
+                        },
+                        discovered_at=datetime.now(),
+                    )
+
+                    # Check if this is a new state
+                    is_new_state = state_id not in chain_states
+
+                    if is_new_state:
+                        chain_states[state_id] = new_chain_state
+                        self.graph.add_state(new_chain_state.to_state())
+                        self.visited_states.add(state_id)
+
+                    # Create transition
+                    transition = Transition(
+                        from_state=current_state.id,
+                        action=resolved_action,
+                        to_state=state_id,
+                        response=response_data,
+                        status_code=status_code,
+                        duration_ms=response.get("duration_ms", 0.0),
+                        success=success,
+                        error=response.get("error"),
+                        discovered_at=datetime.now(),
+                    )
+                    self.graph.add_transition(transition)
+                    self._executed_actions.add(resolved_action)
+
+                    # Add to queue for further exploration (only if new state)
+                    if is_new_state and success:
+                        queue.append((new_chain_state, new_context.copy()))
+
+                    # Record issues for errors
+                    if not success:
+                        # Only record as issue if not an expected 404 after DELETE
+                        is_expected_404 = (
+                            status_code == 404
+                            and action.method == "GET"
+                            and current_state.parent_action
+                            and current_state.parent_action.method == "DELETE"
+                        )
+
+                        if not is_expected_404:
+                            self._record_issue(
+                                severity=(
+                                    IssueSeverity.MEDIUM
+                                    if status_code and status_code < 500
+                                    else IssueSeverity.HIGH
+                                ),
+                                error=f"{action.method} {resolved_endpoint} returned {status_code}",
+                                state=current_state.id,
+                                action=resolved_action,
+                                suggestion="Check endpoint parameters and authentication",
+                            )
+
+                except Exception as e:
+                    # Record error and continue
+                    self._record_issue(
+                        severity=IssueSeverity.HIGH,
+                        error=f"Failed to execute {action.method} {resolved_endpoint}: {e}",
+                        state=current_state.id,
+                        action=resolved_action,
+                        suggestion="Check if the endpoint is reachable",
+                    )
+                    logger.warning(
+                        f"Action execution failed: {action.method} {resolved_endpoint}: {e}"
+                    )
+
+        # Create result
+        return ChainExplorationResult(
+            graph=self.graph,
+            chain_states=chain_states,
+            skipped_actions=skipped_actions,
+            issues=self.issues,
+            coverage=self.get_coverage_report(),
+        )
+
+    def _generate_chain_state_id(
+        self,
+        context: Dict[str, Any],
+        endpoint: str,
+        method: str,
+        status_code: Optional[int],
+    ) -> StateID:
+        """
+        Generate a unique state ID based on context and request.
+
+        The ID incorporates key context values to ensure states with
+        different contexts are treated as different states.
+        """
+        import hashlib
+
+        # Build a deterministic key from context
+        key_parts = []
+
+        # Include status code
+        if status_code:
+            key_parts.append(f"status:{status_code}")
+
+        # Include entity IDs in sorted order
+        entity_keys = sorted(
+            k for k in context.keys()
+            if k.endswith("_id") and not k.startswith("_")
+        )
+        for key in entity_keys:
+            key_parts.append(f"{key}:{context[key]}")
+
+        # Include status flags
+        for key in ["_completed", "_status"]:
+            if key in context:
+                key_parts.append(f"{key}:{context[key]}")
+
+        # Include method and endpoint pattern
+        key_parts.append(f"{method}:{endpoint}")
+
+        # Generate hash
+        key_str = "|".join(key_parts)
+        hash_val = hashlib.sha256(key_str.encode()).hexdigest()[:12]
+
+        return f"chain_{hash_val}"
+
+    def _get_actions_for_state(
+        self,
+        response_data: Dict[str, Any],
+        endpoint: str,
+        method: str,
+        context: Dict[str, Any],
+        initial_actions: List[Action],
+    ) -> List[Action]:
+        """
+        Determine available actions for a state based on response and context.
+
+        This generates the next possible actions based on:
+        1. HATEOAS links in the response
+        2. Standard CRUD operations based on extracted IDs
+        3. Initial actions that might now be resolvable
+        """
+        actions: List[Action] = []
+        seen: Set[str] = set()
+
+        def add_action(action: Action) -> None:
+            key = f"{action.method}:{action.endpoint}"
+            if key not in seen:
+                seen.add(key)
+                actions.append(action)
+
+        # Extract HATEOAS links from response
+        links = response_data.get("_links", response_data.get("links", {}))
+        if isinstance(links, dict):
+            for rel, link_data in links.items():
+                if isinstance(link_data, dict) and "href" in link_data:
+                    add_action(Action(
+                        method=link_data.get("method", "GET"),
+                        endpoint=link_data["href"],
+                        description=rel,
+                    ))
+
+        # Generate CRUD actions based on extracted IDs
+        if "todo_id" in context:
+            todo_id = context["todo_id"]
+            add_action(Action(method="GET", endpoint=f"/todos/{todo_id}"))
+            add_action(Action(method="PUT", endpoint=f"/todos/{todo_id}",
+                            body={"completed": True}))
+            add_action(Action(method="DELETE", endpoint=f"/todos/{todo_id}"))
+
+        if "attachment_id" in context and "todo_id" in context:
+            todo_id = context["todo_id"]
+            att_id = context["attachment_id"]
+            add_action(Action(
+                method="GET",
+                endpoint=f"/todos/{todo_id}/attachments/{att_id}"
+            ))
+            add_action(Action(
+                method="DELETE",
+                endpoint=f"/todos/{todo_id}/attachments/{att_id}"
+            ))
+
+        # Add initial actions that might now be resolvable
+        for action in initial_actions:
+            resolved = substitute_path_params(action.endpoint, context)
+            if resolved:
+                add_action(Action(
+                    method=action.method,
+                    endpoint=resolved,
+                    params=action.params,
+                    body=action.body,
+                    headers=action.headers,
+                    description=action.description,
+                ))
+
+        return actions
+
+
+class ChainExplorationResult:
+    """
+    Result of context-aware state chain exploration.
+
+    Attributes:
+        graph: The explored StateGraph
+        chain_states: Dictionary of ChainState objects with full context
+        skipped_actions: Actions that were skipped due to unresolvable params
+        issues: List of discovered issues
+        coverage: Coverage report
+    """
+
+    def __init__(
+        self,
+        graph: StateGraph,
+        chain_states: Dict[StateID, ChainState],
+        skipped_actions: List[Tuple[Action, str]],
+        issues: List[Issue],
+        coverage: CoverageReport,
+    ) -> None:
+        self.graph = graph
+        self.chain_states = chain_states
+        self.skipped_actions = skipped_actions
+        self.issues = issues
+        self.coverage = coverage
+
+    def print_graph(self) -> None:
+        """Print a text representation of the explored state graph."""
+        print("\n" + "=" * 70)
+        print("CONTEXT-AWARE STATE EXPLORATION RESULTS")
+        print("=" * 70)
+
+        print(f"\nStates discovered: {len(self.chain_states)}")
+        print(f"Transitions: {len(self.graph.transitions)}")
+        print(f"Skipped actions: {len(self.skipped_actions)}")
+        print(f"Issues found: {len(self.issues)}")
+
+        print("\n" + "-" * 70)
+        print("STATES (with context)")
+        print("-" * 70)
+
+        for state_id, state in sorted(
+            self.chain_states.items(),
+            key=lambda x: x[1].depth
+        ):
+            indent = "  " * state.depth
+            print(f"\n{indent}[{state.name}]")
+            print(f"{indent}  ID: {state_id}")
+            print(f"{indent}  Depth: {state.depth}")
+            if state.context:
+                ctx_str = ", ".join(
+                    f"{k}={v}" for k, v in state.context.items()
+                    if not k.startswith("_")
+                )
+                print(f"{indent}  Context: {ctx_str}")
+            if state.parent_action:
+                print(
+                    f"{indent}  Via: {state.parent_action.method} "
+                    f"{state.parent_action.endpoint}"
+                )
+
+        print("\n" + "-" * 70)
+        print("TRANSITIONS")
+        print("-" * 70)
+
+        for t in self.graph.transitions:
+            from_state = self.chain_states.get(t.from_state)
+            to_state = self.chain_states.get(t.to_state)
+            from_name = from_state.name if from_state else t.from_state
+            to_name = to_state.name if to_state else t.to_state
+            status = f" [{t.status_code}]" if t.status_code else ""
+            print(
+                f"  {from_name}\n"
+                f"    --[{t.action.method} {t.action.endpoint}]{status}-->\n"
+                f"  {to_name}\n"
+            )
+
+        if self.skipped_actions:
+            print("\n" + "-" * 70)
+            print("SKIPPED ACTIONS (unresolvable path params)")
+            print("-" * 70)
+            for action, reason in self.skipped_actions:
+                print(f"  {action.method} {action.endpoint}: {reason}")
+
+        if self.issues:
+            print("\n" + "-" * 70)
+            print("ISSUES")
+            print("-" * 70)
+            for issue in self.issues:
+                print(f"  [{issue.severity.value.upper()}] {issue.error}")
+
+        print("\n" + "=" * 70)
