@@ -170,8 +170,8 @@ class StateDetector:
         self.state_key_fields: List[str] = []
         self._state_hashes: Dict[str, StateID] = {}
 
-        # TODO: Initialize default extractors
-        # TODO: Set up common state detection patterns
+        # Initialize default state key fields
+        self.state_key_fields = ["status", "state", "phase"]
 
     def detect_state(
         self,

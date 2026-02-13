@@ -38,6 +38,7 @@ class APIDiscoverer:
         config: Exploration configuration
         discovered_actions: Set of discovered actions
         discovered_endpoints: Set of discovered endpoint patterns
+        _spec_components: Cached components section for $ref resolution
 
     Example:
         discoverer = APIDiscoverer(base_url="http://api.example.com")
@@ -62,6 +63,8 @@ class APIDiscoverer:
         self.config = config or ExplorationConfig()
         self.discovered_actions: Set[Action] = set()
         self.discovered_endpoints: Set[str] = set()
+        self._spec_components: Dict[str, Any] = {}
+        self._spec_security_schemes: Dict[str, Any] = {}
 
     async def discover(self) -> List[Action]:
         """
