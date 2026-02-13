@@ -186,41 +186,58 @@ def install_venomqa(python_cmd: str, editable: bool = False, dev: bool = False, 
 
         if editable:
             extras = "[dev]" if dev else ""
-            cmd = [python_cmd, "-m", "pip", "install"]
+            cmd = [python_cmd, "-m", "pip", "install", "--quiet"]
             if user:
                 cmd.append("--user")
             cmd.extend(["-e", f".{extras}"])
+            cwd = str(setup_dir)
         else:
             # Try to install from PyPI first
             extras = "[dev]" if dev else ""
-            cmd = [python_cmd, "-m", "pip", "install"]
+            cmd = [python_cmd, "-m", "pip", "install", "--quiet"]
             if user:
                 cmd.append("--user")
             cmd.append(f"venomqa{extras}")
+            cwd = None
 
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            cwd=str(setup_dir) if editable else None,
+            cwd=cwd,
         )
 
         # Check for PEP 668 error (externally managed environment)
         if result.returncode != 0:
-            if "externally-managed-environment" in result.stderr.lower() or "pep 668" in result.stderr.lower():
-                # Try with --user flag or --break-system-packages
+            stderr_lower = result.stderr.lower()
+            if "externally-managed-environment" in stderr_lower or "pep 668" in stderr_lower:
+                # Try with --user flag
                 if not user:
                     print_info("System Python detected, trying --user install...")
                     return install_venomqa(python_cmd, editable=editable, dev=dev, user=True)
             # Fall back to editable install from local if PyPI failed
             if not editable:
+                print_info("PyPI install failed, trying local install...")
+                return install_venomqa(python_cmd, editable=True, dev=dev, user=user)
+            # If editable install failed, print error
+            if result.stderr:
+                print_error(f"pip error: {result.stderr.strip()[:200]}")
+            return False
+
+        # Verify installation
+        verify_cmd = [python_cmd, "-c", "import venomqa"]
+        verify_result = subprocess.run(verify_cmd, capture_output=True)
+        if verify_result.returncode != 0:
+            if not editable:
+                print_info("Verification failed, trying local install...")
                 return install_venomqa(python_cmd, editable=True, dev=dev, user=user)
             return False
 
         return True
-    except subprocess.CalledProcessError:
+    except Exception as e:
         # Fall back to editable install from local
         if not editable:
+            print_info(f"Install failed ({e}), trying local install...")
             return install_venomqa(python_cmd, editable=True, dev=dev, user=user)
         return False
 
