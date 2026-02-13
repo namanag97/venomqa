@@ -87,6 +87,13 @@ def main():
     cart = response.json()["cart"]
     assert len(cart["items"]) == 1
     context["line_item_id"] = cart["items"][0]["id"]
+
+    # Validate cart total calculation: quantity * unit_price
+    item = cart["items"][0]
+    expected_total = item["quantity"] * item["unit_price"]
+    actual_total = cart["total"]
+    assert actual_total == expected_total, f"Cart total mismatch: expected {expected_total}, got {actual_total}"
+
     print(f"✓ Item added to cart")
     print(f"  Line item: {context['line_item_id']}")
     print(f"  Cart total: ${cart['total'] / 100}")
