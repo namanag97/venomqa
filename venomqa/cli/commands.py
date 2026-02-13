@@ -1039,32 +1039,67 @@ def _send_notifications(
 @click.option(
     "--path", "-p", "base_path", default="qa", help="Base path for QA directory (default: qa)"
 )
+@click.option(
+    "--with-sample", "-s", is_flag=True, help="Include sample journey and actions"
+)
+@click.option(
+    "--skip-checks", is_flag=True, help="Skip preflight checks"
+)
 @click.pass_context
-def init(ctx: click.Context, force: bool, base_path: str) -> None:
+def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, skip_checks: bool) -> None:
     """Initialize a new VenomQA project structure.
 
     Creates the following structure:
         qa/
-        ├── venomqa.yaml        # Configuration file
+        ├── venomqa.yaml          # Configuration file
         ├── docker-compose.qa.yml # Docker Compose for QA environment
         ├── actions/
-        │   └── __init__.py     # Reusable actions
+        │   └── __init__.py       # Reusable actions
         ├── fixtures/
-        │   └── __init__.py     # Test fixtures
+        │   └── __init__.py       # Test fixtures
         └── journeys/
-            └── __init__.py     # Journey definitions
+            └── __init__.py       # Journey definitions
+
+    Use --with-sample to also create sample actions and journeys.
     """
+    from rich.console import Console
+
+    console = Console()
+
+    # Run preflight checks first (unless skipped)
+    if not skip_checks:
+        console.print("\n[bold blue]Running preflight checks...[/bold blue]")
+        try:
+            from venomqa.cli.doctor import run_health_checks, get_health_checks
+
+            checks = get_health_checks()
+            # Only run essential checks
+            essential_checks = [c for c in checks if c.required or c.name in ["Docker", "Docker Compose"]]
+            passed, failed_required, failed_optional = run_health_checks(essential_checks, verbose=False)
+
+            if failed_required > 0:
+                console.print("\n[yellow]Some required dependencies are missing.[/yellow]")
+                console.print("You can still initialize the project, but some features may not work.")
+                if not click.confirm("Continue anyway?"):
+                    sys.exit(1)
+            console.print()
+        except Exception as e:
+            console.print(f"[yellow]Could not run preflight checks: {e}[/yellow]")
+
     base = Path(base_path)
 
     if base.exists() and not force:
-        click.echo(f"Directory '{base}' already exists. Use --force to overwrite.", err=True)
+        console.print(f"[red]Directory '{base}' already exists. Use --force to overwrite.[/red]")
         sys.exit(1)
+
+    console.print(f"[bold]Initializing VenomQA project in '{base}/'[/bold]\n")
 
     dirs_to_create = [
         base,
         base / "actions",
         base / "fixtures",
         base / "journeys",
+        base / "reports",
     ]
 
     files_to_create = [
@@ -1075,24 +1110,46 @@ def init(ctx: click.Context, force: bool, base_path: str) -> None:
         (base / "journeys" / "__init__.py", JOURNEYS_INIT_PY),
     ]
 
+    # Add sample files if requested
+    if with_sample:
+        files_to_create.extend([
+            (base / "actions" / "sample_actions.py", SAMPLE_ACTION_PY),
+            (base / "journeys" / "sample_journey.py", SAMPLE_JOURNEY_PY),
+        ])
+
+    # Create directories
     for dir_path in dirs_to_create:
         dir_path.mkdir(parents=True, exist_ok=True)
-        click.echo(f"  ✓ Created directory: {dir_path}")
+        console.print(f"  [green]OK[/green] Created directory: {dir_path}")
 
+    # Create files
     for file_path, content in files_to_create:
         if file_path.exists() and not force:
-            click.echo(f"  ⊘ Skipped (exists): {file_path}")
+            console.print(f"  [dim]--[/dim] Skipped (exists): {file_path}")
             continue
         file_path.write_text(content)
-        click.echo(f"  ✓ Created file: {file_path}")
+        console.print(f"  [green]OK[/green] Created file: {file_path}")
 
-    click.echo(f"\n✓ VenomQA project initialized in '{base}/'")
-    click.echo("\nNext steps:")
-    click.echo(f"  1. Edit {base}/venomqa.yaml to configure your environment")
-    click.echo(f"  2. Add actions in {base}/actions/")
-    click.echo(f"  3. Define fixtures in {base}/fixtures/")
-    click.echo(f"  4. Create journeys in {base}/journeys/")
-    click.echo(f"  5. Run with: venomqa run --config {base}/venomqa.yaml")
+    # Create .gitignore for reports
+    gitignore_path = base / "reports" / ".gitignore"
+    gitignore_path.write_text("*\n!.gitignore\n")
+
+    console.print(f"\n[bold green]VenomQA project initialized in '{base}/'[/bold green]")
+    console.print("\n[bold]Next steps:[/bold]")
+    console.print(f"  1. Edit [cyan]{base}/venomqa.yaml[/cyan] to configure your environment")
+    console.print(f"  2. Add actions in [cyan]{base}/actions/[/cyan]")
+    console.print(f"  3. Define fixtures in [cyan]{base}/fixtures/[/cyan]")
+    console.print(f"  4. Create journeys in [cyan]{base}/journeys/[/cyan]")
+
+    if with_sample:
+        console.print(f"\n[bold]Run your first test:[/bold]")
+        console.print(f"  cd {base} && venomqa run sample_journey")
+    else:
+        console.print(f"\n[bold]Or initialize with sample files:[/bold]")
+        console.print(f"  venomqa init --force --with-sample -p {base}")
+
+    console.print(f"\n[bold]Check system status:[/bold]")
+    console.print("  venomqa doctor")
 
 
 @cli.command("list")
