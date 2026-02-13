@@ -2415,16 +2415,14 @@ def seed(
         venomqa seed seeds/api.yaml -e users=/api/v1/users -e products=/api/v1/products
 
     \b
-    Seed file format (YAML):
+    Seed file format (YAML)::
+
         users:
           - id: user_1
             email: test@example.com
-            role: admin
         products:
           - id: product_1
-            seller_id: \${users.user_1.id}
-            title: Test Product
-            price: 99.99
+            seller_id: "{{users.user_1.id}}"
     """
     from venomqa.data import SeedConfig, SeedManager, SeedMode
 
