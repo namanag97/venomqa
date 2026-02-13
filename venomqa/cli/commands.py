@@ -27,17 +27,40 @@ EXIT_FAILURE = 1  # Some journeys failed
 EXIT_CONFIG_ERROR = 2  # Configuration error
 
 VENVOMQA_YAML_TEMPLATE = """# VenomQA Configuration
-# See documentation: https://github.com/your-org/venomqa
+# Documentation: https://venomqa.dev/docs/configuration
 
+# Target API configuration
 base_url: "http://localhost:8000"
 timeout: 30
+
+# Test execution settings
 verbose: false
 fail_fast: false
 capture_logs: true
 log_lines: 50
+
+# Report settings
 report_dir: "reports"
 
-# Port configurations for dependency injection
+# Docker Compose file for test infrastructure (optional)
+# docker_compose_file: "docker-compose.qa.yml"
+
+# Database URL for state management (optional)
+# db_url: "postgresql://user:pass@localhost:5432/testdb"
+
+# Notifications configuration (optional)
+# notifications:
+#   channels:
+#     - type: slack
+#       name: slack-qa
+#       webhook_url: ${SLACK_WEBHOOK}
+#       on: [failure, recovery]
+#     - type: discord
+#       name: discord-qa
+#       webhook_url: ${DISCORD_WEBHOOK}
+#       on: [failure]
+
+# Port configurations for dependency injection (optional)
 ports: []
   # - name: database
   #   adapter_type: postgres
@@ -47,6 +70,11 @@ ports: []
   #     database: test_db
   # - name: time
   #   adapter_type: controllable_time
+  # - name: cache
+  #   adapter_type: redis
+  #   config:
+  #     host: localhost
+  #     port: 6379
 """
 
 DOCKER_COMPOSE_QA_TEMPLATE = """# VenomQA Docker Compose for QA environment
