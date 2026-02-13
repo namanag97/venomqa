@@ -26,7 +26,6 @@ from venomqa.explorer import (
     ExplorationConfig,
     ExplorationStrategy,
     Action,
-    HttpMethod,
 )
 from venomqa.explorer.context import ExplorationContext
 
