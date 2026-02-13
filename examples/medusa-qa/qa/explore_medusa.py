@@ -53,35 +53,31 @@ async def explore_medusa():
     initial_actions = [
         # Health check
         Action(
-            id="health_check",
-            name="Health Check",
-            method=HttpMethod.GET,
-            path="/health",
+            method="GET",
+            endpoint="/health",
+            description="Health Check",
         ),
         # Store endpoints (public)
         Action(
-            id="list_products",
-            name="List Products",
-            method=HttpMethod.GET,
-            path="/store/products",
+            method="GET",
+            endpoint="/store/products",
+            description="List Products",
         ),
         Action(
-            id="create_cart",
-            name="Create Cart",
-            method=HttpMethod.POST,
-            path="/store/carts",
+            method="POST",
+            endpoint="/store/carts",
             body={},
+            description="Create Cart",
         ),
         # Admin auth
         Action(
-            id="admin_login",
-            name="Admin Login",
-            method=HttpMethod.POST,
-            path="/admin/auth",
+            method="POST",
+            endpoint="/admin/auth",
             body={
                 "email": "admin@test.com",
                 "password": "supersecret"
             },
+            description="Admin Login",
         ),
     ]
 
