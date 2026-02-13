@@ -676,25 +676,154 @@ class StateDetector:
 
         # Look for _links (HAL format)
         if "_links" in response and isinstance(response["_links"], dict):
-            for rel, link_data in response["_links"].items():
-                if isinstance(link_data, dict) and "href" in link_data:
-                    method = link_data.get("method", "GET").upper()
-                    actions.append(Action(
-                        method=method,
-                        endpoint=link_data["href"],
-                        description=rel,
-                    ))
+            actions.extend(self._parse_hal_links(response["_links"]))
 
-        # Look for links array (JSON:API format)
+        # Look for links array
         if "links" in response and isinstance(response["links"], list):
-            for link in response["links"]:
-                if isinstance(link, dict) and "href" in link:
-                    method = link.get("method", "GET").upper()
-                    actions.append(Action(
+            actions.extend(self._parse_links_array(response["links"]))
+
+        # Look for links dict (JSON:API format)
+        if "links" in response and isinstance(response["links"], dict):
+            actions.extend(self._parse_jsonapi_links(response["links"]))
+
+        # Look for actions/operations array
+        if "actions" in response and isinstance(response["actions"], list):
+            actions.extend(self._parse_actions_array(response["actions"]))
+        if "operations" in response and isinstance(response["operations"], list):
+            actions.extend(self._parse_actions_array(response["operations"]))
+
+        return actions
+
+    def _parse_hal_links(self, links: Dict[str, Any]) -> List[Action]:
+        """Parse HAL-style _links object."""
+        actions: List[Action] = []
+
+        for rel, link_data in links.items():
+            if rel == "self":
+                continue  # Skip self link
+
+            if isinstance(link_data, dict):
+                href = link_data.get("href")
+                method = link_data.get("method", "GET").upper()
+                title = link_data.get("title") or link_data.get("name") or rel
+
+                if href:
+                    actions.append(
+                        Action(
+                            method=method,
+                            endpoint=href,
+                            description=title,
+                        )
+                    )
+            elif isinstance(link_data, list):
+                # Multiple links for same rel
+                for item in link_data:
+                    if isinstance(item, dict):
+                        href = item.get("href")
+                        method = item.get("method", "GET").upper()
+                        if href:
+                            actions.append(
+                                Action(
+                                    method=method,
+                                    endpoint=href,
+                                    description=rel,
+                                )
+                            )
+
+        return actions
+
+    def _parse_links_array(self, links: List[Any]) -> List[Action]:
+        """Parse links array format."""
+        actions: List[Action] = []
+
+        for link in links:
+            if not isinstance(link, dict):
+                continue
+
+            href = link.get("href") or link.get("url") or link.get("uri")
+            rel = link.get("rel") or link.get("relation") or link.get("name")
+            method = link.get("method", "GET").upper()
+
+            if href and rel != "self":
+                actions.append(
+                    Action(
                         method=method,
-                        endpoint=link["href"],
-                        description=link.get("rel", ""),
-                    ))
+                        endpoint=href,
+                        description=rel,
+                    )
+                )
+
+        return actions
+
+    def _parse_jsonapi_links(self, links: Dict[str, Any]) -> List[Action]:
+        """Parse JSON:API style links object."""
+        actions: List[Action] = []
+
+        for rel, link in links.items():
+            if rel == "self":
+                continue
+
+            href = None
+            if isinstance(link, str):
+                href = link
+            elif isinstance(link, dict):
+                href = link.get("href")
+
+            if href:
+                # Infer method from rel name
+                method = "GET"
+                if rel in ("create", "add", "new"):
+                    method = "POST"
+                elif rel in ("update", "edit", "modify"):
+                    method = "PUT"
+                elif rel in ("delete", "remove", "destroy"):
+                    method = "DELETE"
+
+                actions.append(
+                    Action(
+                        method=method,
+                        endpoint=href,
+                        description=rel,
+                    )
+                )
+
+        return actions
+
+    def _parse_actions_array(self, actions_data: List[Any]) -> List[Action]:
+        """Parse actions/operations array."""
+        actions: List[Action] = []
+
+        for action_item in actions_data:
+            if not isinstance(action_item, dict):
+                continue
+
+            # Various ways to specify action
+            href = (
+                action_item.get("href")
+                or action_item.get("url")
+                or action_item.get("uri")
+                or action_item.get("endpoint")
+            )
+            method = (
+                action_item.get("method")
+                or action_item.get("type")
+                or "GET"
+            ).upper()
+            name = (
+                action_item.get("name")
+                or action_item.get("title")
+                or action_item.get("description")
+                or action_item.get("action")
+            )
+
+            if href:
+                actions.append(
+                    Action(
+                        method=method,
+                        endpoint=href,
+                        description=name,
+                    )
+                )
 
         return actions
 
