@@ -1,23 +1,23 @@
-version: '3.8'
-
 services:
+  # PostgreSQL database for Medusa
   postgres:
     image: postgres:15-alpine
     container_name: medusa-postgres
     environment:
-      POSTGRES_USER: medusa
-      POSTGRES_PASSWORD: medusa
-      POSTGRES_DB: medusa
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: medusa-db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U medusa"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # Redis for caching and events
   redis:
     image: redis:7-alpine
     container_name: medusa-redis
@@ -29,37 +29,55 @@ services:
       timeout: 3s
       retries: 5
 
-  medusa:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: medusa-server
+  # Medusa backend server
+  # Using a pre-built community image
+  backend:
+    image: node:20-alpine
+    container_name: medusa-backend
+    working_dir: /app/backend
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://medusa:medusa@postgres:5432/medusa
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/medusa-db
       REDIS_URL: redis://redis:6379
-      NODE_ENV: development
       JWT_SECRET: supersecret
       COOKIE_SECRET: supersecret
-      PORT: 9000
+      NODE_ENV: development
       MEDUSA_ADMIN_ONBOARDING_TYPE: default
-      MEDUSA_ADMIN_ONBOARDING_NEXTJS: false
     ports:
       - "9000:9000"
       - "7001:7001"
     volumes:
-      - medusa_uploads:/app/uploads
+      - ./backend:/app/backend
+      - backend_node_modules:/app/backend/node_modules
+    command: >
+      sh -c "
+        if [ ! -f package.json ]; then
+          echo 'Installing Medusa CLI and creating project...'
+          npm install -g @medusajs/medusa-cli@latest
+          medusa new . --skip-db --skip-env
+        fi
+        echo 'Installing dependencies...'
+        npm install
+        echo 'Running migrations...'
+        npx medusa migrations run
+        echo 'Creating admin user...'
+        npx medusa user -e admin@medusa.test -p supersecret || true
+        echo 'Seeding demo data...'
+        npx medusa seed -f ./data/seed.json || true
+        echo 'Starting Medusa server...'
+        npx medusa develop
+      "
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:9000/health"]
-      interval: 10s
-      timeout: 5s
+      interval: 15s
+      timeout: 10s
       retries: 10
-      start_period: 45s
+      start_period: 120s
 
 volumes:
   postgres_data:
-  medusa_uploads:
+  backend_node_modules:
