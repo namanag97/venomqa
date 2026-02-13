@@ -636,6 +636,98 @@ class CoverageReport(BaseModel):
         return self.model_dump()
 
 
+class ChainState(BaseModel):
+    """
+    State in the exploration chain with context tracking.
+
+    This is the core state model for context-aware state exploration.
+    It tracks accumulated context (IDs, tokens) through the exploration chain,
+    allowing proper substitution of path parameters in subsequent requests.
+
+    Attributes:
+        id: Unique identifier for this state
+        name: Human-readable name based on context
+        context: Accumulated IDs, tokens, and other extracted data
+        response: Response data that led to this state
+        available_actions: Actions that can be performed from this state
+        depth: How deep in the exploration chain (0 = initial)
+        parent_state: ID of the state this was reached from
+        parent_action: The action that led to this state
+        metadata: Additional metadata about the state
+        discovered_at: Timestamp when this state was first discovered
+    """
+
+    id: StateID = Field(..., description="Unique state identifier")
+    name: str = Field(..., description="Human-readable state name based on context")
+    context: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Accumulated context (IDs, tokens, etc.)"
+    )
+    response: Optional[Dict[str, Any]] = Field(
+        default=None, description="Response that led to this state"
+    )
+    available_actions: List[Action] = Field(
+        default_factory=list, description="Available actions from this state"
+    )
+    depth: int = Field(default=0, ge=0, description="Depth in exploration chain")
+    parent_state: Optional[StateID] = Field(
+        default=None, description="Parent state ID"
+    )
+    parent_action: Optional[Action] = Field(
+        default=None, description="Action that led to this state"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
+    discovered_at: Optional[datetime] = Field(
+        default=None, description="Discovery timestamp"
+    )
+
+    def __hash__(self) -> int:
+        """Allow ChainState to be used in sets and as dict keys."""
+        return hash(self.id)
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality based on state ID."""
+        if not isinstance(other, ChainState):
+            return False
+        return self.id == other.id
+
+    def to_state(self) -> "State":
+        """Convert to basic State for compatibility."""
+        return State(
+            id=self.id,
+            name=self.name,
+            properties={"context": self.context, "depth": self.depth},
+            available_actions=self.available_actions,
+            metadata=self.metadata,
+            discovered_at=self.discovered_at,
+        )
+
+    @classmethod
+    def from_state(
+        cls,
+        state: "State",
+        context: Optional[Dict[str, Any]] = None,
+        depth: int = 0,
+        parent_state: Optional[StateID] = None,
+        parent_action: Optional[Action] = None,
+    ) -> "ChainState":
+        """Create a ChainState from a basic State."""
+        return cls(
+            id=state.id,
+            name=state.name,
+            context=context or {},
+            response=state.properties,
+            available_actions=state.available_actions,
+            depth=depth,
+            parent_state=parent_state,
+            parent_action=parent_action,
+            metadata=state.metadata,
+            discovered_at=state.discovered_at,
+        )
+
+
 class ExplorationConfig(BaseModel):
     """
     Configuration for state exploration.
