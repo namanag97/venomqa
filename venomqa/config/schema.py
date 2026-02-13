@@ -198,6 +198,82 @@ VENOMQA_CONFIG_SCHEMA: dict[str, Any] = {
                 }
             ],
         },
+        "results_database": {
+            "type": "string",
+            "description": "Database URL for storing journey results history",
+            "default": "sqlite:///venomqa_results.db",
+            "examples": [
+                "sqlite:///venomqa_results.db",
+                "sqlite:///./reports/history.db",
+            ],
+        },
+        "persist_results": {
+            "type": "boolean",
+            "description": "Whether to automatically persist journey results",
+            "default": False,
+        },
+        "ports": {
+            "type": "array",
+            "description": "Port configurations for dependency injection",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Port name for reference in code",
+                    },
+                    "adapter_type": {
+                        "type": "string",
+                        "description": "Type of adapter (e.g., postgres, redis, time)",
+                    },
+                    "config": {
+                        "type": "object",
+                        "description": "Adapter-specific configuration",
+                        "additionalProperties": True,
+                    },
+                },
+                "required": ["name", "adapter_type"],
+            },
+            "default": [],
+        },
+        "notifications": {
+            "type": "object",
+            "description": "Notification configuration for test results",
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "description": "Notification channel configurations",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["slack", "discord", "email", "webhook"],
+                                "description": "Notification channel type",
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "Channel name for identification",
+                            },
+                            "webhook_url": {
+                                "type": "string",
+                                "description": "Webhook URL for the notification",
+                            },
+                            "on": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": ["failure", "success", "recovery", "info"],
+                                },
+                                "description": "Events that trigger notifications",
+                            },
+                        },
+                        "required": ["type", "name"],
+                    },
+                },
+            },
+            "additionalProperties": True,
+        },
     },
     "additionalProperties": False,
 }
@@ -271,6 +347,8 @@ def get_default_config() -> dict[str, Any]:
         },
         "verbose": False,
         "fail_fast": False,
+        "results_database": "sqlite:///venomqa_results.db",
+        "persist_results": False,
     }
 
 
