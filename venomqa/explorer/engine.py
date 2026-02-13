@@ -81,7 +81,19 @@ class ExplorationStrategy(str, Enum):
 class ExplorationError(Exception):
     """Exception raised when exploration fails."""
 
-    pass
+    def __init__(
+        self,
+        message: str,
+        state_id: Optional[str] = None,
+        action: Optional[Action] = None,
+        cause: Optional[Exception] = None,
+    ) -> None:
+        """Initialize with message and context."""
+        super().__init__(message)
+        self.message = message
+        self.state_id = state_id
+        self.action = action
+        self.cause = cause
 
 
 class ExplorationEngine:
