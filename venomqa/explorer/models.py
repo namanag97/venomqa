@@ -203,6 +203,23 @@ class StateGraph(BaseModel):
     metadata: Dict[str, Any] = Field(
         default_factory=dict, description="Graph metadata"
     )
+    # Internal adjacency list for efficient graph operations
+    _adjacency: Dict[StateID, List[StateID]] = {}
+
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize the adjacency list after model creation."""
+        self._rebuild_adjacency()
+
+    def _rebuild_adjacency(self) -> None:
+        """Rebuild the adjacency list from transitions."""
+        self._adjacency = {}
+        for state_id in self.states:
+            self._adjacency[state_id] = []
+        for transition in self.transitions:
+            if transition.from_state not in self._adjacency:
+                self._adjacency[transition.from_state] = []
+            if transition.to_state not in self._adjacency[transition.from_state]:
+                self._adjacency[transition.from_state].append(transition.to_state)
 
     def add_state(self, state: State) -> None:
         """
@@ -215,6 +232,8 @@ class StateGraph(BaseModel):
             If a state with the same ID already exists, it will be updated.
         """
         self.states[state.id] = state
+        if state.id not in self._adjacency:
+            self._adjacency[state.id] = []
         if self.initial_state is None:
             self.initial_state = state.id
 
@@ -235,15 +254,20 @@ class StateGraph(BaseModel):
                 id=transition.from_state,
                 name=f"State_{transition.from_state}",
             )
+            self._adjacency[transition.from_state] = []
         if transition.to_state not in self.states:
             self.states[transition.to_state] = State(
                 id=transition.to_state,
                 name=f"State_{transition.to_state}",
             )
+            self._adjacency[transition.to_state] = []
 
         # Avoid duplicate transitions
         if transition not in self.transitions:
             self.transitions.append(transition)
+            # Update adjacency list
+            if transition.to_state not in self._adjacency[transition.from_state]:
+                self._adjacency[transition.from_state].append(transition.to_state)
 
     def get_neighbors(self, state_id: StateID) -> List[StateID]:
         """
@@ -255,12 +279,7 @@ class StateGraph(BaseModel):
         Returns:
             List of state IDs that can be reached from the given state
         """
-        neighbors: List[StateID] = []
-        for transition in self.transitions:
-            if transition.from_state == state_id:
-                if transition.to_state not in neighbors:
-                    neighbors.append(transition.to_state)
-        return neighbors
+        return list(self._adjacency.get(state_id, []))
 
     def get_transitions_from(self, state_id: StateID) -> List[Transition]:
         """
@@ -318,6 +337,36 @@ class StateGraph(BaseModel):
             },
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StateGraph":
+        """
+        Create a StateGraph from a dictionary representation.
+
+        Args:
+            data: Dictionary containing states, transitions, initial_state, and metadata
+
+        Returns:
+            A new StateGraph instance
+        """
+        graph = cls(
+            initial_state=data.get("initial_state"),
+            metadata=data.get("metadata", {}),
+        )
+
+        # Restore states
+        states_data = data.get("states", {})
+        for state_id, state_dict in states_data.items():
+            state = State(**state_dict)
+            graph.add_state(state)
+
+        # Restore transitions
+        transitions_data = data.get("transitions", [])
+        for transition_dict in transitions_data:
+            transition = Transition(**transition_dict)
+            graph.add_transition(transition)
+
+        return graph
+
     def get_all_actions(self) -> Set[Action]:
         """
         Get all unique actions in the graph.
@@ -332,7 +381,7 @@ class StateGraph(BaseModel):
 
     def has_path(self, from_state: StateID, to_state: StateID) -> bool:
         """
-        Check if there is a path between two states.
+        Check if there is a path between two states using BFS.
 
         Args:
             from_state: Source state ID
@@ -343,6 +392,9 @@ class StateGraph(BaseModel):
         """
         if from_state == to_state:
             return True
+
+        if from_state not in self.states:
+            return False
 
         visited: Set[StateID] = set()
         queue: List[StateID] = [from_state]
@@ -357,6 +409,147 @@ class StateGraph(BaseModel):
             queue.extend(self.get_neighbors(current))
 
         return False
+
+    def find_cycles(self) -> List[List[StateID]]:
+        """
+        Find all cycles in the graph using Tarjan's algorithm.
+
+        This implementation uses Tarjan's strongly connected components (SCC)
+        algorithm to find all cycles. Each SCC with more than one node or
+        a self-loop represents a cycle.
+
+        Returns:
+            List of cycles, where each cycle is a list of state IDs
+        """
+        # Tarjan's algorithm data structures
+        index_counter = [0]
+        stack: List[StateID] = []
+        lowlinks: Dict[StateID, int] = {}
+        index: Dict[StateID, int] = {}
+        on_stack: Dict[StateID, bool] = {}
+        sccs: List[List[StateID]] = []
+
+        def strongconnect(node: StateID) -> None:
+            # Set the depth index for node
+            index[node] = index_counter[0]
+            lowlinks[node] = index_counter[0]
+            index_counter[0] += 1
+            stack.append(node)
+            on_stack[node] = True
+
+            # Consider successors
+            for successor in self.get_neighbors(node):
+                if successor not in index:
+                    # Successor has not yet been visited; recurse on it
+                    strongconnect(successor)
+                    lowlinks[node] = min(lowlinks[node], lowlinks[successor])
+                elif on_stack.get(successor, False):
+                    # Successor is on stack and hence in the current SCC
+                    lowlinks[node] = min(lowlinks[node], index[successor])
+
+            # If node is a root node, pop the stack and generate an SCC
+            if lowlinks[node] == index[node]:
+                scc: List[StateID] = []
+                while True:
+                    successor = stack.pop()
+                    on_stack[successor] = False
+                    scc.append(successor)
+                    if successor == node:
+                        break
+                # Only report SCCs that form cycles (size > 1 or self-loop)
+                if len(scc) > 1:
+                    sccs.append(scc)
+                elif len(scc) == 1:
+                    # Check for self-loop
+                    if scc[0] in self.get_neighbors(scc[0]):
+                        sccs.append(scc)
+
+        # Run algorithm for all unvisited nodes
+        for state_id in self.states:
+            if state_id not in index:
+                strongconnect(state_id)
+
+        return sccs
+
+    def find_dead_ends(self) -> List[StateID]:
+        """
+        Find all states with no outgoing transitions (dead ends).
+
+        A dead end is a state from which no other state can be reached,
+        meaning it has no outgoing transitions.
+
+        Returns:
+            List of state IDs that are dead ends
+        """
+        dead_ends: List[StateID] = []
+        for state_id in self.states:
+            neighbors = self.get_neighbors(state_id)
+            if len(neighbors) == 0:
+                dead_ends.append(state_id)
+        return dead_ends
+
+    def find_unreachable_states(self) -> List[StateID]:
+        """
+        Find all states that are not reachable from the initial state.
+
+        Returns:
+            List of state IDs that cannot be reached from the initial state
+        """
+        if self.initial_state is None:
+            return list(self.states.keys())
+
+        # BFS from initial state to find all reachable states
+        visited: Set[StateID] = set()
+        queue: List[StateID] = [self.initial_state]
+
+        while queue:
+            current = queue.pop(0)
+            if current in visited:
+                continue
+            visited.add(current)
+            queue.extend(self.get_neighbors(current))
+
+        # Return states not in visited set
+        unreachable = [s for s in self.states if s not in visited]
+        return unreachable
+
+    def get_shortest_path(
+        self, from_state: StateID, to_state: StateID
+    ) -> Optional[List[StateID]]:
+        """
+        Find the shortest path between two states using BFS.
+
+        Args:
+            from_state: Source state ID
+            to_state: Destination state ID
+
+        Returns:
+            List of state IDs representing the path, or None if no path exists
+        """
+        if from_state == to_state:
+            return [from_state]
+
+        if from_state not in self.states:
+            return None
+
+        visited: Set[StateID] = set()
+        queue: List[List[StateID]] = [[from_state]]
+
+        while queue:
+            path = queue.pop(0)
+            current = path[-1]
+
+            if current in visited:
+                continue
+            visited.add(current)
+
+            for neighbor in self.get_neighbors(current):
+                new_path = path + [neighbor]
+                if neighbor == to_state:
+                    return new_path
+                queue.append(new_path)
+
+        return None
 
 
 class Issue(BaseModel):
