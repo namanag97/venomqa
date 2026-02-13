@@ -38,4 +38,8 @@ __all__ = [
     "WatchRunner",
     "FileWatcher",
     "DependencyAnalyzer",
+    "doctor",
+    "HealthCheck",
+    "get_health_checks",
+    "run_health_checks",
 ]
