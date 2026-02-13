@@ -179,30 +179,49 @@ def install_package(python_cmd: str, package: str, dev: bool = False, user: bool
         return False
 
 
-def install_venomqa(python_cmd: str, editable: bool = False, dev: bool = False) -> bool:
+def install_venomqa(python_cmd: str, editable: bool = False, dev: bool = False, user: bool = False) -> bool:
     """Install VenomQA package."""
     try:
         setup_dir = Path(__file__).parent.resolve()
 
         if editable:
             extras = "[dev]" if dev else ""
-            cmd = [python_cmd, "-m", "pip", "install", "-e", f".{extras}"]
+            cmd = [python_cmd, "-m", "pip", "install"]
+            if user:
+                cmd.append("--user")
+            cmd.extend(["-e", f".{extras}"])
         else:
             # Try to install from PyPI first
             extras = "[dev]" if dev else ""
-            cmd = [python_cmd, "-m", "pip", "install", f"venomqa{extras}"]
+            cmd = [python_cmd, "-m", "pip", "install"]
+            if user:
+                cmd.append("--user")
+            cmd.append(f"venomqa{extras}")
 
-        subprocess.run(
+        result = subprocess.run(
             cmd,
-            check=True,
             capture_output=True,
+            text=True,
             cwd=str(setup_dir) if editable else None,
         )
+
+        # Check for PEP 668 error (externally managed environment)
+        if result.returncode != 0:
+            if "externally-managed-environment" in result.stderr.lower() or "pep 668" in result.stderr.lower():
+                # Try with --user flag or --break-system-packages
+                if not user:
+                    print_info("System Python detected, trying --user install...")
+                    return install_venomqa(python_cmd, editable=editable, dev=dev, user=True)
+            # Fall back to editable install from local if PyPI failed
+            if not editable:
+                return install_venomqa(python_cmd, editable=True, dev=dev, user=user)
+            return False
+
         return True
     except subprocess.CalledProcessError:
         # Fall back to editable install from local
         if not editable:
-            return install_venomqa(python_cmd, editable=True, dev=dev)
+            return install_venomqa(python_cmd, editable=True, dev=dev, user=user)
         return False
 
 
