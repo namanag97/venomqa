@@ -248,9 +248,19 @@ def discover_journeys() -> dict[str, Any]:
     return journeys
 
 
+def get_version() -> str:
+    """Get the VenomQA version string."""
+    try:
+        from venomqa import __version__
+        return f"VenomQA {__version__}"
+    except ImportError:
+        return "VenomQA (version unknown)"
+
+
 @click.group(invoke_without_command=True)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--config", "-c", type=click.Path(exists=True), help="Path to config file")
+@click.version_option(version=None, prog_name="VenomQA", message=get_version())
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, config: str | None) -> None:
     """VenomQA - Stateful Journey QA Framework.
@@ -262,8 +272,8 @@ def cli(ctx: click.Context, verbose: bool, config: str | None) -> None:
     """
     ctx.ensure_object(dict)
 
-    # Don't load config for init command - it creates the config file
-    if ctx.invoked_subcommand == "init":
+    # Don't load config for commands that don't need it
+    if ctx.invoked_subcommand in ("init", "doctor"):
         ctx.obj["verbose"] = verbose
         setup_logging(verbose)
         return
