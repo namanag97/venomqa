@@ -215,7 +215,9 @@ def create_item(client: Any, context: dict, name: str = "Test Item", **kwargs) -
     return response
 '''
 
-README_TEMPLATE = '''# VenomQA Test Suite
+def _get_readme_template(base_path: str) -> str:
+    """Generate README content for an initialized project."""
+    return f'''# VenomQA Test Suite
 
 This directory contains your VenomQA test suite.
 
@@ -223,15 +225,15 @@ This directory contains your VenomQA test suite.
 
 ```
 {base_path}/
-├── venomqa.yaml           # Configuration file
-├── docker-compose.qa.yml  # Docker Compose for test infrastructure
-├── actions/               # Reusable test actions
-│   └── __init__.py
-├── fixtures/              # Test fixtures and data
-│   └── __init__.py
-├── journeys/              # Journey definitions
-│   └── __init__.py
-└── reports/               # Generated test reports
+|-- venomqa.yaml           # Configuration file
+|-- docker-compose.qa.yml  # Docker Compose for test infrastructure
+|-- actions/               # Reusable test actions
+|   +-- __init__.py
+|-- fixtures/              # Test fixtures and data
+|   +-- __init__.py
+|-- journeys/              # Journey definitions
+|   +-- __init__.py
++-- reports/               # Generated test reports
 ```
 
 ## Quick Start
@@ -269,12 +271,12 @@ Create them in `actions/`:
 
 ```python
 # actions/my_actions.py
-def login(client, context, email: str, password: str):
+def login(client, context, email, password):
     """Log in a user."""
-    response = client.post("/api/auth/login", json={
-        "email": email,
-        "password": password
-    })
+    response = client.post("/api/auth/login", json=dict(
+        email=email,
+        password=password
+    ))
     if response.status_code == 200:
         context["token"] = response.json()["token"]
     return response
@@ -293,7 +295,7 @@ journey = Journey(
     name="my_journey",
     description="Test user workflow",
     steps=[
-        Step(name="login", action=login, args={"email": "test@example.com"}),
+        Step(name="login", action=login, args=dict(email="test@example.com")),
         Checkpoint(name="authenticated"),
         Step(name="create", action=create_item),
     ],
