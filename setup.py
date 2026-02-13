@@ -252,14 +252,24 @@ def run_preflight_checks(python_cmd: str) -> bool:
 def create_example_project(python_cmd: str, path: str = "qa") -> bool:
     """Create an example VenomQA project."""
     try:
+        # Use the venomqa module directly since CLI may not be in PATH yet
+        script = f'''
+import sys
+sys.argv = ["venomqa", "init", "--with-sample", "--skip-checks", "-p", "{path}"]
+from venomqa.cli import main
+main()
+'''
         result = subprocess.run(
-            [python_cmd, "-m", "venomqa.cli", "init", "--with-sample", "-p", path],
+            [python_cmd, "-c", script],
             capture_output=True,
             text=True,
             timeout=30,
         )
         if result.stdout:
             for line in result.stdout.strip().split("\n"):
+                # Skip the doctor output since we already ran preflight
+                if "VenomQA Doctor" in line or "========" in line:
+                    continue
                 print(f"  {line}")
         return result.returncode == 0
     except subprocess.CalledProcessError:
