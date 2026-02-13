@@ -94,20 +94,16 @@ class TestCheckPythonVersion:
 
     def test_python_version_310(self):
         """Test check_python_version with Python 3.10."""
-        # Create a mock version_info that behaves like the real one
-        from types import SimpleNamespace
+        # Create a mock version_info that behaves like the real sys.version_info
+        class MockVersionInfo:
+            major = 3
+            minor = 10
+            micro = 0
 
-        mock_version = SimpleNamespace(
-            major=3,
-            minor=10,
-            micro=0,
-            releaselevel="final",
-            serial=0,
-        )
-        # Make it comparable like a tuple
-        mock_version.__ge__ = lambda self, other: (self.major, self.minor) >= other[:2]
+            def __ge__(self, other):
+                return (self.major, self.minor) >= other[:2]
 
-        with patch.object(sys, "version_info", mock_version):
+        with patch.object(sys, "version_info", MockVersionInfo()):
             success, message = check_python_version()
 
         assert success is True
@@ -115,18 +111,16 @@ class TestCheckPythonVersion:
 
     def test_python_version_312(self):
         """Test check_python_version with Python 3.12."""
-        from types import SimpleNamespace
 
-        mock_version = SimpleNamespace(
-            major=3,
-            minor=12,
-            micro=1,
-            releaselevel="final",
-            serial=0,
-        )
-        mock_version.__ge__ = lambda self, other: (self.major, self.minor) >= other[:2]
+        class MockVersionInfo:
+            major = 3
+            minor = 12
+            micro = 1
 
-        with patch.object(sys, "version_info", mock_version):
+            def __ge__(self, other):
+                return (self.major, self.minor) >= other[:2]
+
+        with patch.object(sys, "version_info", MockVersionInfo()):
             success, message = check_python_version()
 
         assert success is True
@@ -134,18 +128,16 @@ class TestCheckPythonVersion:
 
     def test_python_version_too_old(self):
         """Test check_python_version fails with Python < 3.10."""
-        from types import SimpleNamespace
 
-        mock_version = SimpleNamespace(
-            major=3,
-            minor=9,
-            micro=0,
-            releaselevel="final",
-            serial=0,
-        )
-        mock_version.__ge__ = lambda self, other: (self.major, self.minor) >= other[:2]
+        class MockVersionInfo:
+            major = 3
+            minor = 9
+            micro = 0
 
-        with patch.object(sys, "version_info", mock_version):
+            def __ge__(self, other):
+                return (self.major, self.minor) >= other[:2]
+
+        with patch.object(sys, "version_info", MockVersionInfo()):
             success, message = check_python_version()
 
         assert success is False
