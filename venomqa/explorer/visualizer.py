@@ -35,7 +35,12 @@ class OutputFormat(str, Enum):
 
 class VisualizationError(Exception):
     """Error during visualization rendering."""
-    pass
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+        """Initialize with message and optional details."""
+        super().__init__(message)
+        self.message = message
+        self.details = details or {}
 
 
 class GraphVisualizer:
