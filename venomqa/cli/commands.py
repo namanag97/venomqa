@@ -215,6 +215,47 @@ cli.add_command(doctor)
 
 
 @cli.command()
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON",
+)
+@click.pass_context
+def preflight(ctx: click.Context, output_json: bool) -> None:
+    """Run preflight checks before test execution.
+
+    This command verifies that the environment is properly configured
+    for running tests:
+    - Target API is reachable
+    - Docker services are running (if configured)
+    - Database is reachable (if configured)
+    - Configuration is valid
+    - Journeys directory exists
+
+    Exit codes:
+        0 - All required checks passed
+        1 - One or more required checks failed
+    """
+    import json as json_module
+
+    from venomqa.preflight import run_preflight_checks, run_preflight_checks_with_output
+
+    config: dict[str, Any] = ctx.obj.get("config", {})
+
+    if output_json:
+        result = run_preflight_checks(config)
+        click.echo(json_module.dumps(result.to_dict(), indent=2))
+        sys.exit(0 if result.success else 1)
+    else:
+        from rich.console import Console
+
+        console = Console()
+        result = run_preflight_checks_with_output(config, console)
+        sys.exit(0 if result.success else 1)
+
+
+@cli.command()
 @click.argument("journey_names", nargs=-1)
 @click.option("--no-infra", is_flag=True, help="Skip infrastructure setup/teardown")
 @click.option(
