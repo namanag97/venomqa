@@ -19,6 +19,7 @@ Example:
 from venomqa.explorer.models import (
     StateID,
     State,
+    ChainState,
     Transition,
     Action,
     StateGraph,
