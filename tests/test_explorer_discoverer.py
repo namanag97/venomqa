@@ -680,5 +680,453 @@ class TestEdgeCases:
         assert actions[0].params == {"valid": "test"}
 
 
+class TestComprehensiveOpenAPI:
+    """Test parsing a comprehensive OpenAPI spec with $ref resolution."""
+
+    COMPREHENSIVE_OPENAPI_YAML = FIXTURES_DIR / "comprehensive_openapi.yaml"
+
+    def test_from_openapi_yaml_file(self):
+        """Test loading a comprehensive YAML OpenAPI spec."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # Should have many endpoints
+        assert len(actions) >= 15
+
+        # Verify methods are extracted
+        methods = {a.method for a in actions}
+        assert "GET" in methods
+        assert "POST" in methods
+        assert "PUT" in methods
+        assert "DELETE" in methods
+        assert "PATCH" in methods
+
+    def test_ref_resolution_in_parameters(self):
+        """Test that $ref parameters are properly resolved."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # GET /users uses $ref for PageParam and LimitParam
+        get_users = next(
+            (a for a in actions if a.method == "GET" and a.endpoint == "/users"),
+            None,
+        )
+        assert get_users is not None
+        assert get_users.params is not None
+
+        # PageParam has default=1, LimitParam has default=20
+        assert get_users.params.get("page") == 1
+        assert get_users.params.get("limit") == 20
+        # status has default=active
+        assert get_users.params.get("status") == "active"
+
+    def test_ref_resolution_in_request_body(self):
+        """Test that $ref requestBodies are properly resolved."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # POST /users uses $ref for requestBody
+        post_users = next(
+            (a for a in actions if a.method == "POST" and a.endpoint == "/users"),
+            None,
+        )
+        assert post_users is not None
+        assert post_users.body is not None
+
+        # The example should be used
+        assert post_users.body.get("email") == "newuser@example.com"
+        assert post_users.body.get("name") == "New User"
+
+    def test_ref_resolution_in_schema(self):
+        """Test that $ref schemas in request bodies are resolved."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # POST /products has inline example
+        post_products = next(
+            (a for a in actions if a.method == "POST" and a.endpoint == "/products"),
+            None,
+        )
+        assert post_products is not None
+        assert post_products.body is not None
+        assert post_products.body.get("name") == "Premium Widget"
+        assert post_products.body.get("price") == 99.99
+
+    def test_allof_schema_resolution(self):
+        """Test that allOf schemas are properly merged."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        # Parse the spec and check that allOf schemas work
+        spec = discoverer._load_spec(self.COMPREHENSIVE_OPENAPI_YAML)
+        discoverer._spec_components = spec.get("components", {})
+
+        # UserWithProfile uses allOf to combine User and profile
+        user_with_profile = discoverer._spec_components["schemas"]["UserWithProfile"]
+        example = discoverer._build_example_from_schema(user_with_profile)
+
+        # Should have fields from both User and the added profile
+        assert "id" in example  # From User
+        assert "email" in example  # From User
+        assert "profile" in example  # From added object
+
+    def test_path_parameters_resolved_with_examples(self):
+        """Test that path parameters with examples are extracted."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # GET /users/{userId} uses UserIdParam with example=42
+        get_user = next(
+            (a for a in actions if a.method == "GET" and a.endpoint == "/users/{userId}"),
+            None,
+        )
+        assert get_user is not None
+        assert get_user.params is not None
+        # Path params are stored under _path_params
+        path_params = get_user.params.get("_path_params", {})
+        assert path_params.get("userId") == 42
+
+    def test_header_parameters_extracted(self):
+        """Test that header parameters are properly extracted."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # GET /users has X-Correlation-ID header parameter
+        get_users = next(
+            (a for a in actions if a.method == "GET" and a.endpoint == "/users"),
+            None,
+        )
+        assert get_users is not None
+        assert get_users.headers is not None
+        assert "X-Correlation-ID" in get_users.headers
+        assert get_users.headers["X-Correlation-ID"] == "550e8400-e29b-41d4-a716-446655440000"
+
+    def test_cookie_parameters_in_headers(self):
+        """Test that cookie parameters are converted to Cookie header."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # GET /orders has X-Session-ID cookie parameter
+        get_orders = next(
+            (a for a in actions if a.method == "GET" and a.endpoint == "/orders"),
+            None,
+        )
+        assert get_orders is not None
+        assert get_orders.headers is not None
+        # Cookie params should be in Cookie header
+        assert "Cookie" in get_orders.headers
+        assert "X-Session-ID=session_abc123" in get_orders.headers["Cookie"]
+
+    def test_security_requirements_detected(self):
+        """Test that security requirements are properly detected."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # GET /users requires auth (global security)
+        get_users = next(
+            (a for a in actions if a.method == "GET" and a.endpoint == "/users"),
+            None,
+        )
+        assert get_users is not None
+        assert get_users.requires_auth is True
+
+        # POST /users has security: [] (no auth)
+        post_users = next(
+            (a for a in actions if a.method == "POST" and a.endpoint == "/users"),
+            None,
+        )
+        assert post_users is not None
+        assert post_users.requires_auth is False
+
+        # GET /health has security: [] (no auth)
+        get_health = next(
+            (a for a in actions if a.method == "GET" and a.endpoint == "/health"),
+            None,
+        )
+        assert get_health is not None
+        assert get_health.requires_auth is False
+
+    def test_multipart_form_data_request_body(self):
+        """Test that multipart/form-data request bodies are handled."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # POST /users/{userId}/avatar uses multipart/form-data
+        upload_avatar = next(
+            (a for a in actions if a.method == "POST" and a.endpoint == "/users/{userId}/avatar"),
+            None,
+        )
+        assert upload_avatar is not None
+        assert upload_avatar.body is not None
+        # Should have form fields
+        assert "file" in upload_avatar.body or "description" in upload_avatar.body
+
+    def test_examples_used_in_request_body(self):
+        """Test that request body examples are used when available."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # PATCH /users/{userId}/profile has examples in requestBody
+        patch_profile = next(
+            (a for a in actions if a.method == "PATCH" and a.endpoint == "/users/{userId}/profile"),
+            None,
+        )
+        assert patch_profile is not None
+        assert patch_profile.body is not None
+        # Should use first example
+        assert "bio" in patch_profile.body or "avatar_url" in patch_profile.body
+
+    def test_nested_object_schemas_resolved(self):
+        """Test that nested object schemas are properly resolved."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # POST /orders has nested CreateOrder schema with Address
+        post_order = next(
+            (a for a in actions if a.method == "POST" and a.endpoint == "/orders"),
+            None,
+        )
+        assert post_order is not None
+        assert post_order.body is not None
+        # Should have shippingAddress nested object
+        assert "shippingAddress" in post_order.body
+        assert isinstance(post_order.body["shippingAddress"], dict)
+        # Address should have required fields
+        shipping = post_order.body["shippingAddress"]
+        assert "street" in shipping
+        assert "city" in shipping
+        assert "country" in shipping
+
+    def test_array_items_resolved(self):
+        """Test that array item schemas are properly resolved."""
+        discoverer = APIDiscoverer(base_url="https://api.example.com/v1")
+        actions = discoverer.from_openapi(str(self.COMPREHENSIVE_OPENAPI_YAML))
+
+        # POST /orders has items array
+        post_order = next(
+            (a for a in actions if a.method == "POST" and a.endpoint == "/orders"),
+            None,
+        )
+        assert post_order is not None
+        assert post_order.body is not None
+        assert "items" in post_order.body
+        assert isinstance(post_order.body["items"], list)
+        # Each item should have productId and quantity
+        if post_order.body["items"]:
+            item = post_order.body["items"][0]
+            assert "productId" in item
+            assert "quantity" in item
+
+
+class TestRefResolution:
+    """Test $ref resolution in isolation."""
+
+    def test_resolve_simple_schema_ref(self):
+        """Test resolving a simple schema $ref."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+        discoverer._spec_components = {
+            "schemas": {
+                "User": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "name": {"type": "string"},
+                    },
+                }
+            }
+        }
+
+        resolved = discoverer._resolve_ref("#/components/schemas/User")
+        assert resolved["type"] == "object"
+        assert "id" in resolved["properties"]
+        assert "name" in resolved["properties"]
+
+    def test_resolve_parameter_ref(self):
+        """Test resolving a parameter $ref."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+        discoverer._spec_components = {
+            "parameters": {
+                "PageParam": {
+                    "name": "page",
+                    "in": "query",
+                    "schema": {"type": "integer", "default": 1},
+                }
+            }
+        }
+
+        param = {"$ref": "#/components/parameters/PageParam"}
+        resolved = discoverer._resolve_parameter(param)
+        assert resolved["name"] == "page"
+        assert resolved["in"] == "query"
+        assert resolved["schema"]["default"] == 1
+
+    def test_resolve_nonexistent_ref(self):
+        """Test that nonexistent $ref returns empty dict."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+        discoverer._spec_components = {}
+
+        resolved = discoverer._resolve_ref("#/components/schemas/NonExistent")
+        assert resolved == {}
+
+    def test_resolve_external_ref_returns_empty(self):
+        """Test that external $refs return empty dict."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+        discoverer._spec_components = {}
+
+        # External refs (not starting with #/) are not supported
+        resolved = discoverer._resolve_ref("./external.yaml#/components/schemas/User")
+        assert resolved == {}
+
+    def test_build_example_with_circular_ref(self):
+        """Test that circular $refs don't cause infinite recursion."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+        discoverer._spec_components = {
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "properties": {
+                        "value": {"type": "string"},
+                        "children": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Node"},
+                        },
+                    },
+                }
+            }
+        }
+
+        # This should not hang due to circular reference
+        schema = {"$ref": "#/components/schemas/Node"}
+        result = discoverer._build_example_from_schema(schema)
+
+        assert isinstance(result, dict)
+        assert "value" in result
+        assert "children" in result
+
+
+class TestBuildExampleEnhancements:
+    """Test enhanced example building from schemas."""
+
+    def test_build_with_default_value(self):
+        """Test that default values are used."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        schema = {"type": "string", "default": "default_value"}
+        result = discoverer._build_example_from_schema(schema)
+        assert result == "default_value"
+
+    def test_build_integer_with_exclusive_minimum(self):
+        """Test integer with exclusiveMinimum."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        schema = {"type": "integer", "exclusiveMinimum": 5}
+        result = discoverer._build_example_from_schema(schema)
+        assert result == 6
+
+    def test_build_number_with_exclusive_minimum(self):
+        """Test number with exclusiveMinimum."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        schema = {"type": "number", "exclusiveMinimum": 0.0}
+        result = discoverer._build_example_from_schema(schema)
+        assert result == 0.1
+
+    def test_build_string_with_minlength(self):
+        """Test string respects minLength."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        schema = {"type": "string", "minLength": 5}
+        result = discoverer._build_example_from_schema(schema)
+        assert len(result) >= 5
+
+    def test_build_string_formats(self):
+        """Test various string formats."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        formats = {
+            "hostname": "example.com",
+            "ipv4": "192.168.1.1",
+            "ipv6": "::1",
+            "password": "password123",
+            "byte": "dGVzdA==",
+            "time": "12:00:00",
+        }
+
+        for fmt, expected in formats.items():
+            schema = {"type": "string", "format": fmt}
+            result = discoverer._build_example_from_schema(schema)
+            assert result == expected, f"Format {fmt} should return {expected}, got {result}"
+
+    def test_build_null_type(self):
+        """Test null type returns None."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        schema = {"type": "null"}
+        result = discoverer._build_example_from_schema(schema)
+        assert result is None
+
+    def test_build_oneof_uses_first(self):
+        """Test oneOf uses first option."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        schema = {
+            "oneOf": [
+                {"type": "string", "example": "option1"},
+                {"type": "integer", "example": 42},
+            ]
+        }
+        result = discoverer._build_example_from_schema(schema)
+        assert result == "option1"
+
+    def test_build_anyof_uses_first(self):
+        """Test anyOf uses first option."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        schema = {
+            "anyOf": [
+                {"type": "integer", "example": 100},
+                {"type": "string"},
+            ]
+        }
+        result = discoverer._build_example_from_schema(schema)
+        assert result == 100
+
+    def test_build_infers_type_from_properties(self):
+        """Test type is inferred as object when properties exist."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        # No type specified but has properties
+        schema = {
+            "properties": {
+                "name": {"type": "string"},
+            }
+        }
+        result = discoverer._build_example_from_schema(schema)
+        assert isinstance(result, dict)
+        assert "name" in result
+
+    def test_build_infers_type_from_items(self):
+        """Test type is inferred as array when items exist."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        # No type specified but has items
+        schema = {
+            "items": {"type": "string"}
+        }
+        result = discoverer._build_example_from_schema(schema)
+        assert isinstance(result, list)
+
+    def test_build_additional_properties(self):
+        """Test additionalProperties in object without properties."""
+        discoverer = APIDiscoverer(base_url="http://localhost:8000")
+
+        schema = {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+        }
+        result = discoverer._build_example_from_schema(schema)
+        assert isinstance(result, dict)
+        # Should have at least one example additional property
+        assert "additionalProp1" in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
