@@ -490,10 +490,17 @@ class StateExplorer:
 
     async def close(self) -> None:
         """Clean up resources."""
-        # TODO: Implement cleanup
-        # 1. Close HTTP client
-        # 2. Clean up any temporary files
-        raise NotImplementedError("close() not yet implemented")
+        # Close HTTP client if it exists
+        if self._http_client is not None:
+            if hasattr(self._http_client, "aclose"):
+                await self._http_client.aclose()
+            elif hasattr(self._http_client, "close"):
+                self._http_client.close()
+            self._http_client = None
+
+        # Reset state
+        self._auth_token = None
+        self._auth_headers.clear()
 
     async def __aenter__(self) -> "StateExplorer":
         """Async context manager entry."""
