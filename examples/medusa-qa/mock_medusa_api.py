@@ -216,9 +216,6 @@ def get_cart(cart_id: str):
 
 @app.post("/store/carts/{cart_id}/line-items")
 def add_to_cart(cart_id: str, item: LineItem):
-    # INTENTIONAL BUG: Always fail to test QA detection
-    raise HTTPException(status_code=500, detail="Internal server error - inventory service unavailable")
-
     if cart_id not in carts_db:
         raise HTTPException(status_code=404, detail="Cart not found")
 
