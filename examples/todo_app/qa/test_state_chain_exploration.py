@@ -215,40 +215,44 @@ def main():
 
 
 def test_extract_context():
-    """Test the extract_context function."""
+    """Test the extract_context_from_response function."""
     print("\n" + "=" * 70)
-    print("TESTING extract_context()")
+    print("TESTING extract_context_from_response()")
     print("=" * 70)
 
     # Test 1: Extract ID from POST /todos response
     response = {"id": 42, "title": "Test", "completed": False}
-    ctx = extract_context(response, endpoint="/todos")
+    ctx = ExplorationContext()
+    extract_context_from_response(response, endpoint="/todos", context=ctx)
     print(f"\nTest 1: POST /todos response")
     print(f"  Input: {response}")
-    print(f"  Output: {ctx}")
-    assert "todo_id" in ctx and ctx["todo_id"] == 42, f"Expected todo_id=42, got {ctx}"
+    print(f"  Output: {ctx.to_dict()}")
+    assert ctx.has("todo_id") and ctx.get("todo_id") == 42, f"Expected todo_id=42, got {ctx.to_dict()}"
     print("  PASS")
 
     # Test 2: Extract from nested response
     response = {"id": "abc-123", "filename": "doc.pdf", "todo_id": 42}
-    ctx = extract_context(response, endpoint="/todos/42/attachments")
+    ctx = ExplorationContext()
+    extract_context_from_response(response, endpoint="/todos/42/attachments", context=ctx)
     print(f"\nTest 2: POST /attachments response")
     print(f"  Input: {response}")
-    print(f"  Output: {ctx}")
-    assert "attachment_id" in ctx and ctx["attachment_id"] == "abc-123", f"Expected attachment_id, got {ctx}"
-    assert "todo_id" in ctx and ctx["todo_id"] == 42, f"Expected todo_id=42, got {ctx}"
+    print(f"  Output: {ctx.to_dict()}")
+    assert ctx.has("attachment_id") and ctx.get("attachment_id") == "abc-123", f"Expected attachment_id, got {ctx.to_dict()}"
+    assert ctx.has("todo_id") and ctx.get("todo_id") == 42, f"Expected todo_id=42, got {ctx.to_dict()}"
     print("  PASS")
 
     # Test 3: Preserve existing context
-    existing = {"auth_token": "xyz", "user_id": 1}
+    ctx = ExplorationContext()
+    ctx.set("auth_token", "xyz")
+    ctx.set("user_id", 1)
     response = {"id": 42, "title": "Test"}
-    ctx = extract_context(response, endpoint="/todos", existing_context=existing)
+    extract_context_from_response(response, endpoint="/todos", context=ctx)
     print(f"\nTest 3: Preserve existing context")
-    print(f"  Existing: {existing}")
+    print(f"  Existing: auth_token=xyz, user_id=1")
     print(f"  Response: {response}")
-    print(f"  Output: {ctx}")
-    assert "auth_token" in ctx and ctx["auth_token"] == "xyz", f"Lost auth_token"
-    assert "todo_id" in ctx and ctx["todo_id"] == 42, f"Didn't extract todo_id"
+    print(f"  Output: {ctx.to_dict()}")
+    assert ctx.has("auth_token") and ctx.get("auth_token") == "xyz", f"Lost auth_token"
+    assert ctx.has("todo_id") and ctx.get("todo_id") == 42, f"Didn't extract todo_id"
     print("  PASS")
 
 
