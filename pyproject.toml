@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "venomqa"
 version = "0.2.0"
-description = "Stateful Journey QA Framework for end-to-end testing with state exploration"
+description = "Stateful Journey Testing Framework - Test APIs like a human QA would. Context-aware testing with automatic ID chaining, state exploration, and smart issue detection."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -15,10 +15,28 @@ authors = [
 maintainers = [
     { name = "Naman Agarwal", email = "naman@venomqa.dev" }
 ]
-keywords = ["testing", "qa", "e2e", "api-testing", "stateful", "journey-testing", "checkpoint", "branch-exploration"]
+keywords = [
+    "testing",
+    "qa",
+    "api-testing",
+    "e2e-testing",
+    "end-to-end",
+    "stateful-testing",
+    "journey-testing",
+    "integration-testing",
+    "state-management",
+    "checkpoint",
+    "branch-exploration",
+    "test-automation",
+    "http-testing",
+    "rest-api",
+    "graphql-testing",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -28,7 +46,9 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Framework :: Pytest",
     "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Testing :: Acceptance",
     "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Internet :: WWW/HTTP",
     "Typing :: Typed",
 ]
 dependencies = [
