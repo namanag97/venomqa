@@ -909,12 +909,85 @@ class APIDiscoverer:
         Returns:
             List of newly discovered Action objects
         """
-        # TODO: Implement response-based discovery
-        # 1. Look for _links, links, href fields
-        # 2. Parse HAL, JSON:API, or other hypermedia formats
-        # 3. Extract endpoint URLs and methods
-        # 4. Build Action objects for new endpoints
-        raise NotImplementedError("discover_from_response() not yet implemented")
+        actions: List[Action] = []
+
+        # Look for HAL-style _links
+        if "_links" in response and isinstance(response["_links"], dict):
+            for rel, link_data in response["_links"].items():
+                if rel == "self":
+                    continue  # Skip self links
+                if isinstance(link_data, dict) and "href" in link_data:
+                    method = link_data.get("method", "GET").upper()
+                    endpoint = self._normalize_endpoint(link_data["href"])
+                    if self._should_include_endpoint(endpoint):
+                        action = Action(
+                            method=method,
+                            endpoint=endpoint,
+                            description=link_data.get("title", rel),
+                        )
+                        if action not in self.discovered_actions:
+                            self.discovered_actions.add(action)
+                            actions.append(action)
+                elif isinstance(link_data, str):
+                    endpoint = self._normalize_endpoint(link_data)
+                    if self._should_include_endpoint(endpoint):
+                        action = Action(method="GET", endpoint=endpoint, description=rel)
+                        if action not in self.discovered_actions:
+                            self.discovered_actions.add(action)
+                            actions.append(action)
+
+        # Look for JSON:API-style links array
+        if "links" in response and isinstance(response["links"], list):
+            for link in response["links"]:
+                if isinstance(link, dict) and "href" in link:
+                    method = link.get("method", "GET").upper()
+                    endpoint = self._normalize_endpoint(link["href"])
+                    if self._should_include_endpoint(endpoint):
+                        action = Action(
+                            method=method,
+                            endpoint=endpoint,
+                            description=link.get("rel", ""),
+                        )
+                        if action not in self.discovered_actions:
+                            self.discovered_actions.add(action)
+                            actions.append(action)
+
+        # Look for links in data.links (common pattern)
+        if "data" in response and isinstance(response["data"], dict):
+            data_links = response["data"].get("links", response["data"].get("_links", {}))
+            if isinstance(data_links, dict):
+                for rel, link_data in data_links.items():
+                    if isinstance(link_data, dict) and "href" in link_data:
+                        method = link_data.get("method", "GET").upper()
+                        endpoint = self._normalize_endpoint(link_data["href"])
+                        if self._should_include_endpoint(endpoint):
+                            action = Action(method=method, endpoint=endpoint, description=rel)
+                            if action not in self.discovered_actions:
+                                self.discovered_actions.add(action)
+                                actions.append(action)
+
+        # Look for href fields recursively in the response
+        def extract_hrefs(obj: Any, depth: int = 0) -> None:
+            if depth > 5:  # Limit recursion
+                return
+            if isinstance(obj, dict):
+                if "href" in obj and isinstance(obj["href"], str):
+                    endpoint = self._normalize_endpoint(obj["href"])
+                    if self._should_include_endpoint(endpoint):
+                        method = obj.get("method", "GET").upper()
+                        action = Action(method=method, endpoint=endpoint)
+                        if action not in self.discovered_actions:
+                            self.discovered_actions.add(action)
+                            actions.append(action)
+                for value in obj.values():
+                    extract_hrefs(value, depth + 1)
+            elif isinstance(obj, list):
+                for item in obj[:20]:  # Limit array processing
+                    extract_hrefs(item, depth + 1)
+
+        extract_hrefs(response)
+
+        return actions
 
     async def discover_from_har(
         self,
