@@ -552,12 +552,23 @@ class APIDiscoverer:
         Returns:
             Normalized endpoint path
         """
-        # TODO: Implement endpoint normalization
-        # 1. Remove base URL if present
-        # 2. Remove trailing slashes
-        # 3. Normalize path parameters (e.g., /users/123 -> /users/{id})
-        # 4. Handle query parameters
-        raise NotImplementedError("_normalize_endpoint() not yet implemented")
+        # Remove base URL if present
+        if endpoint.startswith(self.base_url):
+            endpoint = endpoint[len(self.base_url) :]
+
+        # Handle query parameters - strip them
+        if "?" in endpoint:
+            endpoint = endpoint.split("?")[0]
+
+        # Ensure leading slash
+        if not endpoint.startswith("/"):
+            endpoint = "/" + endpoint
+
+        # Remove trailing slash (except for root)
+        if endpoint != "/" and endpoint.endswith("/"):
+            endpoint = endpoint.rstrip("/")
+
+        return endpoint
 
     def _extract_path_params(self, endpoint: str) -> List[str]:
         """
