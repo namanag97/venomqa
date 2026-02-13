@@ -1549,21 +1549,21 @@ class ExplorationEngine:
                     success = response.get("success", True)
 
                     # Extract new context from response
-                    new_context = extract_context(
+                    new_context = current_context.copy()
+                    extract_context_from_response(
                         response_data,
                         endpoint=resolved_endpoint,
-                        existing_context=current_context,
+                        context=new_context,
                     )
 
                     # Add status to context for state naming
                     if status_code:
-                        new_context["_status_code"] = status_code
+                        new_context.set("_status_code", status_code)
 
                     # Generate state name from context
                     state_name = generate_state_name(
                         new_context,
-                        response=response_data,
-                        status_code=status_code,
+                        response_data,
                     )
 
                     # Generate unique state ID
