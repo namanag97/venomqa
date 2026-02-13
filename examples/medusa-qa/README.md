@@ -112,7 +112,7 @@ Saved Graph: qa/exploration_results/state_graph.png
 Saved HTML: qa/exploration_results/state_graph.html
 ```
 
-### 3. Run Journeys
+### 4. Run Journeys (TODO)
 
 Run specific test journeys:
 
