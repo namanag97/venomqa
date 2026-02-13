@@ -213,13 +213,30 @@ class StateDetector:
         # Infer state name
         state_name = self._infer_state_name(response, endpoint)
 
+        # Build metadata
+        metadata: Dict[str, Any] = {}
+        if endpoint:
+            metadata["endpoint"] = endpoint
+        if method:
+            metadata["method"] = method
+
+        # Detect auth state and add to metadata
+        auth_state = self.detect_auth_state(response)
+        if auth_state.is_authenticated:
+            metadata["auth_state"] = auth_state.to_dict()
+
+        # Detect entity state and add to metadata
+        entity_state = self.detect_entity_state(response, endpoint)
+        if entity_state.entity_type or entity_state.entity_id:
+            metadata["entity_state"] = entity_state.to_dict()
+
         # Create and cache the state
-        from datetime import datetime
         state = State(
             id=state_id,
             name=state_name,
             properties=properties,
             available_actions=available_actions,
+            metadata=metadata,
             discovered_at=datetime.now(),
         )
 
