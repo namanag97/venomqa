@@ -6,16 +6,16 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
       - DATABASE_URL=postgresql://todouser:todopass@postgres:5432/todos
       - UPLOAD_FOLDER=/tmp/todo_uploads
-      - PORT=5000
+      - PORT=5001
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 10s
       timeout: 5s
       retries: 5
