@@ -65,10 +65,12 @@ from venomqa.explorer.models import (
     StateID,
     Transition,
 )
-from venomqa.explorer.detector import (
-    extract_context,
+from venomqa.explorer.context import (
+    ExplorationContext,
+    extract_context_from_response,
     substitute_path_params,
     generate_state_name,
+    has_unresolved_placeholders,
 )
 
 logger = logging.getLogger(__name__)
