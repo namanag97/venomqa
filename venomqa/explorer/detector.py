@@ -74,14 +74,41 @@ class StateDetector:
         Returns:
             The detected State object
         """
-        # TODO: Implement state detection
-        # 1. Try custom state extractors first
-        # 2. Fall back to automatic detection
-        # 3. Extract state properties
-        # 4. Detect available actions
-        # 5. Generate unique state ID
-        # 6. Cache and return the state
-        raise NotImplementedError("detect_state() not yet implemented")
+        # Try custom state extractors first
+        for extractor in self.state_extractors:
+            extracted_state = extractor(response)
+            if extracted_state is not None:
+                self.known_states[extracted_state.id] = extracted_state
+                return extracted_state
+
+        # Fall back to automatic detection
+        state_id = self._generate_state_id(response, endpoint)
+
+        # Check if we already know this state
+        if state_id in self.known_states:
+            return self.known_states[state_id]
+
+        # Extract state properties
+        properties = self._extract_state_properties(response)
+
+        # Detect available actions
+        available_actions = self.detect_available_actions(response)
+
+        # Infer state name
+        state_name = self._infer_state_name(response, endpoint)
+
+        # Create and cache the state
+        from datetime import datetime
+        state = State(
+            id=state_id,
+            name=state_name,
+            properties=properties,
+            available_actions=available_actions,
+            discovered_at=datetime.now(),
+        )
+
+        self.known_states[state_id] = state
+        return state
 
     def detect_available_actions(
         self,
