@@ -62,4 +62,4 @@ services:
 
 volumes:
   postgres_data:
-  medusa_data:
+  medusa_uploads:
