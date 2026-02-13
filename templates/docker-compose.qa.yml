@@ -1,0 +1,216 @@
+# VenomQA Test Infrastructure Template
+#
+# This template provides a starting point for your test infrastructure.
+# Copy this file to your project and customize it for your needs.
+#
+# Usage:
+#   # Start test infrastructure
+#   docker compose -f docker-compose.qa.yml up -d
+#
+#   # Wait for services and run tests
+#   docker compose -f docker-compose.qa.yml run --rm venomqa
+#
+#   # Or use VenomQA CLI
+#   venomqa docker up
+#   venomqa run
+#   venomqa docker down
+#
+# Environment variables:
+#   API_IMAGE        - Your API image (default: your-api:latest)
+#   API_PORT         - API port (default: 8000)
+#   POSTGRES_VERSION - PostgreSQL version (default: 16)
+#   REDIS_VERSION    - Redis version (default: 7)
+
+version: "3.8"
+
+services:
+  # ==========================================================================
+  # Your Application (customize this)
+  # ==========================================================================
+  api:
+    image: ${API_IMAGE:-your-api:latest}
+    # Or build from local Dockerfile:
+    # build:
+    #   context: ../
+    #   dockerfile: Dockerfile
+    container_name: qa-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=postgresql://test:test@postgres:5432/testdb
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=test
+      - LOG_LEVEL=info
+      - SECRET_KEY=test-secret-key-do-not-use-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - qa-network
+
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    container_name: qa-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: mount init scripts
+      # - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d testdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - qa-network
+
+  # ==========================================================================
+  # Redis Cache
+  # ==========================================================================
+  redis:
+    image: redis:${REDIS_VERSION:-7}-alpine
+    container_name: qa-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - qa-network
+
+  # ==========================================================================
+  # VenomQA Test Runner
+  # ==========================================================================
+  venomqa:
+    image: venomqa:latest
+    # Or build locally:
+    # build:
+    #   context: ../
+    #   dockerfile: docker/Dockerfile
+    container_name: qa-venomqa
+    volumes:
+      # Mount your QA files
+      - ./qa:/app/qa:ro
+      # Output reports
+      - ./reports:/app/reports
+    environment:
+      - VENOMQA_BASE_URL=http://api:8000
+      - VENOMQA_TIMEOUT=30
+      - VENOMQA_REPORT_DIR=/app/reports
+      - VENOMQA_FAIL_FAST=${FAIL_FAST:-false}
+      # Database access for fixtures/cleanup
+      - DATABASE_URL=postgresql://test:test@postgres:5432/testdb
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      api:
+        condition: service_healthy
+    # Default: run all journeys
+    command: ["run"]
+    networks:
+      - qa-network
+
+  # ==========================================================================
+  # Optional Services (activate with --profile)
+  # ==========================================================================
+
+  # Mail testing with MailHog
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: qa-mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    profiles:
+      - mail
+    networks:
+      - qa-network
+
+  # Mock server for external APIs
+  mockserver:
+    image: mockserver/mockserver:latest
+    container_name: qa-mockserver
+    ports:
+      - "1080:1080"
+    environment:
+      - MOCKSERVER_INITIALIZATION_JSON_PATH=/config/mocks.json
+    volumes:
+      - ./mocks:/config:ro
+    profiles:
+      - mocks
+    networks:
+      - qa-network
+
+  # Selenium for browser testing
+  selenium:
+    image: selenium/standalone-chrome:latest
+    container_name: qa-selenium
+    ports:
+      - "4444:4444"
+      - "7900:7900"  # VNC viewer
+    shm_size: 2gb
+    profiles:
+      - browser
+    networks:
+      - qa-network
+
+  # MinIO for S3-compatible storage testing
+  minio:
+    image: minio/minio:latest
+    container_name: qa-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    profiles:
+      - storage
+    networks:
+      - qa-network
+
+  # Report server
+  reports:
+    image: nginx:alpine
+    container_name: qa-reports
+    ports:
+      - "9090:80"
+    volumes:
+      - ./reports:/usr/share/nginx/html:ro
+    profiles:
+      - reports
+    networks:
+      - qa-network
+
+networks:
+  qa-network:
+    driver: bridge
+    name: qa-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
