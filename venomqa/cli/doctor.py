@@ -177,6 +177,68 @@ def check_git() -> Tuple[bool, str]:
     return False, "git not found (optional)"
 
 
+def check_redis_client() -> Tuple[bool, str]:
+    """Check if Redis client is available."""
+    # Check Python redis package
+    try:
+        import redis
+        version = getattr(redis, "__version__", "installed")
+        return True, f"redis-py {version}"
+    except ImportError:
+        pass
+
+    # Check redis-cli
+    if shutil.which("redis-cli"):
+        return True, "redis-cli available"
+
+    return False, "Redis client not found (optional, for cache state management)"
+
+
+def check_disk_space() -> Tuple[bool, str]:
+    """Check available disk space (recommend at least 5GB free)."""
+    try:
+        total, used, free = shutil.disk_usage("/")
+        free_gb = free / (1024 ** 3)
+        total_gb = total / (1024 ** 3)
+
+        if free_gb >= 5:
+            return True, f"{free_gb:.1f} GB free of {total_gb:.1f} GB"
+        elif free_gb >= 1:
+            return False, f"Low disk space: {free_gb:.1f} GB free (recommend 5GB+)"
+        else:
+            return False, f"Very low disk space: {free_gb:.1f} GB free"
+    except Exception as e:
+        return False, f"Could not check disk space: {e}"
+
+
+def check_common_ports() -> Tuple[bool, str]:
+    """Check if common testing ports are available or services are running."""
+    import socket
+
+    ports_info = []
+    common_ports = [
+        (5432, "PostgreSQL"),
+        (6379, "Redis"),
+        (8000, "API"),
+    ]
+
+    for port, service in common_ports:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.5)
+        try:
+            result = sock.connect_ex(("localhost", port))
+            if result == 0:
+                ports_info.append(f"{service}:{port}")
+        except Exception:
+            pass
+        finally:
+            sock.close()
+
+    if ports_info:
+        return True, f"Services detected: {', '.join(ports_info)}"
+    return True, "No services detected on common ports"
+
+
 def check_config_file() -> Tuple[bool, str]:
     """Check if a VenomQA configuration file exists."""
     from pathlib import Path
