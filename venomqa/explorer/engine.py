@@ -7,17 +7,49 @@ Breadth-First Search (BFS), Depth-First Search (DFS), and random walk.
 
 The engine manages the exploration process, tracking visited states and
 transitions, and handling the execution of actions.
+
+Example:
+    >>> from venomqa.explorer.engine import ExplorationEngine, ExplorationStrategy
+    >>> from venomqa.explorer.models import State, Action, ExplorationConfig
+    >>> from venomqa.explorer.detector import StateDetector
+    >>>
+    >>> # Create engine with VenomQA client
+    >>> config = ExplorationConfig(max_depth=5, max_states=50)
+    >>> engine = ExplorationEngine(
+    ...     config=config,
+    ...     strategy=ExplorationStrategy.BFS,
+    ...     base_url="http://api.example.com",
+    ... )
+    >>>
+    >>> # Set up state detector
+    >>> detector = StateDetector()
+    >>> engine.set_state_detector(detector.detect_state)
+    >>>
+    >>> # Define initial state with available actions
+    >>> initial_state = State(
+    ...     id="initial",
+    ...     name="Initial State",
+    ...     available_actions=[
+    ...         Action(method="GET", endpoint="/api/users"),
+    ...         Action(method="GET", endpoint="/api/items"),
+    ...     ]
+    ... )
+    >>>
+    >>> # Run synchronous BFS exploration
+    >>> graph = engine.explore_bfs(initial_state)
+    >>> print(f"Found {len(graph.states)} states")
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 import time
 from collections import deque
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Deque, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Coroutine, Deque, Dict, List, Optional, Set, Tuple, Union
 
 import httpx
 
