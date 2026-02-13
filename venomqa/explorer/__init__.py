@@ -52,6 +52,7 @@ __all__ = [
     "StateDetector",
     "ExplorationEngine",
     "ExplorationStrategy",
+    "ExplorationError",
     "GraphVisualizer",
     "OutputFormat",
     "ExplorationReporter",
