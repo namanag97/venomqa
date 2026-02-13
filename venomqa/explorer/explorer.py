@@ -146,16 +146,60 @@ class StateExplorer:
         Raises:
             ExplorationError: If exploration fails
         """
-        # TODO: Implement main exploration workflow
-        # 1. Record start time
-        # 2. Discover endpoints if needed
-        # 3. Ensure initial state is set
-        # 4. Set up engine with callbacks
-        # 5. Run exploration
-        # 6. Collect results
-        # 7. Generate coverage report
-        # 8. Create and return ExplorationResult
-        raise NotImplementedError("explore() not yet implemented")
+        # Record start time
+        started_at = datetime.now()
+        error_msg: Optional[str] = None
+        success = True
+
+        try:
+            # Set up engine with callbacks
+            self.engine.set_state_detector(self.detector.detect_state)
+
+            # Ensure initial state is set
+            if not self._initial_state:
+                # Create a default initial state
+                self._initial_state = State(
+                    id="initial",
+                    name="Initial",
+                    properties={"authenticated": bool(self._auth_token)},
+                    available_actions=initial_actions or [],
+                    discovered_at=datetime.now(),
+                )
+                self.engine.graph.add_state(self._initial_state)
+                self.engine.graph.initial_state = self._initial_state.id
+
+            # Add initial actions to the state if provided
+            if initial_actions:
+                self._initial_state.available_actions.extend(initial_actions)
+
+            # Run exploration
+            await self.engine.explore(self._initial_state, initial_actions)
+
+        except Exception as e:
+            success = False
+            error_msg = str(e)
+
+        # Record end time
+        finished_at = datetime.now()
+        duration = finished_at - started_at
+
+        # Generate coverage report
+        coverage = self.engine.get_coverage_report()
+
+        # Create ExplorationResult
+        self._result = ExplorationResult(
+            graph=self.engine.graph,
+            issues=self.engine.issues,
+            coverage=coverage,
+            duration=duration,
+            started_at=started_at,
+            finished_at=finished_at,
+            config=self.config,
+            error=error_msg,
+            success=success,
+        )
+
+        return self._result
 
     async def discover_endpoints(self) -> List[Action]:
         """
