@@ -103,7 +103,7 @@ async def explore_medusa():
 
     try:
         # Run exploration with initial actions
-        result = await explorer.explore_from_actions(initial_actions)
+        result = await explorer.explore(initial_actions=initial_actions)
 
         print()
         print("=" * 80)
