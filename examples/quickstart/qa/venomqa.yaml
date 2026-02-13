@@ -1,0 +1,42 @@
+# VenomQA Configuration
+# Documentation: https://venomqa.dev/docs/configuration
+
+# Base URL for the API under test
+base_url: "http://localhost:8000"
+
+# Request timeout in seconds
+timeout: 30
+
+# Enable verbose output
+verbose: false
+
+# Stop on first failure
+fail_fast: false
+
+# Capture Docker logs on failure
+capture_logs: true
+
+# Number of log lines to capture
+log_lines: 50
+
+# Directory for reports
+report_dir: "reports"
+
+# Notifications (optional)
+# notifications:
+#   slack:
+#     webhook_url: ${SLACK_WEBHOOK_URL}
+#     channel: "#qa-alerts"
+#   discord:
+#     webhook_url: ${DISCORD_WEBHOOK_URL}
+
+# Port configurations for adapters (optional)
+# ports:
+#   - name: database
+#     adapter_type: postgres
+#     config:
+#       host: localhost
+#       port: 5432
+#       database: venomqa
+#       user: venomqa
+#       password: venomqa
