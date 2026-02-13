@@ -302,6 +302,13 @@ class APIDiscoverer:
         """
         Parse an OpenAPI operation into an Action.
 
+        Fully parses OpenAPI 3.0 operations including:
+        - Path parameters (extracted and used to fill path templates)
+        - Query parameters (with example values)
+        - Header parameters
+        - Request body (with schema resolution)
+        - Security requirements
+
         Args:
             method: HTTP method
             path: Endpoint path
@@ -317,48 +324,110 @@ class APIDiscoverer:
         if description and len(description) > 200:
             description = description[:197] + "..."
 
-        # Combine path-level and operation-level parameters
-        all_params = list(path_params) + operation.get("parameters", [])
+        # Add operation ID to description if available
+        operation_id = operation.get("operationId")
+        if operation_id and not description:
+            description = operation_id
+
+        # Combine path-level and operation-level parameters, resolving $refs
+        raw_params = list(path_params) + operation.get("parameters", [])
+        all_params = [self._resolve_parameter(p) for p in raw_params if isinstance(p, dict)]
+
+        # Extract path parameters and build example path
+        path_param_values: Dict[str, Any] = {}
+        for param in all_params:
+            if param.get("in") == "path":
+                param_name = param.get("name", "")
+                if param_name:
+                    value = self._get_param_example_value(param)
+                    path_param_values[param_name] = value
 
         # Extract query parameters
         query_params: Dict[str, Any] = {}
         for param in all_params:
-            if not isinstance(param, dict):
-                continue
             if param.get("in") == "query":
                 param_name = param.get("name", "")
                 if param_name:
-                    # Use example value if available, otherwise use placeholder
-                    example = param.get("example")
-                    schema = param.get("schema", {})
-                    if example is not None:
-                        query_params[param_name] = example
-                    elif schema.get("default") is not None:
-                        query_params[param_name] = schema.get("default")
-                    elif schema.get("example") is not None:
-                        query_params[param_name] = schema.get("example")
+                    value = self._get_param_example_value(param)
+                    if value is not None:
+                        query_params[param_name] = value
+                    # Include required params even without example
+                    elif param.get("required", False):
+                        schema = param.get("schema", {})
+                        query_params[param_name] = self._build_example_from_schema(schema)
+
+        # Extract cookie parameters (store in headers as Cookie)
+        cookie_params: Dict[str, Any] = {}
+        for param in all_params:
+            if param.get("in") == "cookie":
+                param_name = param.get("name", "")
+                if param_name:
+                    value = self._get_param_example_value(param)
+                    if value is not None:
+                        cookie_params[param_name] = value
 
         # Extract request body schema (for POST, PUT, PATCH)
         body: Optional[Dict[str, Any]] = None
         request_body = operation.get("requestBody", {})
+
+        # Resolve requestBody $ref if present
+        if "$ref" in request_body:
+            request_body = self._resolve_ref(request_body["$ref"])
+
         if request_body and method in ("POST", "PUT", "PATCH"):
             body = self._extract_request_body_example(request_body)
 
         # Determine if authentication is required
-        operation_security = operation.get("security", global_security)
-        requires_auth = bool(operation_security)
+        # Check operation-level security first, fall back to global
+        operation_security = operation.get("security")
+        if operation_security is None:
+            operation_security = global_security
+
+        # Empty array [] means no auth required (explicit override)
+        requires_auth = bool(operation_security) and operation_security != []
+
+        # Determine auth type from security schemes
+        auth_type: Optional[str] = None
+        if requires_auth and operation_security:
+            for sec_req in operation_security:
+                if isinstance(sec_req, dict):
+                    for scheme_name in sec_req.keys():
+                        scheme = self._spec_security_schemes.get(scheme_name, {})
+                        auth_type = scheme.get("type", "unknown")
+                        break
+                    if auth_type:
+                        break
 
         # Build headers from parameters
         headers: Dict[str, str] = {}
         for param in all_params:
-            if not isinstance(param, dict):
-                continue
             if param.get("in") == "header":
                 param_name = param.get("name", "")
-                if param_name and param_name.lower() not in ("authorization", "content-type"):
-                    example = param.get("example", param.get("schema", {}).get("example"))
-                    if example:
-                        headers[param_name] = str(example)
+                # Skip auth and content-type headers (handled separately)
+                if param_name and param_name.lower() not in (
+                    "authorization",
+                    "content-type",
+                    "accept",
+                ):
+                    value = self._get_param_example_value(param)
+                    if value is not None:
+                        headers[param_name] = str(value)
+                    elif param.get("required", False):
+                        schema = param.get("schema", {})
+                        example = self._build_example_from_schema(schema)
+                        if example is not None:
+                            headers[param_name] = str(example)
+
+        # Add cookie header if we have cookie params
+        if cookie_params:
+            cookie_str = "; ".join(f"{k}={v}" for k, v in cookie_params.items())
+            headers["Cookie"] = cookie_str
+
+        # Store path parameters in the Action for reference
+        # The endpoint keeps the template format for identification
+        # but we store resolved examples in params under _path_params key
+        if path_param_values:
+            query_params["_path_params"] = path_param_values
 
         return Action(
             method=method,
@@ -369,6 +438,52 @@ class APIDiscoverer:
             description=description,
             requires_auth=requires_auth,
         )
+
+    def _get_param_example_value(self, param: Dict[str, Any]) -> Any:
+        """
+        Extract an example value from a parameter definition.
+
+        Checks in order:
+        1. Direct example on parameter
+        2. Examples collection (first value)
+        3. Schema default
+        4. Schema example
+        5. Build from schema
+
+        Args:
+            param: OpenAPI parameter object
+
+        Returns:
+            Example value or None if not determinable
+        """
+        # Check direct example
+        if "example" in param:
+            return param["example"]
+
+        # Check examples collection
+        examples = param.get("examples", {})
+        if examples:
+            first_example = next(iter(examples.values()), {})
+            if "value" in first_example:
+                return first_example["value"]
+
+        # Check schema
+        schema = param.get("schema", {})
+        if not schema:
+            return None
+
+        # Resolve schema ref if present
+        if "$ref" in schema:
+            schema = self._resolve_ref(schema["$ref"])
+
+        # Check schema default and example
+        if "default" in schema:
+            return schema["default"]
+        if "example" in schema:
+            return schema["example"]
+
+        # Build example from schema type
+        return self._build_example_from_schema(schema)
 
     def _extract_request_body_example(
         self,
