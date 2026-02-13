@@ -115,11 +115,18 @@ venomqa = "venomqa.cli:main"
 
 [project.entry-points."venomqa.state_backends"]
 postgresql = "venomqa.state.postgres:PostgreSQLStateManager"
+mysql = "venomqa.state.mysql:MySQLStateManager"
+sqlite = "venomqa.state.sqlite:SQLiteStateManager"
+memory = "venomqa.state.memory:MemoryStateManager"
 
 [project.entry-points."venomqa.reporters"]
 markdown = "venomqa.reporters.markdown:MarkdownReporter"
 json = "venomqa.reporters.json_report:JSONReporter"
 junit = "venomqa.reporters.junit:JUnitReporter"
+html = "venomqa.reporters.html:HTMLReporter"
+sarif = "venomqa.reporters.sarif:SarifReporter"
+slack = "venomqa.reporters.slack:SlackReporter"
+discord = "venomqa.reporters.discord:DiscordReporter"
 
 [project.entry-points."venomqa.plugins"]
 # Built-in example plugins
@@ -128,6 +135,14 @@ timing-analyzer = "venomqa.plugins.examples.timing_analyzer:TimingAnalyzerPlugin
 custom-assertions = "venomqa.plugins.examples.custom_assertions:CustomAssertionsPlugin"
 slack-notifier = "venomqa.plugins.examples.slack_notifier:SlackNotifierPlugin"
 datadog-metrics = "venomqa.plugins.examples.datadog_metrics:DataDogMetricsPlugin"
+
+[project.entry-points."venomqa.adapters"]
+# Adapters for dependency injection
+postgres = "venomqa.adapters.storage:PostgresAdapter"
+redis = "venomqa.adapters.cache:RedisAdapter"
+time = "venomqa.adapters.time:ControllableTimeAdapter"
+mail = "venomqa.adapters.mail:MockMailAdapter"
+queue = "venomqa.adapters.queue:MockQueueAdapter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["venomqa"]
