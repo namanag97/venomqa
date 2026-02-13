@@ -722,4 +722,11 @@ __all__ = [
     "GraphQLGeneratedAction",
     "generate_actions_from_schema",
     "GraphQLTester",
+    # Preflight Checks
+    "CheckStatus",
+    "CheckResult",
+    "PreflightResult",
+    "PreflightChecker",
+    "run_preflight_checks",
+    "run_preflight_checks_with_output",
 ]
