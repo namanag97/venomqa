@@ -62,6 +62,23 @@ help:
 	@echo "  Reports:"
 	@echo "    report         Generate test reports"
 
+# Quick Start targets
+setup:
+	$(PYTHON) setup.py
+
+quickstart:
+	./scripts/quickstart.sh
+
+init:
+	venomqa init --with-sample
+
+preflight:
+	venomqa preflight
+
+doctor:
+	venomqa doctor
+
+# Installation targets
 install:
 	$(PIP) install -e .
 
