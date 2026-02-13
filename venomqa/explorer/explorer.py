@@ -231,12 +231,34 @@ class StateExplorer:
             headers: Custom authentication headers
             login_action: Action to execute for authentication
         """
-        # TODO: Implement authentication setup
-        # 1. Store token/headers
-        # 2. Update config
-        # 3. Execute login action if provided
-        # 4. Set initial state from login response
-        raise NotImplementedError("authenticate() not yet implemented")
+        # Store token
+        if token:
+            self._auth_token = token
+            self._auth_headers["Authorization"] = f"Bearer {token}"
+
+        # Store custom headers
+        if headers:
+            self._auth_headers.update(headers)
+
+        # Update config with auth token
+        if token:
+            self.config.auth_token = token
+
+        # Merge auth headers into config headers
+        self.config.headers.update(self._auth_headers)
+
+        # Create authenticated initial state
+        self._initial_state = State(
+            id="authenticated",
+            name="Authenticated",
+            properties={
+                "authenticated": True,
+                "has_token": bool(token),
+            },
+            discovered_at=datetime.now(),
+        )
+        self.engine.graph.add_state(self._initial_state)
+        self.engine.graph.initial_state = self._initial_state.id
 
     def set_initial_state(self, state: State) -> None:
         """
