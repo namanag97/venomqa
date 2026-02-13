@@ -92,26 +92,61 @@ class TestCheckPythonVersion:
         assert success is True
         assert f"Python {sys.version_info.major}.{sys.version_info.minor}" in message
 
-    @patch.object(sys, "version_info", (3, 10, 0, "final", 0))
     def test_python_version_310(self):
         """Test check_python_version with Python 3.10."""
-        success, message = check_python_version()
+        # Create a mock version_info that behaves like the real one
+        from types import SimpleNamespace
+
+        mock_version = SimpleNamespace(
+            major=3,
+            minor=10,
+            micro=0,
+            releaselevel="final",
+            serial=0,
+        )
+        # Make it comparable like a tuple
+        mock_version.__ge__ = lambda self, other: (self.major, self.minor) >= other[:2]
+
+        with patch.object(sys, "version_info", mock_version):
+            success, message = check_python_version()
 
         assert success is True
         assert "Python 3.10" in message
 
-    @patch.object(sys, "version_info", (3, 12, 1, "final", 0))
     def test_python_version_312(self):
         """Test check_python_version with Python 3.12."""
-        success, message = check_python_version()
+        from types import SimpleNamespace
+
+        mock_version = SimpleNamespace(
+            major=3,
+            minor=12,
+            micro=1,
+            releaselevel="final",
+            serial=0,
+        )
+        mock_version.__ge__ = lambda self, other: (self.major, self.minor) >= other[:2]
+
+        with patch.object(sys, "version_info", mock_version):
+            success, message = check_python_version()
 
         assert success is True
         assert "Python 3.12.1" in message
 
-    @patch.object(sys, "version_info", (3, 9, 0, "final", 0))
     def test_python_version_too_old(self):
         """Test check_python_version fails with Python < 3.10."""
-        success, message = check_python_version()
+        from types import SimpleNamespace
+
+        mock_version = SimpleNamespace(
+            major=3,
+            minor=9,
+            micro=0,
+            releaselevel="final",
+            serial=0,
+        )
+        mock_version.__ge__ = lambda self, other: (self.major, self.minor) >= other[:2]
+
+        with patch.object(sys, "version_info", mock_version):
+            success, message = check_python_version()
 
         assert success is False
         assert "requires >= 3.10" in message
