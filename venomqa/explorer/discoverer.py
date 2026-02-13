@@ -816,13 +816,85 @@ class APIDiscoverer:
         Returns:
             List of discovered Action objects
         """
-        # TODO: Implement HTML crawling
-        # 1. Fetch the start page
-        # 2. Parse for links and forms
-        # 3. Extract API endpoints from links
-        # 4. Build Action objects from forms
-        # 5. Recursively crawl discovered pages
-        raise NotImplementedError("discover_from_html() not yet implemented")
+        import httpx
+        import re
+
+        url = start_url or self.base_url
+        actions: List[Action] = []
+        visited_urls: Set[str] = set()
+        urls_to_visit: List[str] = [url]
+
+        async with httpx.AsyncClient(
+            timeout=self.config.request_timeout_seconds,
+            verify=self.config.verify_ssl,
+            follow_redirects=self.config.follow_redirects,
+        ) as client:
+            while urls_to_visit and len(visited_urls) < 100:  # Limit crawling
+                current_url = urls_to_visit.pop(0)
+                if current_url in visited_urls:
+                    continue
+
+                visited_urls.add(current_url)
+
+                try:
+                    response = await client.get(current_url)
+                    if response.status_code != 200:
+                        continue
+
+                    html_content = response.text
+
+                    # Extract links from href attributes
+                    link_pattern = r'href=["\']([^"\']+)["\']'
+                    links = re.findall(link_pattern, html_content)
+
+                    for link in links:
+                        # Skip non-API links
+                        if any(ext in link.lower() for ext in ['.css', '.js', '.png', '.jpg', '.gif', '.ico', '.svg']):
+                            continue
+
+                        # Normalize the link
+                        if link.startswith('/'):
+                            full_url = f"{self.base_url}{link}"
+                            endpoint = link
+                        elif link.startswith('http'):
+                            if not link.startswith(self.base_url):
+                                continue  # Skip external links
+                            full_url = link
+                            endpoint = link[len(self.base_url):]
+                        else:
+                            continue
+
+                        # Check if it looks like an API endpoint
+                        if '/api/' in endpoint or endpoint.startswith('/api'):
+                            normalized = self._normalize_endpoint(endpoint)
+                            if self._should_include_endpoint(normalized):
+                                action = Action(method="GET", endpoint=normalized)
+                                if action not in self.discovered_actions:
+                                    self.discovered_actions.add(action)
+                                    actions.append(action)
+
+                        # Add to crawl queue if it's an internal page
+                        if full_url not in visited_urls and full_url.startswith(self.base_url):
+                            urls_to_visit.append(full_url)
+
+                    # Extract forms and their actions
+                    form_pattern = r'<form[^>]*action=["\']([^"\']*)["\'][^>]*method=["\']([^"\']*)["\']'
+                    forms = re.findall(form_pattern, html_content, re.IGNORECASE)
+
+                    for form_action, form_method in forms:
+                        if form_action:
+                            endpoint = self._normalize_endpoint(form_action)
+                            if self._should_include_endpoint(endpoint):
+                                method = form_method.upper() if form_method else "POST"
+                                action = Action(method=method, endpoint=endpoint)
+                                if action not in self.discovered_actions:
+                                    self.discovered_actions.add(action)
+                                    actions.append(action)
+
+                except httpx.RequestError:
+                    continue
+
+        return actions
 
     async def discover_from_response(
         self,
