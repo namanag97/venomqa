@@ -306,7 +306,7 @@ class TestPreflightCheckerChecks:
         result = checker._check_database()
 
         assert result.status == CheckStatus.SKIPPED
-        assert "not configured" in result.message.lower()
+        assert "no database url" in result.message.lower()
 
     @patch("socket.socket")
     def test_check_database_reachable(self, mock_socket):
