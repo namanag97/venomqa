@@ -240,12 +240,24 @@ class StateDetector:
         Returns:
             Dictionary of state properties
         """
-        # TODO: Implement property extraction
-        # 1. Identify relevant fields
-        # 2. Filter out transient data
-        # 3. Normalize values
-        # 4. Return clean properties dict
-        raise NotImplementedError("_extract_state_properties() not yet implemented")
+        # Filter out transient/non-relevant fields
+        transient_fields = {
+            "timestamp", "created_at", "updated_at", "request_id",
+            "_links", "links", "meta", "_meta"
+        }
+
+        properties: Dict[str, Any] = {}
+        for key, value in response.items():
+            # Skip transient fields
+            if key.lower() in transient_fields:
+                continue
+            # Include scalar values and small lists/dicts
+            if isinstance(value, (str, int, float, bool, type(None))):
+                properties[key] = value
+            elif isinstance(value, (list, dict)) and len(str(value)) < 500:
+                properties[key] = value
+
+        return properties
 
     def _extract_links(
         self,
