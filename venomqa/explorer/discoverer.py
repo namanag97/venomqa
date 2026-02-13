@@ -63,10 +63,6 @@ class APIDiscoverer:
         self.discovered_actions: Set[Action] = set()
         self.discovered_endpoints: Set[str] = set()
 
-        # TODO: Initialize HTTP client for making requests
-        # TODO: Set up authentication if configured
-        # TODO: Configure request timeouts and retry logic
-
     async def discover(self) -> List[Action]:
         """
         Discover all available API endpoints.
