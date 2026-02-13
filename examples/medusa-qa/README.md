@@ -54,7 +54,24 @@ View the API docs:
 open http://localhost:9000/docs
 ```
 
-### 2. Run State Exploration
+### 2. Run Basic Test
+
+Verify the API is working with a simple end-to-end test:
+
+```bash
+cd qa
+python3 test_basic.py
+```
+
+This will:
+- Test all major API endpoints
+- Demonstrate context passing (IDs from one request used in the next)
+- Show a complete e-commerce flow from browsing to order completion
+- Verify admin operations (product CRUD, order management)
+
+Output shows each step with request/response details and accumulated context.
+
+### 3. Run State Exploration
 
 Automatically discover and test the Medusa API:
 
