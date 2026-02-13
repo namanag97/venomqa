@@ -1,0 +1,3 @@
+base_url: "http://localhost:9000"
+timeout: 30
+verbose: true
