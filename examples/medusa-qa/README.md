@@ -35,24 +35,23 @@ medusa-qa/
 
 ## Quick Start
 
-### 1. Start Medusa
+### 1. Start the Mock Medusa API
 
 ```bash
 cd examples/medusa-qa
 docker compose up -d
 ```
 
-Wait for services to be healthy (takes ~30-60 seconds):
-
-```bash
-docker compose ps
-```
-
-Check Medusa is ready:
+The API starts in ~10 seconds. Check it's ready:
 
 ```bash
 curl http://localhost:9000/health
 # Should return: {"status":"ok"}
+```
+
+View the API docs:
+```bash
+open http://localhost:9000/docs
 ```
 
 ### 2. Run State Exploration
