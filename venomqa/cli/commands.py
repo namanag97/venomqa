@@ -1250,6 +1250,7 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
         (base / "actions" / "__init__.py", ACTIONS_INIT_PY),
         (base / "fixtures" / "__init__.py", FIXTURES_INIT_PY),
         (base / "journeys" / "__init__.py", JOURNEYS_INIT_PY),
+        (base / "README.md", README_TEMPLATE.format(base_path=base_path)),
     ]
 
     # Add sample files if requested
