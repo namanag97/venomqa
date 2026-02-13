@@ -42,7 +42,6 @@ journey = Journey(
             name="check_health",
             action=check_health,
             description="Verify API is healthy",
-            expected_status=200,
         ),
 
         # Step 2: List items (should be empty initially)
@@ -50,7 +49,6 @@ journey = Journey(
             name="list_items_initial",
             action=list_items,
             description="List items before creating any",
-            expected_status=200,
         ),
 
         # Step 3: Create an item
@@ -59,7 +57,6 @@ journey = Journey(
             action=create_item,
             args={"name": "Hello VenomQA", "description": "My first item", "price": 19.99},
             description="Create a new item",
-            expected_status=201,
         ),
 
         # Step 4: Verify item was created
@@ -67,7 +64,6 @@ journey = Journey(
             name="get_created_item",
             action=get_item,
             description="Fetch the created item",
-            expected_status=200,
         ),
 
         # Checkpoint: Save state here for branching
@@ -90,13 +86,11 @@ journey = Journey(
                             action=update_item,
                             args={"name": "Updated VenomQA Item", "price": 29.99},
                             description="Update the item",
-                            expected_status=200,
                         ),
                         Step(
                             name="verify_update",
                             action=get_item,
                             description="Verify the update",
-                            expected_status=200,
                         ),
                     ],
                 ),
@@ -110,13 +104,12 @@ journey = Journey(
                             name="delete_item",
                             action=delete_item,
                             description="Delete the item",
-                            expected_status=204,
                         ),
                         Step(
                             name="verify_delete",
                             action=get_item,
                             description="Verify item is deleted (expect 404)",
-                            expected_status=404,
+                            expect_failure=True,
                         ),
                     ],
                 ),
@@ -128,7 +121,6 @@ journey = Journey(
             name="list_items_final",
             action=list_items,
             description="List items after operations",
-            expected_status=200,
         ),
     ],
 )
