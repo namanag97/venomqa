@@ -195,20 +195,17 @@ journey = Journey(
             name="health_check",
             action=health_check,
             description="Verify API is healthy",
-            expected_status=200,
         ),
         Step(
             name="list_items",
             action=get_items,
             description="List existing items",
-            expected_status=200,
         ),
         Step(
             name="create_item",
             action=create_item,
             args={"name": "My Test Item"},
             description="Create a new item",
-            expected_status=[200, 201],
         ),
         Checkpoint(
             name="item_created",
