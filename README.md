@@ -1,281 +1,299 @@
 # VenomQA
 
-[![PyPI version](https://badge.fury.io/py/venomqa.svg)](https://badge.fury.io/py/venomqa)
-[![Python Support](https://img.shields.io/pypi/pyversions/venomqa.svg)](https://pypi.org/project/venomqa/)
+**Stateful Journey Testing Framework** - Test APIs like a human QA would.
+
+[![PyPI version](https://badge.fury.io/py/venomqa.svg)](https://pypi.org/project/venomqa/)
+[![Python versions](https://img.shields.io/pypi/pyversions/venomqa.svg)](https://pypi.org/project/venomqa/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Tests](https://github.com/your-org/venomqa/workflows/Tests/badge.svg)](https://github.com/your-org/venomqa/actions)
-[![Coverage](https://codecov.io/gh/your-org/venomqa/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/venomqa)
 
-A **stateful journey testing framework** for API QA with database checkpointing and branch exploration.
+---
 
-VenomQA lets you test complex user flows while automatically exploring multiple execution paths from saved database states. Unlike traditional test runners, it can fork execution at checkpoints, test alternative scenarios, and roll back to pristine state between branches.
+## Why VenomQA?
 
-## Features
+Traditional API testing treats each request in isolation. But real users follow journeys through your application, and bugs emerge from specific state combinations.
 
-- **State Branching** - Save database checkpoints and fork execution to test multiple paths from the same state
-- **Journey DSL** - Declarative syntax for defining user flows with Steps, Checkpoints, and Branches
-- **Ports & Adapters** - Clean architecture with swappable backends for databases, caches, queues, and more
-- **Issue Capture** - Automatic failure detection with request/response logs and fix suggestions
-- **Infrastructure Management** - Docker Compose integration for isolated test environments
-- **Context Passing** - Share data between steps with typed execution context
-- **Rich Reporters** - Markdown, JSON, JUnit XML, and HTML output formats
+**VenomQA is different:**
 
-## Installation
+| Problem | VenomQA Solution |
+|---------|------------------|
+| Manually tracking IDs between requests | **Context-aware testing** - IDs flow automatically |
+| Writing separate tests for each path | **State chain exploration** - discover all API paths |
+| Isolated endpoint testing | **Real journeys** - test complete user flows |
+| Missing edge cases | **Smart issue detection** - catches calculation bugs, data inconsistencies |
 
-```bash
-pip install venomqa
-```
-
-For PostgreSQL state management:
-
-```bash
-pip install "venomqa[postgres]"
-```
+---
 
 ## Quick Start
 
-Create a journey file `journeys/my_journey.py`:
+```bash
+# Install
+pip install venomqa
+
+# Initialize project
+venomqa init my-project
+cd my-project
+
+# Run preflight checks
+venomqa preflight
+
+# Run tests
+venomqa run
+```
+
+---
+
+## Example Journey
 
 ```python
-from venomqa import Journey, Step, Branch, Path, Checkpoint
+from venomqa import Journey, Step
 
-def login(client, context):
-    response = client.post("/api/auth/login", json={
-        "email": "test@example.com",
-        "password": "secret"
-    })
-    context["token"] = response.json()["token"]
+def create_cart(client, context):
+    response = client.post("/api/cart")
+    context["cart_id"] = response.json()["id"]
     return response
 
-def create_order(client, context):
-    return client.post("/api/orders", json={"item_id": 1, "quantity": 1})
+def add_item(client, context):
+    return client.post(f"/api/cart/{context['cart_id']}/items", json={
+        "product_id": 123,
+        "quantity": 2
+    })
 
-def pay_with_card(client, context):
-    return client.post("/api/payments", json={"method": "credit_card"})
+def checkout(client, context):
+    response = client.post(f"/api/cart/{context['cart_id']}/checkout")
+    context["order_id"] = response.json()["order_id"]
+    return response
 
-def pay_with_wallet(client, context):
-    return client.post("/api/payments", json={"method": "wallet"})
+def verify_order(client, context):
+    return client.get(f"/api/orders/{context['order_id']}")
 
 journey = Journey(
     name="checkout_flow",
-    description="Test checkout with multiple payment methods",
+    description="Complete checkout with automatic ID chaining",
     steps=[
-        Step(name="login", action=login),
-        Checkpoint(name="authenticated"),
-        Step(name="create_order", action=create_order),
-        Checkpoint(name="order_created"),
-        Branch(
-            checkpoint_name="order_created",
-            paths=[
-                Path(name="card_payment", steps=[
-                    Step(name="pay_card", action=pay_with_card),
-                ]),
-                Path(name="wallet_payment", steps=[
-                    Step(name="pay_wallet", action=pay_with_wallet),
-                ]),
-            ]
-        ),
-    ],
-)
-```
-
-Run the journey:
-
-```bash
-venomqa run checkout_flow
-```
-
-## Core Concepts
-
-### Journey
-
-A complete user scenario from start to finish. Contains a sequence of Steps, Checkpoints, and Branches.
-
-```python
-journey = Journey(
-    name="user_registration",
-    description="Full registration flow",
-    tags=["auth", "critical"],
-    steps=[...],
-)
-```
-
-### Step
-
-A single action with assertions. Steps receive `(client, context)` and can access previous results.
-
-```python
-Step(
-    name="fetch_profile",
-    action=get_profile,
-    timeout=10.0,
-    retries=3,
-    expect_failure=False,
-)
-```
-
-### Checkpoint
-
-A savepoint for database state. Enables rollback after exploring branches.
-
-```python
-Checkpoint(name="user_created")
-```
-
-### Branch
-
-Forks execution to explore multiple paths from a checkpoint.
-
-```python
-Branch(
-    checkpoint_name="user_created",
-    paths=[
-        Path(name="admin_flow", steps=[...]),
-        Path(name="regular_user_flow", steps=[...]),
+        Step("create_cart", create_cart),       # Returns cart_id
+        Step("add_item", add_item),             # Uses cart_id
+        Step("checkout", checkout),             # Uses cart_id, returns order_id
+        Step("verify_order", verify_order),     # Uses order_id
     ]
 )
 ```
 
-## Ports & Adapters
+**Key insight:** Context flows between steps automatically. No manual ID tracking.
 
-VenomQA uses a **Ports and Adapters** architecture for clean separation between test logic and external dependencies.
+---
 
-### What are Ports?
+## State Chain Exploration
 
-Ports are abstract interfaces that define what operations your tests need:
-
-```python
-from venomqa.ports import CachePort, MailPort, QueuePort
-
-# Depend on the abstraction
-def test_with_cache(cache: CachePort):
-    cache.set("user:1", {"name": "John"})
-    assert cache.get("user:1") is not None
-```
-
-### What are Adapters?
-
-Adapters are concrete implementations for real services:
+Test multiple paths from a single checkpoint:
 
 ```python
-from venomqa.adapters import RedisCacheAdapter, MailhogAdapter
+from venomqa import Journey, Step, Checkpoint, Branch, Path
 
-# Use in tests
-cache = RedisCacheAdapter(host="localhost")
-mail = MailhogAdapter(host="localhost")
-
-# Wait for email
-email = mail.wait_for_email(to="user@example.com", timeout=30.0)
+journey = Journey(
+    name="payment_methods",
+    steps=[
+        Step("login", login),
+        Step("add_to_cart", add_to_cart),
+        Checkpoint("ready_to_pay"),  # Save database state
+        Branch(
+            checkpoint_name="ready_to_pay",
+            paths=[
+                Path("credit_card", [Step("pay_card", pay_card)]),
+                Path("paypal", [Step("pay_paypal", pay_paypal)]),
+                Path("crypto", [Step("pay_crypto", pay_crypto)]),
+            ]
+        ),
+    ]
+)
 ```
 
-### Available Adapters
+Each payment path runs from the same database state. No flaky tests from inconsistent data.
 
-| Category | Adapters |
-|----------|----------|
-| **Email** | MailhogAdapter, MailpitAdapter, SMTPMockAdapter |
-| **Cache** | RedisCacheAdapter |
-| **Queue** | RedisQueueAdapter, CeleryQueueAdapter |
-| **Search** | ElasticsearchAdapter |
-| **Storage** | S3StorageAdapter, LocalStorageAdapter |
-| **Mock** | WireMockAdapter |
-| **Time** | ControllableTimeAdapter, RealTimeAdapter |
-| **Concurrency** | ThreadingConcurrencyAdapter, AsyncConcurrencyAdapter |
+---
 
-### Benefits
+## Features
 
-- **Testability**: Swap real services for mocks in unit tests
-- **Flexibility**: Change infrastructure without modifying test code
-- **Clarity**: Clear contracts between test logic and external systems
+### Core Testing
+- **Stateful journeys** with automatic context passing
+- **State chain exploration** with checkpoints and branches
+- **Smart assertions** that catch data inconsistencies
 
-See [Ports Documentation](docs/ports.md) and [Adapters Reference](docs/adapters.md) for details.
+### Integration
+- **OpenAPI spec parsing** for automatic endpoint discovery
+- **GraphQL support** with query/mutation testing
+- **gRPC support** for microservices
 
-## CLI Usage
+### Infrastructure
+- **Docker Compose integration** for test environments
+- **Multiple database backends** (PostgreSQL, MySQL, SQLite)
+- **Redis, S3, and queue adapters**
+
+### Reporting
+- **HTML reports** with visual test results
+- **JSON output** for CI/CD integration
+- **JUnit XML** for Jenkins/GitHub Actions
+- **Slack/Discord notifications**
+
+### Performance
+- **Load testing** capabilities
+- **Security scanning** integration
+- **Parallel execution** support
+
+---
+
+## Installation Options
 
 ```bash
+# Basic installation
+pip install venomqa
+
+# With PostgreSQL state management
+pip install "venomqa[postgres]"
+
+# With Redis adapters
+pip install "venomqa[redis]"
+
+# With all features
+pip install "venomqa[all]"
+```
+
+**Requirements:** Python 3.10+
+
+---
+
+## CLI Commands
+
+```bash
+# Initialize new project
+venomqa init
+
 # Run all journeys
 venomqa run
 
-# Run specific journeys
-venomqa run checkout_flow payment_flow
+# Run specific journey
+venomqa run checkout_flow
 
-# Run with options
-venomqa run checkout_flow --fail-fast --format json
-
-# Skip infrastructure setup
-venomqa run --no-infra
+# Run with verbose output
+venomqa run --verbose
 
 # List available journeys
 venomqa list
 
-# Generate report
-venomqa report --format markdown --output reports/test.md
-venomqa report --format junit --output reports/junit.xml
+# Validate configuration
+venomqa validate
+
+# Generate reports
+venomqa report --format html --output reports/
 ```
+
+---
 
 ## Configuration
 
-Create `venomqa.yaml`:
+Create `venomqa.yaml` in your project:
 
 ```yaml
 base_url: "http://localhost:8000"
 db_url: "postgresql://qa:secret@localhost:5432/qa_test"
 db_backend: "postgresql"
-docker_compose_file: "docker-compose.qa.yml"
 timeout: 30
 retry_count: 3
-parallel_paths: 1
-report_dir: "reports"
+
 report_formats:
-  - markdown
+  - html
   - junit
 ```
 
-Environment variables (prefix with `VENOMQA_`):
+Override with environment variables:
 
 ```bash
-export VENOMQA_BASE_URL="http://api.example.com"
-export VENOMQA_DB_URL="postgresql://user:pass@host/db"
+export VENOMQA_BASE_URL="http://api.staging.example.com"
 export VENOMQA_VERBOSE=true
 ```
 
+---
+
 ## Documentation
 
+### Getting Started
+- [Quick Start Guide](docs/QUICKSTART.md) - Get running in 5 minutes
+- [Getting Started](docs/getting-started.md) - Full installation and setup
+- [Your First Journey](docs/tutorials/first-journey.md) - Step-by-step tutorial
+
+### Core Concepts
+- [Journeys](docs/journeys.md) - Writing effective test journeys
+- [State Explorer](docs/STATE_CHAIN_SPEC.md) - State chain exploration deep dive
+- [Branching](docs/concepts/branching.md) - Testing multiple paths
+
+### Reference
+- [CLI Reference](docs/cli.md) - All CLI commands and options
 - [API Reference](docs/api.md) - Complete API documentation
-- [Ports & Adapters](docs/ports.md) - Ports and Adapters architecture guide
-- [Adapters Reference](docs/adapters.md) - All available adapters and configuration
-- [CLI Documentation](docs/cli.md) - Full CLI usage guide
-- [Writing Journeys](docs/journeys.md) - Guide to creating test journeys
-- [Database Backends](docs/backends.md) - State management configuration
-- [Advanced Usage](docs/advanced.md) - Caching, parallelism, custom reporters
-- [Examples](docs/examples.md) - Real-world usage examples
+- [Configuration](docs/reference/config.md) - All configuration options
+
+### Advanced
+- [Ports and Adapters](docs/ports.md) - Clean architecture patterns
+- [Custom Reporters](docs/advanced/custom-reporters.md) - Build your own reporters
+- [CI/CD Integration](docs/ci-cd.md) - GitHub Actions, GitLab CI
+
+### Examples
+- [Examples Gallery](docs/examples.md) - Real-world patterns
+- [Todo App Example](examples/todo_app/) - Complete working example
+- [FastAPI Example](examples/fastapi-example/) - FastAPI integration
+
+---
 
 ## Project Structure
 
 ```
-my_project/
-├── venomqa.yaml
-├── docker-compose.qa.yml
-├── journeys/
-│   ├── __init__.py
-│   ├── auth_flow.py
-│   ├── checkout.py
-│   └── admin.py
+my-project/
+├── venomqa.yaml              # Configuration
+├── docker-compose.qa.yml     # Test infrastructure
 ├── actions/
-│   ├── __init__.py
-│   ├── auth.py
-│   └── items.py
-└── reports/
+│   ├── auth.py               # Login, logout, register
+│   └── orders.py             # Order operations
+├── journeys/
+│   ├── checkout.py           # Checkout flows
+│   └── user_management.py    # User journeys
+└── reports/                  # Generated reports
 ```
+
+---
+
+## Comparison
+
+| Feature | VenomQA | Postman | pytest | Playwright |
+|---------|---------|---------|--------|------------|
+| Stateful journeys | Yes | Manual | Manual | Yes |
+| State branching | Yes | No | No | No |
+| Context auto-flow | Yes | Manual | Manual | Manual |
+| Database checkpoints | Yes | No | No | No |
+| OpenAPI integration | Yes | Yes | Plugin | No |
+| Load testing | Yes | Yes | Plugin | No |
+
+---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.
+We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for details.
 
-## Changelog
+```bash
+# Clone and setup
+git clone https://github.com/venomqa/venomqa.git
+cd venomqa
+pip install -e ".[dev]"
+pre-commit install
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+# Run tests
+pytest
+```
+
+---
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+Built by [Naman Agarwal](https://github.com/namanagarwal) and contributors.
