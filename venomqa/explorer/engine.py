@@ -1522,7 +1522,7 @@ class ExplorationEngine:
                     skipped_actions.append((action, "Unresolved path parameters"))
                     logger.debug(
                         f"Skipping {action.method} {action.endpoint} - "
-                        f"can't resolve path params with context: {current_context}"
+                        f"can't resolve path params with context: {current_context.to_dict()}"
                     )
                     continue
 
