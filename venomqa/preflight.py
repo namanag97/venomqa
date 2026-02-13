@@ -254,6 +254,149 @@ class PreflightChecker:
         self.result.total_duration_ms = (time.perf_counter() - start_time) * 1000
         return self.result
 
+    def _check_python_version(self) -> CheckResult:
+        """Check if Python version meets minimum requirements (>= 3.10)."""
+        start_time = time.perf_counter()
+
+        version = sys.version_info
+        version_str = f"{version.major}.{version.minor}.{version.micro}"
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        if version >= (3, 10):
+            return CheckResult(
+                name="python_version",
+                status=CheckStatus.PASSED,
+                message=f"Python {version_str}",
+                duration_ms=duration_ms,
+                details={"version": version_str},
+            )
+
+        return CheckResult(
+            name="python_version",
+            status=CheckStatus.FAILED,
+            message=f"Python {version_str} is not supported (requires >= 3.10)",
+            duration_ms=duration_ms,
+            details={"version": version_str, "required": "3.10"},
+        )
+
+    def _check_required_dependencies(self) -> CheckResult:
+        """Check if all required Python dependencies are installed."""
+        start_time = time.perf_counter()
+
+        required_packages = [
+            ("httpx", "httpx"),
+            ("pydantic", "pydantic"),
+            ("click", "click"),
+            ("rich", "rich"),
+            ("yaml", "pyyaml"),
+        ]
+
+        missing = []
+        installed = []
+
+        for import_name, package_name in required_packages:
+            try:
+                module = __import__(import_name)
+                version = getattr(module, "__version__", "installed")
+                installed.append(f"{package_name}=={version}")
+            except ImportError:
+                missing.append(package_name)
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        if missing:
+            return CheckResult(
+                name="required_dependencies",
+                status=CheckStatus.FAILED,
+                message=f"Missing packages: {', '.join(missing)}",
+                duration_ms=duration_ms,
+                details={"missing": missing, "installed": installed},
+            )
+
+        return CheckResult(
+            name="required_dependencies",
+            status=CheckStatus.PASSED,
+            message=f"All {len(installed)} required packages installed",
+            duration_ms=duration_ms,
+            details={"installed": installed},
+        )
+
+    def _check_docker(self) -> CheckResult:
+        """Check if Docker is installed and the daemon is running."""
+        start_time = time.perf_counter()
+
+        if not shutil.which("docker"):
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            return CheckResult(
+                name="docker",
+                status=CheckStatus.WARNING,
+                message="Docker not found in PATH (optional)",
+                duration_ms=duration_ms,
+            )
+
+        try:
+            # Check Docker version
+            version_result = subprocess.run(
+                ["docker", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if version_result.returncode != 0:
+                duration_ms = (time.perf_counter() - start_time) * 1000
+                return CheckResult(
+                    name="docker",
+                    status=CheckStatus.WARNING,
+                    message="Docker command failed",
+                    duration_ms=duration_ms,
+                )
+
+            docker_version = version_result.stdout.strip()
+
+            # Check if daemon is running
+            info_result = subprocess.run(
+                ["docker", "info"],
+                capture_output=True,
+                timeout=10,
+            )
+
+            duration_ms = (time.perf_counter() - start_time) * 1000
+
+            if info_result.returncode == 0:
+                return CheckResult(
+                    name="docker",
+                    status=CheckStatus.PASSED,
+                    message=docker_version,
+                    duration_ms=duration_ms,
+                    details={"version": docker_version, "daemon_running": True},
+                )
+            else:
+                return CheckResult(
+                    name="docker",
+                    status=CheckStatus.WARNING,
+                    message="Docker installed but daemon not running",
+                    duration_ms=duration_ms,
+                    details={"version": docker_version, "daemon_running": False},
+                )
+
+        except subprocess.TimeoutExpired:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            return CheckResult(
+                name="docker",
+                status=CheckStatus.WARNING,
+                message="Docker check timed out",
+                duration_ms=duration_ms,
+            )
+        except Exception as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            return CheckResult(
+                name="docker",
+                status=CheckStatus.WARNING,
+                message=f"Could not check Docker: {e}",
+                duration_ms=duration_ms,
+            )
+
     def _check_target_api(self) -> CheckResult:
         """Check if the target API is reachable."""
         base_url = self.config.get("base_url", "http://localhost:8000")
