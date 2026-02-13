@@ -148,7 +148,7 @@ def main():
     output_dir = Path(__file__).parent / "reports"
     output_dir.mkdir(exist_ok=True)
 
-    visualizer = GraphVisualizer(graph=graph, issues=issues)
+    visualizer = GraphVisualizer(graph=graph)
 
     # Generate Mermaid diagram
     mermaid = visualizer.to_mermaid()
