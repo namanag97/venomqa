@@ -50,6 +50,7 @@ __all__ = [
     # Models
     "StateID",
     "State",
+    "ChainState",
     "Transition",
     "Action",
     "StateGraph",
@@ -64,9 +65,14 @@ __all__ = [
     "ExplorationEngine",
     "ExplorationStrategy",
     "ExplorationError",
+    "ChainExplorationResult",
     "GraphVisualizer",
     "OutputFormat",
     "ExplorationReporter",
     "ReportFormat",
     "StateExplorer",
+    # Context functions
+    "extract_context",
+    "substitute_path_params",
+    "generate_state_name",
 ]
