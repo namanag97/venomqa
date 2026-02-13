@@ -228,9 +228,8 @@ def add_to_cart(cart_id: str, item: LineItem):
     }
 
     carts_db[cart_id]["items"].append(line_item)
-    # BUG: Wrong calculation - divides instead of multiplies
     carts_db[cart_id]["total"] = sum(
-        item["unit_price"] // item["quantity"]  # WRONG: should be *
+        item["unit_price"] * item["quantity"]
         for item in carts_db[cart_id]["items"]
     )
 
