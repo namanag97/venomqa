@@ -4,13 +4,27 @@ from __future__ import annotations
 
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import click
 
-from venomqa.config import QAConfig, load_config
+# Note: watchdog is imported lazily in the watch command to avoid import errors
+# when watchdog is not installed
+
+from venomqa.config import ConfigLoadError, ConfigValidationError, QAConfig, load_config
+from venomqa.errors.debug import (
+    DebugLevel,
+    DebugLogger,
+    StepThroughController,
+)
 from venomqa.runner import JourneyRunner
+
+# Exit codes for CI/CD integration
+EXIT_SUCCESS = 0  # All journeys passed
+EXIT_FAILURE = 1  # Some journeys failed
+EXIT_CONFIG_ERROR = 2  # Configuration error
 
 VENVOMQA_YAML_TEMPLATE = """# VenomQA Configuration
 # See documentation: https://github.com/your-org/venomqa
@@ -149,22 +163,55 @@ def discover_journeys() -> dict[str, Any]:
     return journeys
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--config", "-c", type=click.Path(exists=True), help="Path to config file")
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, config: str | None) -> None:
-    """VenomQA - Stateful Journey QA Framework."""
+    """VenomQA - Stateful Journey QA Framework.
+
+    Exit codes:
+        0 - All journeys passed
+        1 - Some journeys failed
+        2 - Configuration error
+    """
     ctx.ensure_object(dict)
 
-    config_obj = load_config(config)
+    # Don't load config for init command - it creates the config file
+    if ctx.invoked_subcommand == "init":
+        ctx.obj["verbose"] = verbose
+        setup_logging(verbose)
+        return
+
+    try:
+        config_obj = load_config(config)
+    except (ConfigLoadError, ConfigValidationError) as e:
+        click.echo(f"Configuration error: {e}", err=True)
+        if hasattr(e, "details") and e.details:
+            if "suggestions" in e.details:
+                click.echo("\nSuggestions:", err=True)
+                for suggestion in e.details["suggestions"]:
+                    click.echo(f"  - {suggestion}", err=True)
+        sys.exit(EXIT_CONFIG_ERROR)
+
     if verbose:
-        config_obj.verbose = True
+        config_obj["verbose"] = True
 
     ctx.obj["config"] = config_obj
     ctx.obj["verbose"] = verbose
 
     setup_logging(verbose)
+
+
+# Register history subcommands
+from venomqa.cli.history import history
+
+cli.add_command(history)
+
+# Register doctor command
+from venomqa.cli.doctor import doctor
+
+cli.add_command(doctor)
 
 
 @cli.command()
@@ -185,6 +232,58 @@ def cli(ctx: click.Context, verbose: bool, config: str | None) -> None:
     multiple=True,
     help="Port configuration in format: name=adapter_type (e.g., database=postgres)",
 )
+@click.option(
+    "--benchmark",
+    is_flag=True,
+    help="Run in benchmark mode with performance metrics",
+)
+@click.option(
+    "--benchmark-iterations",
+    type=int,
+    default=10,
+    help="Number of benchmark iterations (default: 10)",
+)
+@click.option(
+    "--parallel",
+    "-p",
+    type=int,
+    default=1,
+    help="Number of parallel journeys to run (default: 1)",
+)
+@click.option(
+    "--debug",
+    "-d",
+    is_flag=True,
+    help="Enable debug mode with detailed logging of HTTP requests, SQL queries, and timing",
+)
+@click.option(
+    "--debug-log",
+    type=click.Path(),
+    default=None,
+    help="Path to save debug log file (default: logs/debug-<timestamp>.log)",
+)
+@click.option(
+    "--step",
+    "step_through",
+    is_flag=True,
+    help="Enable step-through mode - pause after each step for inspection",
+)
+@click.option(
+    "--notify-on-failure",
+    is_flag=True,
+    help="Send notifications only on failure",
+)
+@click.option(
+    "--notify-always",
+    is_flag=True,
+    help="Send notifications on both success and failure",
+)
+@click.option(
+    "--report-url",
+    type=str,
+    default=None,
+    help="URL to include in notifications linking to the full report",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -193,13 +292,34 @@ def run(
     output_format: str,
     fail_fast: bool,
     ports: tuple[str, ...],
+    benchmark: bool,
+    benchmark_iterations: int,
+    parallel: int,
+    debug: bool,
+    debug_log: str | None,
+    step_through: bool,
+    notify_on_failure: bool,
+    notify_always: bool,
+    report_url: str | None,
 ) -> None:
     """Run journeys (optionally filtered by name).
 
     If no journey names are provided, runs all discovered journeys.
+
+    Use --benchmark to run journeys multiple times and collect performance
+    metrics including steps/second and journeys/minute.
+
+    Use --parallel to run multiple journeys concurrently (each with its
+    own isolated client and state).
+
+    Use --debug to enable detailed logging of HTTP requests/responses,
+    SQL queries, and timing breakdowns. Logs are saved to a file.
+
+    Use --step to pause after each step for manual inspection.
+    Type 'help' at the prompt for available commands.
     """
-    config: QAConfig = ctx.obj["config"]
-    config.fail_fast = fail_fast
+    config: dict[str, Any] = ctx.obj["config"]
+    config["fail_fast"] = fail_fast
 
     parsed_ports = _parse_ports(ports, config)
 
@@ -216,34 +336,102 @@ def run(
             click.echo(f"Journey not found: {name}", err=True)
             sys.exit(1)
 
-    click.echo(f"Running {len(to_run)} journey(s)...")
+    from venomqa.cli.output import CLIOutput, ProgressConfig
+
+    output = CLIOutput(ProgressConfig())
+
+    # Benchmark mode
+    if benchmark:
+        output.console.print(
+            f"\n[bold]Benchmarking {len(to_run)} journey(s) "
+            f"({benchmark_iterations} iterations each)...[/bold]"
+        )
+        _run_benchmark_mode(
+            to_run, journeys, config, parsed_ports, benchmark_iterations, output, output_format
+        )
+        return
+
+    # Parallel execution mode
+    if parallel > 1:
+        output.console.print(
+            f"\n[bold]Running {len(to_run)} journey(s) with {parallel} parallel workers...[/bold]"
+        )
+        _run_parallel_mode(
+            to_run, journeys, config, no_infra, parsed_ports, parallel, output, output_format, ctx
+        )
+        return
+
+    # Configure debug logger if debug mode is enabled
+    debug_logger_instance: DebugLogger | None = None
+    if debug:
+        if debug_log is None:
+            # Generate default log path with timestamp
+            log_dir = Path("logs")
+            log_dir.mkdir(exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            debug_log = str(log_dir / f"debug-{timestamp}.log")
+
+        debug_logger_instance = DebugLogger.configure(
+            enabled=True,
+            log_file=debug_log,
+            level=DebugLevel.VERBOSE if ctx.obj.get("verbose") else DebugLevel.DETAILED,
+        )
+        output.console.print(f"[dim]Debug logging enabled. Log file: {debug_log}[/dim]")
+
+    # Configure step-through controller if step mode is enabled
+    step_controller: StepThroughController | None = None
+    if step_through:
+        step_controller = StepThroughController(enabled=True)
+        output.console.print("[dim]Step-through mode enabled. Press Enter to continue after each step.[/dim]")
+
+    # Store debug/step config for journey execution
+    config["debug_logger"] = debug_logger_instance
+    config["step_controller"] = step_controller
+
+    # Standard sequential mode
+    output.console.print(f"\n[bold]Running {len(to_run)} journey(s)...[/bold]")
 
     results: list[dict[str, Any]] = []
     all_passed = True
 
-    for journey_name in to_run:
-        click.echo(f"\n→ Running journey: {journey_name}")
+    try:
+        for journey_name in to_run:
+            journey_data = _load_journey(journey_name, journeys[journey_name]["path"])
+            if journey_data is None:
+                output.console.print(
+                    f"[red]x Failed to load journey: {journey_name}[/red]", err=True
+                )
+                all_passed = False
+                continue
 
-        journey_data = _load_journey(journey_name, journeys[journey_name]["path"])
-        if journey_data is None:
-            click.echo(f"  ✗ Failed to load journey: {journey_name}", err=True)
-            all_passed = False
-            continue
+            result = _execute_journey(journey_data, config, no_infra, parsed_ports)
+            results.append(result)
 
-        result = _execute_journey(journey_data, config, no_infra, parsed_ports)
-        results.append(result)
+            all_passed = all_passed and result.get("success", False)
 
-        if result.get("success"):
-            click.echo(f"  ✓ Passed ({result.get('duration_ms', 0):.0f}ms)")
-        else:
-            click.echo(f"  ✗ Failed ({result.get('duration_ms', 0):.0f}ms)")
-            all_passed = False
-
-            if fail_fast:
-                click.echo("\nFail-fast triggered, stopping.")
+            if not result.get("success") and fail_fast:
+                output.console.print("\n[yellow]Fail-fast triggered, stopping.[/yellow]")
                 break
 
+    finally:
+        # Close debug logger
+        if debug_logger_instance:
+            debug_logger_instance.close()
+            output.console.print(f"[dim]Debug log saved to: {debug_log}[/dim]")
+
     ctx.obj["last_results"] = results
+
+    # Handle notifications
+    if notify_on_failure or notify_always:
+        _send_notifications(
+            results=results,
+            config=config,
+            notify_on_failure=notify_on_failure,
+            notify_always=notify_always,
+            report_url=report_url,
+            all_passed=all_passed,
+            output=output,
+        )
 
     if output_format == "json":
         import json
@@ -252,14 +440,163 @@ def run(
     else:
         _print_summary(results)
 
-    sys.exit(0 if all_passed else 1)
+    sys.exit(EXIT_SUCCESS if all_passed else EXIT_FAILURE)
 
 
-def _parse_ports(ports: tuple[str, ...], config: QAConfig) -> dict[str, Any]:
+def _run_benchmark_mode(
+    to_run: list[str],
+    journeys: dict[str, Any],
+    config: dict[str, Any],
+    ports: dict[str, Any],
+    iterations: int,
+    output: Any,
+    output_format: str,
+) -> None:
+    """Run journeys in benchmark mode."""
+    from venomqa import Client
+    from venomqa.performance.benchmark import Benchmarker, BenchmarkConfig, BenchmarkSuite
+
+    suite = BenchmarkSuite(
+        BenchmarkConfig(
+            iterations=iterations,
+            warmup_iterations=max(1, iterations // 10),
+            verbose=False,
+        )
+    )
+
+    for journey_name in to_run:
+        journey_data = _load_journey(journey_name, journeys[journey_name]["path"])
+        if journey_data is None:
+            output.console.print(f"[red]x Failed to load journey: {journey_name}[/red]", err=True)
+            continue
+
+        def runner_factory(j=journey_data):
+            client = Client(
+                base_url=config.get("base_url", "http://localhost:8000"),
+                timeout=config.get("timeout", 30),
+            )
+            return JourneyRunner(
+                client=client,
+                fail_fast=False,
+                capture_logs=False,
+                ports=ports,
+            )
+
+        suite.add(journey_data, runner_factory)
+
+    results = suite.run_all()
+
+    if output_format == "json":
+        import json
+
+        data = [r.to_dict() for r in results]
+        click.echo(json.dumps(data, indent=2))
+    else:
+        output.console.print(suite.get_report())
+
+    sys.exit(0)
+
+
+def _run_parallel_mode(
+    to_run: list[str],
+    journeys: dict[str, Any],
+    config: dict[str, Any],
+    no_infra: bool,
+    ports: dict[str, Any],
+    parallel: int,
+    output: Any,
+    output_format: str,
+    ctx: click.Context,
+) -> None:
+    """Run journeys in parallel mode."""
+    from venomqa import Client
+    from venomqa.performance.optimizations import ParallelJourneyExecutor
+
+    # Load all journeys first
+    journey_objects = []
+    for journey_name in to_run:
+        journey_data = _load_journey(journey_name, journeys[journey_name]["path"])
+        if journey_data is None:
+            output.console.print(f"[red]x Failed to load journey: {journey_name}[/red]", err=True)
+            continue
+        journey_objects.append(journey_data)
+
+    if not journey_objects:
+        output.console.print("[red]No valid journeys to run[/red]", err=True)
+        sys.exit(1)
+
+    def runner_factory():
+        client = Client(
+            base_url=config.get("base_url", "http://localhost:8000"),
+            timeout=config.get("timeout", 30),
+        )
+        return JourneyRunner(
+            client=client,
+            fail_fast=config.get("fail_fast", False),
+            capture_logs=config.get("capture_logs", True),
+            log_lines=config.get("log_lines", 50),
+            ports=ports,
+        )
+
+    executor = ParallelJourneyExecutor(
+        max_workers=parallel,
+        fail_fast=config.get("fail_fast", False),
+    )
+
+    result = executor.run(journey_objects, runner_factory)
+
+    # Convert to standard result format
+    results = []
+    for jr in result.journey_results:
+        if jr:
+            results.append({
+                "journey_name": jr.journey_name,
+                "success": jr.success,
+                "started_at": jr.started_at.isoformat() if hasattr(jr, "started_at") else "",
+                "finished_at": jr.finished_at.isoformat() if hasattr(jr, "finished_at") else "",
+                "duration_ms": jr.duration_ms,
+                "step_count": len(jr.step_results) if hasattr(jr, "step_results") else 0,
+                "issues_count": len(jr.issues) if hasattr(jr, "issues") else 0,
+                "issues": [
+                    {
+                        "step": i.step,
+                        "path": i.path,
+                        "error": i.error,
+                        "severity": i.severity.value if hasattr(i.severity, "value") else str(i.severity),
+                    }
+                    for i in (jr.issues if hasattr(jr, "issues") else [])
+                ],
+            })
+
+    ctx.obj["last_results"] = results
+
+    if output_format == "json":
+        import json
+
+        click.echo(json.dumps(results, indent=2, default=str))
+    else:
+        output.console.print(f"\n[bold]Parallel Execution Results[/bold]")
+        output.console.print(f"  Total: {result.total_journeys}")
+        output.console.print(f"  Passed: [green]{result.passed}[/green]")
+        output.console.print(f"  Failed: [red]{result.failed}[/red]")
+        output.console.print(f"  Duration: {result.duration_ms:.2f}ms")
+        output.console.print(f"  Success Rate: {result.success_rate:.1f}%")
+
+        if result.errors:
+            output.console.print("\n[bold red]Errors:[/bold red]")
+            for error in result.errors:
+                output.console.print(f"  [red]- {error}[/red]")
+
+        _print_summary(results)
+
+    sys.exit(EXIT_SUCCESS if result.failed == 0 else EXIT_FAILURE)
+
+
+def _parse_ports(ports: tuple[str, ...], config: dict[str, Any]) -> dict[str, Any]:
     """Parse port configuration from CLI args and config."""
     result: dict[str, Any] = {}
 
-    for port_config in config.ports:
+    for port_config in config.get("ports", []):
         name = port_config.get("name")
         adapter_type = port_config.get("adapter_type")
         if name and adapter_type:
@@ -312,24 +649,82 @@ def _load_journey(name: str, path: str) -> Any:
         return None
 
 
+def _count_steps(journey: Any) -> int:
+    """Count total steps in a journey including branches."""
+    count = 0
+    steps = getattr(journey, "steps", [])
+
+    for step in steps:
+        from venomqa.core.models import Branch, Checkpoint, Step
+
+        if isinstance(step, Step):
+            count += 1
+        elif isinstance(step, Branch):
+            # Don't count branch paths in main progress
+            pass
+        elif isinstance(step, Checkpoint):
+            # Don't count checkpoints as steps
+            pass
+
+    return count
+
+
 def _execute_journey(
-    journey: Any, config: QAConfig, no_infra: bool, ports: dict[str, Any]
+    journey: Any, config: dict[str, Any], no_infra: bool, ports: dict[str, Any]
 ) -> dict[str, Any]:
     """Execute a journey and return results."""
     from venomqa import Client
+    from venomqa.cli.output import CLIOutput, ProgressConfig
 
-    client = Client(base_url=config.base_url, timeout=config.timeout)
+    client = Client(base_url=config.get("base_url", "http://localhost:8000"), timeout=config.get("timeout", 30))
+
+    # Create output handler
+    output = CLIOutput(ProgressConfig())
+
+    # Count total steps
+    total_steps = _count_steps(journey)
+
+    # Start journey with progress
+    output.journey_start(
+        name=getattr(journey, "name", "unknown"),
+        description=getattr(journey, "description", ""),
+        total_steps=total_steps,
+    )
+
+    # Get debug logger and step controller from config
+    debug_logger = config.get("debug_logger")
+    step_controller = config.get("step_controller")
 
     runner = JourneyRunner(
         client=client,
-        fail_fast=config.fail_fast,
-        capture_logs=config.capture_logs,
-        log_lines=config.log_lines,
+        fail_fast=config.get("fail_fast", False),
+        capture_logs=config.get("capture_logs", True),
+        log_lines=config.get("log_lines", 50),
         ports=ports,
+        output=output,
+        debug_logger=debug_logger,
+        step_controller=step_controller,
     )
 
     try:
         result = runner.run(journey)
+
+        # Count passed paths
+        paths_passed = sum(1 for br in result.branch_results for pr in br.path_results if pr.success)
+        paths_total = sum(len(br.path_results) for br in result.branch_results)
+
+        # Show summary
+        output.journey_summary(
+            name=result.journey_name,
+            success=result.success,
+            step_count=len(result.step_results),
+            passed_steps=sum(1 for s in result.step_results if s.success),
+            duration_ms=result.duration_ms,
+            issues=result.issues,
+            paths_passed=paths_passed,
+            paths_total=paths_total,
+        )
+
         return {
             "journey_name": result.journey_name,
             "success": result.success,
@@ -352,6 +747,8 @@ def _execute_journey(
         }
     except Exception as e:
         logging.exception("Journey execution failed")
+        if output.live:
+            output.live.stop()
         return {
             "journey_name": journey.name if hasattr(journey, "name") else "unknown",
             "success": False,
@@ -361,19 +758,154 @@ def _execute_journey(
 
 def _print_summary(results: list[dict[str, Any]]) -> None:
     """Print a summary of results."""
+    from venomqa.cli.output import CLIOutput, ProgressConfig
+
     passed = sum(1 for r in results if r.get("success"))
     failed = len(results) - passed
+    total_duration = sum(r.get("duration_ms", 0) for r in results)
 
-    click.echo(f"\n{'=' * 50}")
-    click.echo(f"Summary: {passed} passed, {failed} failed")
+    output = CLIOutput(ProgressConfig())
+    output.overall_summary(
+        total=len(results), passed=passed, failed=failed, total_duration_ms=total_duration
+    )
 
     if failed > 0:
-        click.echo("\nFailed journeys:")
+        output.console.print("\n[bold red]Failed journeys:[/bold red]")
         for r in results:
             if not r.get("success"):
-                click.echo(f"  - {r.get('journey_name', 'unknown')}")
+                output.console.print(f"  [red]- {r.get('journey_name', 'unknown')}[/red]")
                 for issue in r.get("issues", []):
-                    click.echo(f"    • {issue.get('step')}: {issue.get('error')}")
+                    output.console.print(
+                        f"    [red]•[/red] {issue.get('step')}: {issue.get('error')}"
+                    )
+
+
+def _send_notifications(
+    results: list[dict[str, Any]],
+    config: dict[str, Any],
+    notify_on_failure: bool,
+    notify_always: bool,
+    report_url: str | None,
+    all_passed: bool,
+    output: Any,
+) -> None:
+    """Send notifications based on test results.
+
+    Args:
+        results: List of journey result dictionaries.
+        config: Configuration dictionary with notification settings.
+        notify_on_failure: Whether to only notify on failures.
+        notify_always: Whether to always notify (success or failure).
+        report_url: Optional URL to include in notifications.
+        all_passed: Whether all tests passed.
+        output: CLI output handler.
+    """
+    from venomqa.notifications import (
+        NotificationConfig,
+        NotificationManager,
+        NotificationMessage,
+        NotificationEvent,
+        create_notification_manager_from_config,
+    )
+
+    # Skip if no notification is needed
+    if notify_on_failure and all_passed:
+        output.console.print("[dim]All tests passed, skipping failure notifications[/dim]")
+        return
+
+    # Get notification config from venomqa.yaml or create default
+    notification_config = config.get("notifications", {})
+
+    if not notification_config.get("channels"):
+        # No channels configured - check for environment variables
+        slack_webhook = config.get("SLACK_WEBHOOK") or None
+        discord_webhook = config.get("DISCORD_WEBHOOK") or None
+
+        if not slack_webhook and not discord_webhook:
+            output.console.print(
+                "[yellow]No notification channels configured. "
+                "Add 'notifications' section to venomqa.yaml or set SLACK_WEBHOOK/DISCORD_WEBHOOK env vars.[/yellow]"
+            )
+            return
+
+        # Build channel config from env vars
+        channels = []
+        if slack_webhook:
+            channels.append({
+                "type": "slack",
+                "name": "slack",
+                "webhook_url": slack_webhook,
+                "on": ["failure", "recovery"] if notify_on_failure else ["failure", "recovery", "info"],
+            })
+        if discord_webhook:
+            channels.append({
+                "type": "discord",
+                "name": "discord",
+                "webhook_url": discord_webhook,
+                "on": ["failure", "recovery"] if notify_on_failure else ["failure", "recovery", "info"],
+            })
+        notification_config["channels"] = channels
+
+    # Create notification manager
+    try:
+        manager = create_notification_manager_from_config(
+            {"notifications": notification_config},
+            report_url=report_url,
+        )
+    except Exception as e:
+        output.console.print(f"[yellow]Failed to initialize notifications: {e}[/yellow]")
+        return
+
+    # Build notification message
+    passed = sum(1 for r in results if r.get("success"))
+    failed = len(results) - passed
+    total_duration = sum(r.get("duration_ms", 0) for r in results)
+
+    if all_passed:
+        event = NotificationEvent.INFO
+        title = "All Tests Passed"
+        body = f"{passed} journey(s) completed successfully in {total_duration/1000:.2f}s"
+        severity = "info"
+    else:
+        event = NotificationEvent.FAILURE
+        title = f"Test Failures: {failed} of {len(results)} journeys failed"
+        # Collect failed journey info
+        failed_journeys = [r for r in results if not r.get("success")]
+        body_lines = [f"{failed} journey(s) failed out of {len(results)}"]
+        for fj in failed_journeys[:3]:  # Show first 3 failures
+            issues = fj.get("issues", [])
+            if issues:
+                body_lines.append(f"- {fj.get('journey_name')}: {issues[0].get('error', 'Unknown error')}")
+            else:
+                body_lines.append(f"- {fj.get('journey_name')}: Failed")
+        if len(failed_journeys) > 3:
+            body_lines.append(f"... and {len(failed_journeys) - 3} more")
+        body = "\n".join(body_lines)
+        severity = "high" if failed > 1 else "medium"
+
+    message = NotificationMessage(
+        title=title,
+        body=body,
+        event=event,
+        severity=severity,
+        report_url=report_url,
+        metadata={
+            "total_journeys": len(results),
+            "passed_journeys": passed,
+            "failed_journeys": failed,
+            "total_duration_ms": total_duration,
+        },
+    )
+
+    # Send notification
+    output.console.print("[dim]Sending notifications...[/dim]")
+    send_results = manager.send_message(message)
+
+    for channel_name, success in send_results:
+        if success:
+            output.console.print(f"  [green]Sent to {channel_name}[/green]")
+        else:
+            output.console.print(f"  [red]Failed to send to {channel_name}[/red]")
 
 
 @cli.command()
@@ -486,8 +1018,8 @@ def report(ctx: click.Context, output_format: str, output_path: str | None) -> N
         click.echo("No results available. Run a journey first with 'venomqa run'.", err=True)
         sys.exit(1)
 
-    config: QAConfig = ctx.obj["config"]
-    report_dir = Path(config.report_dir)
+    config: dict[str, Any] = ctx.obj["config"]
+    report_dir = Path(config.get("report_dir", "reports"))
     report_dir.mkdir(parents=True, exist_ok=True)
 
     if output_path is None:
@@ -619,3 +1151,1643 @@ def _generate_html_report(results: list[dict[str, Any]]) -> str:
 </body>
 </html>"""
     return html
+
+
+@cli.command("load")
+@click.argument("journey_name")
+@click.option("--users", "-u", default=10, type=int, help="Number of concurrent users (default: 10)")
+@click.option("--duration", "-d", default="60s", help="Test duration (e.g., 60s, 2m, 1h) (default: 60s)")
+@click.option("--ramp-up", "-r", default="0s", help="Ramp-up time (e.g., 10s, 1m) (default: 0s)")
+@click.option("--think-time", "-t", default="0s", help="Think time between requests (e.g., 1s, 1-3s)")
+@click.option("--warmup", "-w", default="0s", help="Warmup period before collecting metrics")
+@click.option(
+    "--pattern",
+    type=click.Choice(["constant", "ramp_up", "spike", "stress"]),
+    default="constant",
+    help="Load pattern (default: constant)",
+)
+@click.option("--output", "-o", "output_path", type=click.Path(), help="Output file for report")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["json", "html", "markdown", "text"]),
+    default="text",
+    help="Output format (default: text)",
+)
+@click.option("--p99", type=float, help="Assert p99 latency is below this value (ms)")
+@click.option("--error-rate", type=float, help="Assert error rate is below this value (%)")
+@click.option("--throughput", type=float, help="Assert throughput is above this value (req/s)")
+@click.pass_context
+def load_test(
+    ctx: click.Context,
+    journey_name: str,
+    users: int,
+    duration: str,
+    ramp_up: str,
+    think_time: str,
+    warmup: str,
+    pattern: str,
+    output_path: str | None,
+    output_format: str,
+    p99: float | None,
+    error_rate: float | None,
+    throughput: float | None,
+) -> None:
+    """Run load tests against a journey.
+
+    Execute a journey with multiple concurrent users to measure performance
+    under load. Collects metrics including response times (p50, p90, p95, p99),
+    throughput (requests/second), and error rates.
+
+    \b
+    Examples:
+        venomqa load checkout_journey --users 100 --duration 60s
+        venomqa load payment_flow -u 50 -d 2m --ramp-up 10s
+        venomqa load api_test -u 100 -d 60s --think-time 1-3s
+        venomqa load checkout -u 100 -d 60s --p99 500 --error-rate 1
+        venomqa load checkout -u 100 -d 60s -f html -o report.html
+
+    \b
+    Load patterns:
+        constant  - Maintain constant load throughout the test
+        ramp_up   - Gradually increase load from 0 to target
+        spike     - Sudden increase followed by sustained load
+        stress    - Increase load until system breaks
+
+    \b
+    Assertions (fail if not met):
+        --p99 500       - P99 latency must be below 500ms
+        --error-rate 1  - Error rate must be below 1%
+        --throughput 100 - Throughput must be above 100 req/s
+    """
+    from venomqa.cli.output import CLIOutput, ProgressConfig
+    from venomqa.performance.load_tester import (
+        LoadTestAssertions,
+        LoadTestConfig,
+        LoadTester,
+    )
+
+    config: dict[str, Any] = ctx.obj.get("config", {})
+    output = CLIOutput(ProgressConfig())
+
+    # Discover and load the journey
+    journeys = discover_journeys()
+    if journey_name not in journeys:
+        click.echo(f"Journey not found: {journey_name}", err=True)
+        click.echo(f"Available journeys: {', '.join(journeys.keys())}", err=True)
+        sys.exit(1)
+
+    journey = _load_journey(journey_name, journeys[journey_name]["path"])
+    if journey is None:
+        click.echo(f"Failed to load journey: {journey_name}", err=True)
+        sys.exit(1)
+
+    # Create load test config
+    load_config_dict = {
+        "users": users,
+        "duration": duration,
+        "ramp_up": ramp_up,
+        "think_time": think_time,
+        "warmup": warmup,
+        "pattern": pattern,
+    }
+    load_config = LoadTestConfig.from_dict(load_config_dict)
+
+    # Display test configuration
+    output.console.print("\n[bold cyan]Load Test Configuration[/bold cyan]")
+    output.console.print(f"  Journey: {journey_name}")
+    output.console.print(f"  Users: {load_config.concurrent_users}")
+    output.console.print(f"  Duration: {load_config.duration_seconds}s")
+    output.console.print(f"  Ramp-up: {load_config.ramp_up_seconds}s")
+    output.console.print(f"  Think time: {load_config.think_time_min}-{load_config.think_time_max}s")
+    output.console.print(f"  Pattern: {load_config.pattern.value}")
+    if load_config.warmup_seconds > 0:
+        output.console.print(f"  Warmup: {load_config.warmup_seconds}s")
+    output.console.print()
+
+    # Create runner factory
+    from venomqa import Client
+
+    def runner_factory() -> JourneyRunner:
+        client = Client(
+            base_url=config.get("base_url", "http://localhost:8000"),
+            timeout=config.get("timeout", 30),
+        )
+        return JourneyRunner(
+            client=client,
+            fail_fast=False,
+            capture_logs=False,
+        )
+
+    # Progress callback
+    last_rps = [0.0]
+
+    def progress_callback(metrics) -> None:
+        snapshot = metrics.get_snapshot()
+        rps = snapshot["actual_rps"]
+        if abs(rps - last_rps[0]) > 0.5:
+            output.console.print(
+                f"  [dim]Users: {snapshot['active_users']}, "
+                f"Requests: {snapshot['total_requests']}, "
+                f"RPS: {rps:.1f}, "
+                f"Errors: {snapshot['failed_requests']}[/dim]"
+            )
+            last_rps[0] = rps
+
+    # Run load test
+    output.console.print("[bold]Starting load test...[/bold]")
+    tester = LoadTester(load_config, progress_callback=progress_callback)
+
+    try:
+        result = tester.run(journey, runner_factory)
+    except KeyboardInterrupt:
+        output.console.print("\n[yellow]Load test interrupted by user[/yellow]")
+        tester.stop()
+        sys.exit(1)
+
+    # Display results
+    if output_format == "text":
+        output.console.print(f"\n[bold green]{result.get_summary()}[/bold green]")
+    elif output_format == "json":
+        import json
+
+        click.echo(json.dumps(result.to_dict(), indent=2, default=str))
+    elif output_format in ("html", "markdown"):
+        # Save to file
+        if output_path:
+            result.save_report(output_path, format=output_format)
+            output.console.print(f"\n[green]Report saved to: {output_path}[/green]")
+        else:
+            # Generate and print
+            if output_format == "markdown":
+                click.echo(result._generate_markdown_report())
+            else:
+                click.echo(result._generate_html_report())
+
+    # Save report if output path specified
+    if output_path and output_format not in ("html", "markdown"):
+        result.save_report(output_path, format="json" if output_format == "json" else "json")
+        output.console.print(f"\n[green]Report saved to: {output_path}[/green]")
+
+    # Validate assertions
+    if p99 is not None or error_rate is not None or throughput is not None:
+        assertions = LoadTestAssertions(
+            max_p99_ms=p99,
+            max_error_rate_percent=error_rate,
+            min_throughput_rps=throughput,
+        )
+        passed, failures = assertions.validate(result)
+
+        if not passed:
+            output.console.print("\n[bold red]Load test assertions FAILED:[/bold red]")
+            for failure in failures:
+                output.console.print(f"  [red]- {failure}[/red]")
+            sys.exit(1)
+        else:
+            output.console.print("\n[bold green]All load test assertions PASSED[/bold green]")
+
+    # Exit with error if error rate is too high (> 50%)
+    if result.error_rate > 50:
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("journey_names", nargs=-1)
+@click.option("--all", "-a", "run_all", is_flag=True, help="Watch and run all journeys")
+@click.option(
+    "--path",
+    "-p",
+    "base_path",
+    default=".",
+    type=click.Path(exists=True),
+    help="Base path containing actions/, fixtures/, journeys/ directories",
+)
+@click.pass_context
+def watch(
+    ctx: click.Context,
+    journey_names: tuple[str, ...],
+    run_all: bool,
+    base_path: str,
+) -> None:
+    """Watch for file changes and automatically re-run affected journeys.
+
+    This command monitors the actions/, fixtures/, and journeys/ directories
+    for changes and intelligently re-runs only the affected journeys.
+
+    \b
+    Examples:
+        venomqa watch                    # Watch all journeys
+        venomqa watch --all              # Same as above
+        venomqa watch user_login         # Watch specific journey
+        venomqa watch checkout payment   # Watch multiple journeys
+        venomqa watch -p ./qa            # Watch from specific path
+
+    \b
+    Smart re-running:
+        - If an action file changes, re-run journeys using that action
+        - If a fixture file changes, re-run journeys using that fixture
+        - If a journey file changes, re-run that specific journey
+
+    Press Ctrl+C to stop watching.
+    """
+    try:
+        from venomqa.cli.watch import run_watch_mode
+    except ImportError as e:
+        click.echo(
+            "Watch mode requires the 'watchdog' package. "
+            "Install it with: pip install watchdog",
+            err=True,
+        )
+        click.echo(f"Import error: {e}", err=True)
+        sys.exit(1)
+
+    config: dict[str, Any] = ctx.obj.get("config", {})
+    journey_list = list(journey_names) if journey_names else None
+
+    # If no journeys specified and --all not set, default to --all
+    if not journey_list and not run_all:
+        run_all = True
+
+    run_watch_mode(
+        base_path=Path(base_path),
+        journey_names=journey_list,
+        run_all=run_all,
+        config=config,
+    )
+
+
+@cli.command()
+@click.argument("journey_names", nargs=-1, required=True)
+@click.option("--iterations", "-i", type=int, default=100, help="Iterations (default: 100)")
+@click.option("--warmup", "-w", type=int, default=10, help="Warmup iterations (default: 10)")
+@click.option(
+    "--format", "-f", "output_format", type=click.Choice(["text", "json", "csv"]),
+    default="text", help="Output format",
+)
+@click.option("--output", "-o", "output_path", type=click.Path(), help="Output file path")
+@click.option("--track-memory", is_flag=True, help="Track memory usage")
+@click.option("--port", "ports", multiple=True, help="Port config: name=adapter_type")
+@click.pass_context
+def benchmark(
+    ctx: click.Context,
+    journey_names: tuple[str, ...],
+    iterations: int,
+    warmup: int,
+    output_format: str,
+    output_path: str | None,
+    track_memory: bool,
+    ports: tuple[str, ...],
+) -> None:
+    """Benchmark journeys for performance analysis."""
+    from venomqa import Client
+    from venomqa.cli.output import CLIOutput, ProgressConfig
+    from venomqa.performance.benchmark import BenchmarkConfig, BenchmarkResult, BenchmarkSuite
+
+    config: dict[str, Any] = ctx.obj["config"]
+    parsed_ports = _parse_ports(ports, config)
+    journeys = discover_journeys()
+
+    if not journeys:
+        click.echo("No journeys found.", err=True)
+        sys.exit(1)
+
+    for name in journey_names:
+        if name not in journeys:
+            click.echo(f"Journey not found: {name}", err=True)
+            sys.exit(1)
+
+    output = CLIOutput(ProgressConfig())
+    output.console.print(f"\n[bold]Benchmarking {len(journey_names)} journey(s)...[/bold]\n")
+
+    bench_config = BenchmarkConfig(
+        iterations=iterations, warmup_iterations=warmup,
+        track_memory=track_memory, verbose=ctx.obj.get("verbose", False),
+    )
+    suite = BenchmarkSuite(bench_config)
+
+    for journey_name in journey_names:
+        journey_data = _load_journey(journey_name, journeys[journey_name]["path"])
+        if not journey_data:
+            continue
+
+        def make_factory(j=journey_data):
+            def factory():
+                client = Client(
+                    base_url=config.get("base_url", "http://localhost:8000"),
+                    timeout=config.get("timeout", 30),
+                )
+                return JourneyRunner(client=client, fail_fast=False, capture_logs=False, ports=parsed_ports)
+            return factory
+        suite.add(journey_data, make_factory())
+
+    results = suite.run_all()
+
+    if output_format == "json":
+        import json
+        data = [r.to_dict() for r in results]
+        if output_path:
+            with open(output_path, "w") as f:
+                json.dump(data, f, indent=2)
+        else:
+            click.echo(json.dumps(data, indent=2))
+    elif output_format == "csv":
+        lines = [BenchmarkResult.csv_header()] + [r.to_csv_row() for r in results]
+        csv_content = "\n".join(lines)
+        if output_path:
+            with open(output_path, "w") as f:
+                f.write(csv_content)
+        else:
+            click.echo(csv_content)
+    else:
+        for result in results:
+            output.console.print(result.get_summary())
+        if len(results) > 1:
+            comparison = suite.get_comparison()
+            output.console.print(f"[bold]Fastest:[/bold] {comparison.get('fastest')}")
+        if output_path:
+            suite.export_json(output_path)
+
+    sys.exit(0)
+
+
+@cli.command("generate")
+@click.option(
+    "--from-openapi",
+    "openapi_path",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to OpenAPI specification (YAML or JSON)",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    default="qa/actions",
+    help="Output directory for generated files (default: qa/actions)",
+)
+@click.option(
+    "--actions-file",
+    default="actions.py",
+    help="Filename for actions module (default: actions.py)",
+)
+@click.option(
+    "--fixtures-file",
+    default="fixtures.py",
+    help="Filename for fixtures module (default: fixtures.py)",
+)
+@click.option(
+    "--no-fixtures",
+    is_flag=True,
+    help="Skip generating fixture factories",
+)
+@click.option(
+    "--group-by-tags",
+    is_flag=True,
+    help="Group actions by OpenAPI tags into separate files",
+)
+@click.option(
+    "--no-docstrings",
+    is_flag=True,
+    help="Skip generating docstrings",
+)
+@click.option(
+    "--no-type-hints",
+    is_flag=True,
+    help="Skip generating type hints",
+)
+@click.pass_context
+def generate(
+    ctx: click.Context,
+    openapi_path: str,
+    output_dir: str,
+    actions_file: str,
+    fixtures_file: str,
+    no_fixtures: bool,
+    group_by_tags: bool,
+    no_docstrings: bool,
+    no_type_hints: bool,
+) -> None:
+    """Generate VenomQA actions and fixtures from an OpenAPI specification.
+
+    Parses an OpenAPI 3.0 specification and generates:
+    - Action functions for each endpoint
+    - Fixture factories for schema definitions
+
+    Examples:
+        venomqa generate --from-openapi openapi.yaml
+        venomqa generate --from-openapi api.json --output qa/generated/
+        venomqa generate --from-openapi spec.yaml --group-by-tags
+    """
+    from venomqa.generators import GeneratorConfig, OpenAPIGenerator, OpenAPIParseError
+
+    config = GeneratorConfig(
+        output_dir=output_dir,
+        actions_file=actions_file,
+        fixtures_file=fixtures_file,
+        generate_fixtures=not no_fixtures,
+        group_by_tags=group_by_tags,
+        include_docstrings=not no_docstrings,
+        include_type_hints=not no_type_hints,
+    )
+
+    click.echo(f"Loading OpenAPI specification from: {openapi_path}")
+
+    try:
+        generator = OpenAPIGenerator(openapi_path, config=config)
+        schema = generator.load()
+
+        click.echo(f"  API: {schema.title} v{schema.version}")
+        click.echo(f"  Endpoints: {len(schema.endpoints)}")
+        click.echo(f"  Schemas: {len(schema.schemas)}")
+
+        click.echo(f"\nGenerating code to: {output_dir}/")
+        generated_files = generator.generate(output_dir)
+
+        click.echo("\nGenerated files:")
+        for filename in generated_files:
+            click.echo(f"  - {output_dir}/{filename}")
+
+        click.echo(f"\nSuccessfully generated {len(generated_files)} file(s)!")
+
+    except OpenAPIParseError as e:
+        click.echo(f"Error parsing OpenAPI specification: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error generating code: {e}", err=True)
+        if ctx.obj.get("verbose"):
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
+
+@cli.command("generate-graphql")
+@click.option(
+    "--from-schema",
+    "schema_path",
+    type=click.Path(exists=True),
+    help="Path to GraphQL schema file (SDL or JSON introspection)",
+)
+@click.option(
+    "--from-endpoint",
+    "endpoint_url",
+    help="GraphQL endpoint URL for introspection",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(),
+    default="qa/actions",
+    help="Output directory for generated files (default: qa/actions)",
+)
+@click.option(
+    "--module-name",
+    default="graphql_actions",
+    help="Module name for generated file (default: graphql_actions)",
+)
+@click.option(
+    "--no-docstrings",
+    is_flag=True,
+    help="Skip generating docstrings",
+)
+@click.option(
+    "--no-type-hints",
+    is_flag=True,
+    help="Skip generating type hints",
+)
+@click.option(
+    "--header",
+    "-H",
+    "headers",
+    multiple=True,
+    help="HTTP headers for introspection (format: 'Name: Value')",
+)
+@click.pass_context
+def generate_graphql(
+    ctx: click.Context,
+    schema_path: str | None,
+    endpoint_url: str | None,
+    output_dir: str,
+    module_name: str,
+    no_docstrings: bool,
+    no_type_hints: bool,
+    headers: tuple[str, ...],
+) -> None:
+    """Generate VenomQA actions from a GraphQL schema.
+
+    Parses a GraphQL schema (from file or introspection endpoint) and generates
+    action functions for queries, mutations, and subscriptions.
+
+    \b
+    Examples:
+        venomqa generate-graphql --from-schema schema.graphql
+        venomqa generate-graphql --from-schema introspection.json
+        venomqa generate-graphql --from-endpoint https://api.example.com/graphql
+        venomqa generate-graphql --from-endpoint http://localhost:4000/graphql -H "Authorization: Bearer token"
+
+    \b
+    Generated code includes:
+        - Query functions decorated with @query
+        - Mutation functions decorated with @mutation
+        - Subscription generators decorated with @subscription
+        - Full type hints and docstrings
+    """
+    if schema_path is None and endpoint_url is None:
+        click.echo(
+            "Error: Either --from-schema or --from-endpoint must be provided",
+            err=True,
+        )
+        sys.exit(1)
+
+    if schema_path is not None and endpoint_url is not None:
+        click.echo(
+            "Error: Cannot use both --from-schema and --from-endpoint",
+            err=True,
+        )
+        sys.exit(1)
+
+    try:
+        from venomqa.graphql.codegen import generate_actions_from_schema
+        from venomqa.graphql.schema import load_schema_from_file, load_schema_from_introspection
+
+        schema_source: str | Path | dict[str, Any]
+
+        if schema_path:
+            click.echo(f"Loading GraphQL schema from: {schema_path}")
+            schema_source = Path(schema_path)
+        else:
+            # Introspect from endpoint
+            click.echo(f"Introspecting GraphQL schema from: {endpoint_url}")
+
+            # Parse headers
+            http_headers: dict[str, str] = {}
+            for header in headers:
+                if ":" in header:
+                    name, value = header.split(":", 1)
+                    http_headers[name.strip()] = value.strip()
+
+            # Use GraphQL client to introspect
+            from venomqa.clients.graphql import GraphQLClient, INTROSPECTION_QUERY
+
+            client = GraphQLClient(
+                endpoint=endpoint_url,
+                default_headers=http_headers,
+            )
+            client.connect()
+
+            try:
+                response = client.execute(INTROSPECTION_QUERY)
+                if response.has_errors:
+                    click.echo(f"Introspection failed: {response.errors}", err=True)
+                    sys.exit(1)
+
+                schema_source = {"data": {"__schema": response.get_data("__schema")}}
+            finally:
+                client.disconnect()
+
+        # Generate code
+        click.echo(f"\nGenerating actions to: {output_dir}/")
+
+        code = generate_actions_from_schema(
+            schema_source=schema_source,
+            output_dir=output_dir,
+            module_name=module_name,
+            include_docstrings=not no_docstrings,
+            include_type_hints=not no_type_hints,
+        )
+
+        # Count generated items
+        query_count = code.count("@query(")
+        mutation_count = code.count("@mutation(")
+        subscription_count = code.count("@subscription(")
+
+        click.echo("\nGenerated files:")
+        click.echo(f"  - {output_dir}/{module_name}.py")
+        click.echo(f"  - {output_dir}/__init__.py")
+
+        click.echo(f"\nGenerated actions:")
+        click.echo(f"  - Queries: {query_count}")
+        click.echo(f"  - Mutations: {mutation_count}")
+        click.echo(f"  - Subscriptions: {subscription_count}")
+
+        click.echo("\nSuccessfully generated GraphQL actions!")
+        click.echo(f"\nUsage example:")
+        click.echo(f"    from {output_dir.replace('/', '.')}.{module_name} import *")
+
+    except FileNotFoundError as e:
+        click.echo(f"Schema file not found: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error generating code: {e}", err=True)
+        if ctx.obj.get("verbose"):
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
+
+# Environment management commands
+@cli.command("check-env")
+@click.argument("environment_name")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
+)
+@click.pass_context
+def check_env(ctx: click.Context, environment_name: str, output_format: str) -> None:
+    """Check health of an environment.
+
+    Verifies connectivity, permissions, and database access for the specified
+    environment.
+
+    Examples:
+        venomqa check-env staging
+        venomqa check-env production --format json
+    """
+    from venomqa.environments import EnvironmentManager
+
+    try:
+        env_manager = EnvironmentManager("venomqa.yaml")
+    except Exception as e:
+        click.echo(f"Error loading environments: {e}", err=True)
+        sys.exit(EXIT_CONFIG_ERROR)
+
+    if environment_name not in env_manager.list_environments():
+        click.echo(f"Environment not found: {environment_name}", err=True)
+        click.echo("Available environments: " + ", ".join(env_manager.list_environments()))
+        sys.exit(EXIT_CONFIG_ERROR)
+
+    click.echo(f"Checking environment: {environment_name}...")
+
+    health = env_manager.check_health(environment_name)
+
+    if output_format == "json":
+        import json
+
+        click.echo(json.dumps(health.to_dict(), indent=2))
+    else:
+        status = "HEALTHY" if health.overall_healthy else "UNHEALTHY"
+        status_color = "green" if health.overall_healthy else "red"
+
+        from venomqa.cli.output import CLIOutput, ProgressConfig
+
+        output = CLIOutput(ProgressConfig())
+        output.console.print(f"\n[bold]Environment: {environment_name}[/bold]")
+        output.console.print(f"Status: [{status_color}]{status}[/{status_color}]")
+        output.console.print(f"\nHealth Checks:")
+
+        for check in health.checks:
+            check_status = "PASS" if check.healthy else "FAIL"
+            check_color = "green" if check.healthy else "red"
+            output.console.print(
+                f"  [{check_color}]{check_status}[/{check_color}] {check.name}: {check.message} ({check.duration_ms:.0f}ms)"
+            )
+
+    sys.exit(EXIT_SUCCESS if health.overall_healthy else EXIT_FAILURE)
+
+
+@cli.command("list-envs")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
+)
+@click.pass_context
+def list_envs(ctx: click.Context, output_format: str) -> None:
+    """List all configured environments.
+
+    Examples:
+        venomqa list-envs
+        venomqa list-envs --format json
+    """
+    from venomqa.environments import EnvironmentManager
+
+    try:
+        env_manager = EnvironmentManager("venomqa.yaml")
+    except Exception as e:
+        click.echo(f"Error loading environments: {e}", err=True)
+        sys.exit(EXIT_CONFIG_ERROR)
+
+    environments = env_manager.get_all_environments()
+
+    if not environments:
+        click.echo("No environments configured.")
+        click.echo("Add environments to your venomqa.yaml file.")
+        return
+
+    if output_format == "json":
+        import json
+
+        data = {name: env.config.to_dict() for name, env in environments.items()}
+        click.echo(json.dumps(data, indent=2))
+    else:
+        from venomqa.cli.output import CLIOutput, ProgressConfig
+
+        output = CLIOutput(ProgressConfig())
+        output.console.print(f"\n[bold]Configured Environments ({len(environments)}):[/bold]\n")
+
+        default_env = env_manager.default_environment
+
+        for name, env in environments.items():
+            is_default = " (default)" if name == default_env else ""
+            mode = env.config.mode.value
+            mode_indicator = "[dim][read-only][/dim]" if env.is_read_only else ""
+
+            output.console.print(f"  [bold]{name}[/bold]{is_default} {mode_indicator}")
+            output.console.print(f"    URL: {env.base_url}")
+            output.console.print(f"    Mode: {mode}")
+            if env.database:
+                # Mask password in database URL
+                db_url = env.database
+                if "@" in db_url:
+                    parts = db_url.split("@")
+                    db_url = parts[0].split(":")[0] + ":****@" + parts[1]
+                output.console.print(f"    Database: {db_url}")
+            output.console.print("")
+
+
+@cli.command("compare-envs")
+@click.argument("journey_name")
+@click.argument("env1")
+@click.argument("env2")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
+)
+@click.option(
+    "--ignore",
+    "-i",
+    "ignore_fields",
+    multiple=True,
+    help="Fields to ignore in comparison (can be specified multiple times)",
+)
+@click.pass_context
+def compare_envs(
+    ctx: click.Context,
+    journey_name: str,
+    env1: str,
+    env2: str,
+    output_format: str,
+    ignore_fields: tuple[str, ...],
+) -> None:
+    """Compare journey results between two environments.
+
+    Runs the specified journey in both environments and highlights differences
+    in responses.
+
+    Examples:
+        venomqa compare-envs user_login staging production
+        venomqa compare-envs checkout staging production --ignore timestamp --ignore id
+    """
+    from venomqa.environments import EnvironmentManager
+
+    try:
+        env_manager = EnvironmentManager("venomqa.yaml")
+    except Exception as e:
+        click.echo(f"Error loading environments: {e}", err=True)
+        sys.exit(EXIT_CONFIG_ERROR)
+
+    # Verify environments exist
+    for env_name in [env1, env2]:
+        if env_name not in env_manager.list_environments():
+            click.echo(f"Environment not found: {env_name}", err=True)
+            click.echo("Available environments: " + ", ".join(env_manager.list_environments()))
+            sys.exit(EXIT_CONFIG_ERROR)
+
+    # Load journey
+    journeys = discover_journeys()
+    if journey_name not in journeys:
+        click.echo(f"Journey not found: {journey_name}", err=True)
+        sys.exit(EXIT_FAILURE)
+
+    journey = _load_journey(journey_name, journeys[journey_name]["path"])
+    if journey is None:
+        click.echo(f"Failed to load journey: {journey_name}", err=True)
+        sys.exit(EXIT_FAILURE)
+
+    from venomqa.cli.output import CLIOutput, ProgressConfig
+
+    output = CLIOutput(ProgressConfig())
+    output.console.print(f"\n[bold]Comparing {journey_name} across environments...[/bold]")
+    output.console.print(f"  Environment 1: {env1}")
+    output.console.print(f"  Environment 2: {env2}")
+
+    # Run comparison
+    ignore_list = list(ignore_fields) if ignore_fields else None
+    comparison = env_manager.compare_environments(
+        journey=journey,
+        env1_name=env1,
+        env2_name=env2,
+        ignore_fields=ignore_list,
+    )
+
+    if output_format == "json":
+        import json
+
+        click.echo(json.dumps(comparison.to_dict(), indent=2, default=str))
+    else:
+        output.console.print(f"\n[bold]Results:[/bold]")
+        output.console.print(f"  Both passed: {'Yes' if comparison.both_passed else 'No'}")
+        output.console.print(f"  Differences found: {len(comparison.differences)}")
+
+        if comparison.differences:
+            output.console.print(f"\n[bold]Differences:[/bold]")
+            for diff in comparison.differences:
+                output.console.print(f"\n  [yellow]{diff.path}[/yellow]")
+                output.console.print(f"    Type: {diff.difference_type}")
+                output.console.print(f"    {env1}: {diff.env1_value}")
+                output.console.print(f"    {env2}: {diff.env2_value}")
+
+    sys.exit(EXIT_SUCCESS if comparison.both_passed and not comparison.has_differences else EXIT_FAILURE)
+
+
+
+@cli.command()
+@click.argument("seed_file", type=click.Path(exists=True))
+@click.option(
+    "--mode",
+    "-m",
+    "seed_mode",
+    type=click.Choice(["api", "database", "hybrid"]),
+    default="api",
+    help="Seeding mode (api, database, or hybrid)",
+)
+@click.option(
+    "--prefix",
+    "-p",
+    "prefix",
+    default=None,
+    help="Unique prefix for test isolation (auto-generated if not provided)",
+)
+@click.option(
+    "--endpoint",
+    "-e",
+    "endpoints",
+    multiple=True,
+    help="API endpoint mapping (format: resource_type=/api/path)",
+)
+@click.option(
+    "--table",
+    "-t",
+    "tables",
+    multiple=True,
+    help="Table mapping (format: resource_type=table_name)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be seeded without actually seeding",
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
+)
+@click.pass_context
+def seed(
+    ctx: click.Context,
+    seed_file: str,
+    seed_mode: str,
+    prefix: str | None,
+    endpoints: tuple[str, ...],
+    tables: tuple[str, ...],
+    dry_run: bool,
+    output_format: str,
+) -> None:
+    """Seed test data from a YAML or JSON file.
+
+    Loads seed data from the specified file and creates resources either
+    via API calls or direct database inserts.
+
+    \b
+    Examples:
+        venomqa seed seeds/base.yaml
+        venomqa seed seeds/users.yaml --mode database
+        venomqa seed seeds/ecommerce.yaml --prefix test_run_001
+        venomqa seed seeds/api.yaml -e users=/api/v1/users -e products=/api/v1/products
+
+    \b
+    Seed file format (YAML):
+        users:
+          - id: user_1
+            email: test@example.com
+            role: admin
+        products:
+          - id: product_1
+            seller_id: \${users.user_1.id}
+            title: Test Product
+            price: 99.99
+    """
+    from venomqa.data import SeedConfig, SeedManager, SeedMode
+
+    # Parse endpoint mappings
+    api_endpoints: dict[str, str] = {}
+    for endpoint in endpoints:
+        if "=" in endpoint:
+            resource_type, path = endpoint.split("=", 1)
+            api_endpoints[resource_type] = path
+
+    # Parse table mappings
+    table_mapping: dict[str, str] = {}
+    for table in tables:
+        if "=" in table:
+            resource_type, table_name = table.split("=", 1)
+            table_mapping[resource_type] = table_name
+
+    # Map mode string to enum
+    mode_map = {
+        "api": SeedMode.API,
+        "database": SeedMode.DATABASE,
+        "hybrid": SeedMode.HYBRID,
+    }
+    mode = mode_map[seed_mode]
+
+    config = SeedConfig(
+        mode=mode,
+        prefix=prefix or "",
+        api_endpoints=api_endpoints,
+        table_mapping=table_mapping,
+    )
+
+    # Get client and database from config
+    config_obj: dict[str, Any] = ctx.obj.get("config", {})
+    client = None
+    database = None
+
+    # Create client if API mode
+    if mode in (SeedMode.API, SeedMode.HYBRID):
+        from venomqa import Client
+
+        client = Client(
+            base_url=config_obj.get("base_url", "http://localhost:8000"),
+            timeout=config_obj.get("timeout", 30),
+        )
+
+    # Get database from ports if database mode
+    if mode in (SeedMode.DATABASE, SeedMode.HYBRID):
+        ports = _parse_ports(tuple(), config_obj)
+        database = ports.get("database")
+
+    seed_manager = SeedManager(client=client, database=database, config=config)
+
+    try:
+        seeds = seed_manager.load(seed_file)
+
+        if dry_run:
+            click.echo(f"Dry run - would seed from: {seed_file}")
+            click.echo(f"  Resource types: {', '.join(seeds.resource_types)}")
+            click.echo(f"  Total resources: {seeds.total_resources}")
+            click.echo(f"  Mode: {mode.value}")
+            click.echo(f"  Prefix: {config.prefix}")
+            return
+
+        result = seed_manager.apply(seeds, mode=mode, prefix=prefix)
+
+        if output_format == "json":
+            import json
+
+            output_data = {
+                "success": result.success,
+                "created_count": result.created_count,
+                "failed_count": result.failed_count,
+                "prefix": result.prefix,
+                "duration_ms": result.duration_ms,
+                "created_resources": [
+                    {
+                        "type": r.resource_type,
+                        "logical_id": r.logical_id,
+                        "actual_id": r.actual_id,
+                    }
+                    for r in result.created_resources
+                ],
+                "failed_resources": [
+                    {"type": r.resource_type, "logical_id": r.logical_id, "error": err}
+                    for r, err in result.failed_resources
+                ],
+            }
+            click.echo(json.dumps(output_data, indent=2, default=str))
+        else:
+            if result.success:
+                click.echo(f"Successfully seeded {result.created_count} resources")
+            else:
+                click.echo(
+                    f"Seeding completed with errors: "
+                    f"{result.created_count} created, {result.failed_count} failed"
+                )
+
+            click.echo(f"  Prefix: {result.prefix}")
+            click.echo(f"  Duration: {result.duration_ms:.0f}ms")
+
+            if result.failed_resources:
+                click.echo("\nFailed resources:")
+                for resource, error in result.failed_resources:
+                    click.echo(
+                        f"  - {resource.resource_type}/{resource.logical_id}: {error}"
+                    )
+
+        sys.exit(0 if result.success else 1)
+
+    except FileNotFoundError as e:
+        click.echo(f"Seed file not found: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Seeding failed: {e}", err=True)
+        if ctx.obj.get("verbose"):
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
+
+@cli.command("security-scan")
+@click.option(
+    "--target",
+    "-t",
+    "target_url",
+    required=True,
+    help="Target URL to scan (e.g., http://localhost:8000)",
+)
+@click.option(
+    "--endpoint",
+    "-e",
+    "endpoints",
+    multiple=True,
+    help="Endpoints to test (can be specified multiple times)",
+)
+@click.option(
+    "--auth-endpoint",
+    "auth_endpoints",
+    multiple=True,
+    help="Authentication endpoints for rate limit testing",
+)
+@click.option(
+    "--token",
+    "user_token",
+    default=None,
+    help="User token for authenticated tests",
+)
+@click.option(
+    "--admin-endpoint",
+    "admin_endpoints",
+    multiple=True,
+    help="Admin endpoints for privilege escalation tests",
+)
+@click.option(
+    "--skip",
+    "skip_tests",
+    multiple=True,
+    type=click.Choice(["authentication", "injection", "owasp"]),
+    help="Test categories to skip",
+)
+@click.option(
+    "--max-payloads",
+    default=50,
+    type=int,
+    help="Maximum payloads per test category (default: 50)",
+)
+@click.option(
+    "--timeout",
+    default=30.0,
+    type=float,
+    help="Request timeout in seconds (default: 30)",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_path",
+    type=click.Path(),
+    help="Output file path",
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["sarif", "json", "markdown", "text"]),
+    default="text",
+    help="Output format (default: text)",
+)
+@click.option(
+    "--fail-on-high",
+    is_flag=True,
+    help="Exit with error code if high/critical vulnerabilities found",
+)
+@click.pass_context
+def security_scan(
+    ctx: click.Context,
+    target_url: str,
+    endpoints: tuple[str, ...],
+    auth_endpoints: tuple[str, ...],
+    user_token: str | None,
+    admin_endpoints: tuple[str, ...],
+    skip_tests: tuple[str, ...],
+    max_payloads: int,
+    timeout: float,
+    output_path: str | None,
+    output_format: str,
+    fail_on_high: bool,
+) -> None:
+    """Run security vulnerability scan against a target.
+
+    Performs comprehensive security testing including:
+    - Authentication bypass testing
+    - SQL injection detection
+    - XSS vulnerability testing
+    - Command injection testing
+    - Security headers validation
+    - CORS misconfiguration detection
+    - Rate limiting verification
+    - Error message leakage detection
+
+    \b
+    Examples:
+        venomqa security-scan --target http://localhost:8000
+        venomqa security-scan -t http://api.example.com -e /api/users -e /api/products
+        venomqa security-scan -t http://localhost:8000 --format sarif -o report.sarif
+        venomqa security-scan -t http://localhost:8000 --skip injection --format json
+        venomqa security-scan -t http://api.example.com --token "Bearer jwt_here" --fail-on-high
+
+    \b
+    Output formats:
+        text     - Human-readable console output (default)
+        json     - Detailed JSON report
+        sarif    - SARIF format for GitHub Code Scanning integration
+        markdown - Markdown report for documentation
+    """
+    from venomqa import Client
+    from venomqa.cli.output import CLIOutput, ProgressConfig
+    from venomqa.domains.security import SecurityScanner, ScanConfig
+
+    output = CLIOutput(ProgressConfig())
+
+    # Default endpoints if none specified
+    endpoint_list = list(endpoints) if endpoints else ["/", "/api"]
+    auth_endpoint_list = list(auth_endpoints) if auth_endpoints else ["/api/login", "/api/auth/token"]
+    admin_endpoint_list = list(admin_endpoints) if admin_endpoints else ["/api/admin"]
+
+    output.console.print("\n[bold cyan]VenomQA Security Scanner[/bold cyan]")
+    output.console.print(f"  Target: {target_url}")
+    output.console.print(f"  Endpoints: {', '.join(endpoint_list)}")
+    output.console.print(f"  Max payloads: {max_payloads}")
+    if skip_tests:
+        output.console.print(f"  Skipping: {', '.join(skip_tests)}")
+    output.console.print()
+
+    # Create client
+    client = Client(base_url=target_url, timeout=timeout)
+
+    # Create scan config
+    scan_config = ScanConfig(
+        target_url=target_url,
+        endpoints=endpoint_list,
+        auth_endpoints=auth_endpoint_list,
+        admin_endpoints=admin_endpoint_list,
+        user_token=user_token,
+        timeout=timeout,
+        max_payloads=max_payloads,
+        skip_tests=list(skip_tests),
+    )
+
+    # Run scan
+    scanner = SecurityScanner(client)
+    output.console.print("[bold]Starting security scan...[/bold]\n")
+
+    try:
+        result = scanner.run_full_scan(scan_config)
+    except Exception as e:
+        output.console.print(f"[red]Scan failed: {e}[/red]")
+        sys.exit(1)
+
+    # Generate output
+    if output_format == "text":
+        _display_security_results(output, result)
+    elif output_format == "sarif":
+        if output_path:
+            scanner.generate_sarif_report(result, output_path)
+            output.console.print(f"\n[green]SARIF report saved to: {output_path}[/green]")
+        else:
+            import json
+
+            sarif = _generate_sarif_inline(result)
+            click.echo(json.dumps(sarif, indent=2))
+    elif output_format == "json":
+        if output_path:
+            scanner.generate_json_report(result, output_path)
+            output.console.print(f"\n[green]JSON report saved to: {output_path}[/green]")
+        else:
+            import json
+
+            report = _generate_json_inline(result)
+            click.echo(json.dumps(report, indent=2, default=str))
+    elif output_format == "markdown":
+        if output_path:
+            scanner.generate_markdown_report(result, output_path)
+            output.console.print(f"\n[green]Markdown report saved to: {output_path}[/green]")
+        else:
+            md = _generate_markdown_inline(result)
+            click.echo(md)
+
+    # Save report if output path specified but not already saved
+    if output_path and output_format == "text":
+        scanner.generate_markdown_report(result, output_path.replace(".txt", ".md"))
+        output.console.print(f"\n[green]Report saved to: {output_path.replace('.txt', '.md')}[/green]")
+
+    # Exit with error if high severity issues found and flag is set
+    if fail_on_high and result.has_critical_issues:
+        output.console.print("\n[red]High/Critical vulnerabilities found. Failing build.[/red]")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+def _display_security_results(output: Any, result: Any) -> None:
+    """Display security scan results in terminal."""
+    output.console.print("[bold]Scan Complete[/bold]")
+    output.console.print(f"  Duration: {result.scan_duration_ms:.0f}ms")
+    output.console.print(f"  Total findings: {result.total_findings}")
+    output.console.print()
+
+    if result.findings_by_severity:
+        output.console.print("[bold]Findings by Severity:[/bold]")
+        severity_colors = {
+            "critical": "red",
+            "high": "red",
+            "medium": "yellow",
+            "low": "blue",
+            "info": "dim",
+        }
+        severity_order = ["critical", "high", "medium", "low", "info"]
+        for severity in severity_order:
+            count = result.findings_by_severity.get(severity, 0)
+            if count > 0:
+                color = severity_colors.get(severity, "white")
+                output.console.print(f"  [{color}]{severity.upper()}: {count}[/{color}]")
+        output.console.print()
+
+    if result.all_findings:
+        output.console.print("[bold]Vulnerability Details:[/bold]\n")
+        for i, finding in enumerate(result.all_findings[:20], 1):  # Show first 20
+            severity_colors = {
+                "critical": "red",
+                "high": "red",
+                "medium": "yellow",
+                "low": "blue",
+                "info": "dim",
+            }
+            color = severity_colors.get(finding.severity.value, "white")
+            output.console.print(f"[{color}]{i}. [{finding.severity.value.upper()}] {finding.title}[/{color}]")
+            output.console.print(f"   Type: {finding.vuln_type.value}")
+            output.console.print(f"   Location: {finding.location}")
+            if finding.payload:
+                payload_display = finding.payload[:80] + ("..." if len(finding.payload) > 80 else "")
+                output.console.print(f"   Payload: {payload_display}")
+            if finding.remediation:
+                remediation_display = finding.remediation[:100] + "..." if len(finding.remediation) > 100 else finding.remediation
+                output.console.print(f"   Remediation: {remediation_display}")
+            output.console.print()
+
+        if len(result.all_findings) > 20:
+            output.console.print(f"[dim]... and {len(result.all_findings) - 20} more findings[/dim]")
+
+    if result.errors:
+        output.console.print("\n[yellow]Errors during scan:[/yellow]")
+        for error in result.errors[:5]:
+            output.console.print(f"  [yellow]- {error}[/yellow]")
+        if len(result.errors) > 5:
+            output.console.print(f"  [dim]... and {len(result.errors) - 5} more errors[/dim]")
+
+
+def _generate_sarif_inline(result: Any) -> dict:
+    """Generate SARIF report inline."""
+    from venomqa.security.testing import VulnerabilitySeverity
+
+    severity_map = {
+        VulnerabilitySeverity.CRITICAL: "error",
+        VulnerabilitySeverity.HIGH: "error",
+        VulnerabilitySeverity.MEDIUM: "warning",
+        VulnerabilitySeverity.LOW: "note",
+        VulnerabilitySeverity.INFO: "none",
+    }
+
+    rules: dict[str, Any] = {}
+    results_list: list[dict[str, Any]] = []
+
+    for i, finding in enumerate(result.all_findings):
+        rule_id = f"VENOM-{finding.vuln_type.value.upper().replace('_', '-')}"
+
+        if rule_id not in rules:
+            rules[rule_id] = {
+                "id": rule_id,
+                "name": finding.vuln_type.value.replace("_", " ").title(),
+                "shortDescription": {"text": finding.title},
+                "defaultConfiguration": {"level": severity_map.get(finding.severity, "warning")},
+            }
+
+        results_list.append({
+            "ruleId": rule_id,
+            "level": severity_map.get(finding.severity, "warning"),
+            "message": {"text": finding.description},
+            "locations": [{"physicalLocation": {"artifactLocation": {"uri": finding.location or result.target}}}],
+        })
+
+    return {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Documents/schemas/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "VenomQA Security Scanner",
+                    "version": "1.0.0",
+                    "rules": list(rules.values()),
+                }
+            },
+            "results": results_list,
+        }],
+    }
+
+
+def _generate_json_inline(result: Any) -> dict:
+    """Generate JSON report inline."""
+    return {
+        "scan_info": {
+            "target": result.target,
+            "started_at": result.scan_started.isoformat(),
+            "finished_at": result.scan_finished.isoformat(),
+            "duration_ms": result.scan_duration_ms,
+        },
+        "summary": {
+            "total_findings": result.total_findings,
+            "findings_by_severity": result.findings_by_severity,
+            "is_vulnerable": result.is_vulnerable,
+            "has_critical_issues": result.has_critical_issues,
+        },
+        "findings": [
+            {
+                "type": f.vuln_type.value,
+                "severity": f.severity.value,
+                "title": f.title,
+                "description": f.description,
+                "location": f.location,
+                "remediation": f.remediation,
+                "cwe": f.cwe,
+                "owasp": f.owasp,
+            }
+            for f in result.all_findings
+        ],
+    }
+
+
+def _generate_markdown_inline(result: Any) -> str:
+    """Generate Markdown report inline."""
+    lines = [
+        "# VenomQA Security Scan Report\n",
+        f"**Target:** {result.target}  ",
+        f"**Scan Date:** {result.scan_started.strftime('%Y-%m-%d %H:%M:%S')}  ",
+        f"**Duration:** {result.scan_duration_ms:.0f}ms\n",
+        "## Summary\n",
+        "| Severity | Count |",
+        "|----------|-------|",
+    ]
+    for severity in ["critical", "high", "medium", "low", "info"]:
+        count = result.findings_by_severity.get(severity, 0)
+        lines.append(f"| {severity.upper()} | {count} |")
+
+    if result.all_findings:
+        lines.append("\n## Findings\n")
+        for finding in result.all_findings:
+            lines.extend([
+                f"### [{finding.severity.value.upper()}] {finding.title}\n",
+                f"**Type:** {finding.vuln_type.value}  ",
+                f"**Location:** {finding.location}\n",
+                f"{finding.description}\n",
+                f"**Remediation:** {finding.remediation}\n",
+                "---\n",
+            ])
+
+    return "\n".join(lines)
+
+
+@cli.command()
+@click.option(
+    "--all",
+    "-a",
+    "cleanup_all",
+    is_flag=True,
+    help="Clean up all tracked resources",
+)
+@click.option(
+    "--journey",
+    "-j",
+    "journey_name",
+    default=None,
+    help="Clean up resources for a specific journey",
+)
+@click.option(
+    "--strategy",
+    "-s",
+    "strategy",
+    type=click.Choice(["reverse_delete", "truncate", "snapshot_restore", "soft_delete"]),
+    default="reverse_delete",
+    help="Cleanup strategy to use",
+)
+@click.option(
+    "--table",
+    "-t",
+    "tables",
+    multiple=True,
+    help="Tables to truncate (when using truncate strategy)",
+)
+@click.option(
+    "--snapshot",
+    "snapshot_name",
+    default=None,
+    help="Snapshot name to restore (when using snapshot_restore strategy)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be cleaned up without actually cleaning",
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
+)
+@click.pass_context
+def cleanup(
+    ctx: click.Context,
+    cleanup_all: bool,
+    journey_name: str | None,
+    strategy: str,
+    tables: tuple[str, ...],
+    snapshot_name: str | None,
+    dry_run: bool,
+    output_format: str,
+) -> None:
+    """Clean up test data.
+
+    Removes test resources created during seeding or test execution.
+    Supports multiple cleanup strategies.
+
+    \b
+    Examples:
+        venomqa cleanup --all
+        venomqa cleanup --journey checkout
+        venomqa cleanup --strategy truncate --table users --table orders
+        venomqa cleanup --strategy snapshot_restore --snapshot before_test
+
+    \b
+    Strategies:
+        reverse_delete    - Delete resources in reverse order of creation (default)
+        truncate          - Truncate specified tables
+        snapshot_restore  - Restore database from a saved snapshot
+        soft_delete       - Mark resources as deleted with TTL
+    """
+    from venomqa.data import CleanupConfig, CleanupManager, CleanupStrategy
+
+    # Map strategy string to enum
+    strategy_map = {
+        "reverse_delete": CleanupStrategy.REVERSE_DELETE,
+        "truncate": CleanupStrategy.TRUNCATE,
+        "snapshot_restore": CleanupStrategy.SNAPSHOT_RESTORE,
+        "soft_delete": CleanupStrategy.SOFT_DELETE,
+    }
+    cleanup_strategy = strategy_map[strategy]
+
+    config = CleanupConfig(strategy=cleanup_strategy)
+
+    # Get client and database from config
+    config_obj: dict[str, Any] = ctx.obj.get("config", {})
+    client = None
+    database = None
+
+    # Create client for API cleanup
+    from venomqa import Client
+
+    client = Client(
+        base_url=config_obj.get("base_url", "http://localhost:8000"),
+        timeout=config_obj.get("timeout", 30),
+    )
+
+    # Get database from ports
+    ports = _parse_ports(tuple(), config_obj)
+    database = ports.get("database")
+
+    cleanup_manager = CleanupManager(client=client, database=database, config=config)
+
+    # Check for stored seed manager in context
+    seed_manager = ctx.obj.get("seed_manager")
+    if seed_manager:
+        cleanup_manager.register_resources(seed_manager.created_resources)
+
+    try:
+        if dry_run:
+            resources = cleanup_manager.tracker.get_cleanup_order(journey_name)
+            click.echo(f"Dry run - would clean up {len(resources)} resources")
+            click.echo(f"  Strategy: {strategy}")
+            if journey_name:
+                click.echo(f"  Journey: {journey_name}")
+            if resources:
+                click.echo("\nResources to clean up:")
+                for r in resources[:20]:  # Show first 20
+                    click.echo(f"  - {r.resource_type}/{r.resource_id}")
+                if len(resources) > 20:
+                    click.echo(f"  ... and {len(resources) - 20} more")
+            return
+
+        # Special handling for truncate strategy
+        if cleanup_strategy == CleanupStrategy.TRUNCATE and tables:
+            if database is None:
+                click.echo("Database connection required for truncate strategy", err=True)
+                sys.exit(1)
+
+            for table in tables:
+                database.truncate(table, cascade=True)
+                click.echo(f"Truncated table: {table}")
+            sys.exit(0)
+
+        # Special handling for snapshot restore
+        if cleanup_strategy == CleanupStrategy.SNAPSHOT_RESTORE:
+            if snapshot_name is None:
+                click.echo("Snapshot name required for snapshot_restore strategy", err=True)
+                sys.exit(1)
+
+            try:
+                cleanup_manager.restore_snapshot(snapshot_name)
+                click.echo(f"Restored from snapshot: {snapshot_name}")
+                sys.exit(0)
+            except ValueError as e:
+                click.echo(str(e), err=True)
+                sys.exit(1)
+
+        # Standard cleanup
+        result = cleanup_manager.cleanup(
+            journey=journey_name,
+            strategy=cleanup_strategy,
+        )
+
+        if output_format == "json":
+            import json
+
+            output_data = {
+                "success": result.success,
+                "deleted_count": result.deleted_count,
+                "failed_count": result.failed_count,
+                "strategy": result.strategy.value,
+                "duration_ms": result.duration_ms,
+                "deleted_resources": [
+                    {"type": r.resource_type, "id": r.resource_id}
+                    for r in result.deleted_resources
+                ],
+                "failed_resources": [
+                    {"type": r.resource_type, "id": r.resource_id, "error": err}
+                    for r, err in result.failed_resources
+                ],
+            }
+            click.echo(json.dumps(output_data, indent=2, default=str))
+        else:
+            if result.success:
+                click.echo(f"Successfully cleaned up {result.deleted_count} resources")
+            else:
+                click.echo(
+                    f"Cleanup completed with errors: "
+                    f"{result.deleted_count} deleted, {result.failed_count} failed"
+                )
+
+            click.echo(f"  Strategy: {result.strategy.value}")
+            click.echo(f"  Duration: {result.duration_ms:.0f}ms")
+
+            if result.failed_resources:
+                click.echo("\nFailed to clean up:")
+                for resource, error in result.failed_resources:
+                    click.echo(f"  - {resource.resource_type}/{resource.resource_id}: {error}")
+
+        sys.exit(0 if result.success else 1)
+
+    except Exception as e:
+        click.echo(f"Cleanup failed: {e}", err=True)
+        if ctx.obj.get("verbose"):
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
