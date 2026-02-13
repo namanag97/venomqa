@@ -269,7 +269,274 @@ class StateDetector:
         hateoas_actions = self._extract_links(response)
         actions.extend(hateoas_actions)
 
-        return actions
+        # Deduplicate actions
+        seen: Set[Tuple[str, str]] = set()
+        unique_actions: List[Action] = []
+        for action in actions:
+            key = (action.method, action.endpoint)
+            if key not in seen:
+                seen.add(key)
+                unique_actions.append(action)
+
+        return unique_actions
+
+    def detect_auth_state(self, response: Dict[str, Any]) -> AuthState:
+        """
+        Detect authentication state from response.
+
+        Args:
+            response: The API response data
+
+        Returns:
+            AuthState object with detected auth information
+        """
+        auth_state = AuthState()
+
+        # Check for tokens in response
+        token_type = None
+        for field in AUTH_TOKEN_FIELDS:
+            if field in response:
+                auth_state.has_token = True
+                if "access" in field.lower():
+                    token_type = "access_token"
+                elif "refresh" in field.lower():
+                    token_type = "refresh_token"
+                elif "jwt" in field.lower() or "bearer" in field.lower():
+                    token_type = "jwt"
+                else:
+                    token_type = "token"
+                break
+
+            # Check nested data
+            if "data" in response and isinstance(response["data"], dict):
+                if field in response["data"]:
+                    auth_state.has_token = True
+                    token_type = "token"
+                    break
+
+        auth_state.token_type = token_type
+
+        # Check for user info
+        user_info: Dict[str, Any] = {}
+        for field in USER_FIELDS:
+            if field in response:
+                value = response[field]
+                if isinstance(value, dict):
+                    user_info.update(value)
+                else:
+                    user_info[field] = value
+
+            # Check nested data
+            if "data" in response and isinstance(response["data"], dict):
+                if field in response["data"]:
+                    value = response["data"][field]
+                    if isinstance(value, dict):
+                        user_info.update(value)
+                    else:
+                        user_info[field] = value
+
+        auth_state.user_info = user_info
+
+        # Determine if authenticated
+        auth_state.is_authenticated = auth_state.has_token or bool(user_info)
+
+        # Extract roles/permissions if present
+        if "roles" in response:
+            roles = response["roles"]
+            if isinstance(roles, list):
+                auth_state.roles = roles
+        if "permissions" in response:
+            perms = response["permissions"]
+            if isinstance(perms, list):
+                auth_state.permissions = perms
+
+        # Check user object for roles
+        if "user" in response and isinstance(response["user"], dict):
+            user = response["user"]
+            if "roles" in user and isinstance(user["roles"], list):
+                auth_state.roles = user["roles"]
+            if "permissions" in user and isinstance(user["permissions"], list):
+                auth_state.permissions = user["permissions"]
+
+        return auth_state
+
+    def detect_entity_state(
+        self,
+        response: Dict[str, Any],
+        endpoint: Optional[str] = None,
+    ) -> EntityState:
+        """
+        Detect entity state from response.
+
+        Args:
+            response: The API response data
+            endpoint: The endpoint for context
+
+        Returns:
+            EntityState object with detected entity information
+        """
+        entity_state = EntityState()
+
+        # Try to infer entity type from endpoint
+        if endpoint:
+            entity_type = self._infer_entity_type_from_endpoint(endpoint)
+            if entity_type:
+                entity_state.entity_type = entity_type
+
+        # Look for entity ID
+        for field in ENTITY_ID_FIELDS:
+            if field in response:
+                entity_state.entity_id = str(response[field])
+                break
+            # Check nested data
+            if "data" in response and isinstance(response["data"], dict):
+                if field in response["data"]:
+                    entity_state.entity_id = str(response["data"][field])
+                    break
+
+        # Look for status
+        for field in STATUS_FIELDS:
+            if field in response:
+                entity_state.status = str(response[field])
+                break
+            # Check nested data
+            if "data" in response and isinstance(response["data"], dict):
+                if field in response["data"]:
+                    entity_state.status = str(response["data"][field])
+                    break
+
+        # Extract other properties (exclude known fields)
+        excluded = AUTH_TOKEN_FIELDS | USER_FIELDS | ENTITY_ID_FIELDS | STATUS_FIELDS
+        properties: Dict[str, Any] = {}
+        for key, value in response.items():
+            if key not in excluded and not key.startswith("_"):
+                # Only include simple types for properties
+                if isinstance(value, (str, int, float, bool)):
+                    properties[key] = value
+                elif isinstance(value, list) and len(value) > 0:
+                    # Store list length as a property
+                    properties[f"{key}_count"] = len(value)
+
+        entity_state.properties = properties
+
+        return entity_state
+
+    def fingerprint(self, response: Dict[str, Any]) -> str:
+        """
+        Create a unique fingerprint for a response.
+
+        This creates a hash-based signature that can identify
+        equivalent states across different API calls.
+
+        Args:
+            response: The API response data
+
+        Returns:
+            A hex string fingerprint
+        """
+        # Extract key fields for fingerprinting
+        fingerprint_data: Dict[str, Any] = {}
+
+        # Include state key fields
+        for field in self.state_key_fields:
+            if field in response:
+                fingerprint_data[field] = response[field]
+            elif "data" in response and isinstance(response["data"], dict):
+                if field in response["data"]:
+                    fingerprint_data[field] = response["data"][field]
+
+        # Include entity identifiers
+        for field in ENTITY_ID_FIELDS:
+            if field in response:
+                fingerprint_data[f"_id_{field}"] = response[field]
+                break
+
+        # Include auth presence (but not actual tokens)
+        has_auth = any(field in response for field in AUTH_TOKEN_FIELDS)
+        fingerprint_data["_has_auth"] = has_auth
+
+        # Include response structure signature
+        structure = self._get_structure_signature(response)
+        fingerprint_data["_structure"] = structure
+
+        # Create hash
+        canonical = json.dumps(fingerprint_data, sort_keys=True, default=str)
+        return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+    def _infer_entity_type_from_endpoint(self, endpoint: str) -> Optional[str]:
+        """
+        Infer entity type from endpoint path.
+
+        Args:
+            endpoint: The API endpoint
+
+        Returns:
+            Inferred entity type or None
+        """
+        # Remove leading slash and split
+        path = endpoint.lstrip("/")
+        segments = path.split("/")
+
+        # Skip common prefixes
+        skip_prefixes = {"api", "v1", "v2", "v3", "rest", "graphql"}
+
+        for segment in segments:
+            # Skip version numbers and common prefixes
+            if segment.lower() in skip_prefixes:
+                continue
+            if re.match(r"^v\d+$", segment.lower()):
+                continue
+
+            # Skip IDs (numeric or UUID-like)
+            if re.match(r"^\d+$", segment):
+                continue
+            if re.match(
+                r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                segment.lower()
+            ):
+                continue
+
+            # Found a likely entity type
+            # Singularize if ends with 's'
+            if segment.endswith("s") and len(segment) > 2:
+                return segment[:-1]
+            return segment
+
+        return None
+
+    def _get_structure_signature(self, response: Dict[str, Any]) -> str:
+        """
+        Get a signature representing the structure of the response.
+
+        Args:
+            response: The API response data
+
+        Returns:
+            A string signature of the response structure
+        """
+        def get_type_sig(value: Any, depth: int = 0) -> str:
+            if depth > 3:  # Limit depth
+                return "..."
+            if isinstance(value, dict):
+                keys = sorted(value.keys())[:10]  # Limit keys
+                return "{" + ",".join(keys) + "}"
+            elif isinstance(value, list):
+                if len(value) > 0:
+                    return "[" + get_type_sig(value[0], depth + 1) + "]"
+                return "[]"
+            elif isinstance(value, str):
+                return "str"
+            elif isinstance(value, bool):
+                return "bool"
+            elif isinstance(value, int):
+                return "int"
+            elif isinstance(value, float):
+                return "float"
+            elif value is None:
+                return "null"
+            return "?"
+
+        return get_type_sig(response)
 
     def add_state_extractor(
         self,
