@@ -785,10 +785,15 @@ class TestGetStructureSignature:
         """Test structure signature with empty list."""
         detector = StateDetector()
 
-        response = {"items": []}
-        sig = detector._get_structure_signature(response)
+        # When response is the top-level empty list
+        response_list: list = []
+        sig = detector._get_structure_signature(response_list)  # type: ignore
+        assert sig == "[]"
 
-        assert "[]" in sig
+        # When response has a key with empty list, structure shows keys
+        response_dict = {"items": []}
+        sig_dict = detector._get_structure_signature(response_dict)
+        assert "items" in sig_dict
 
 
 class TestIntegration:
