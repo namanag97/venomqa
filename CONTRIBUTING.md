@@ -1,29 +1,54 @@
 # Contributing to VenomQA
 
-Thank you for your interest in contributing to VenomQA! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to VenomQA! This guide will help you get started.
+
+---
 
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
+- [Quick Start](#quick-start)
 - [Development Setup](#development-setup)
+- [Project Structure](#project-structure)
 - [Making Changes](#making-changes)
 - [Testing](#testing)
 - [Code Style](#code-style)
 - [Pull Request Process](#pull-request-process)
-- [Reporting Issues](#reporting-issues)
+- [Release Process](#release-process)
+
+---
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+This project follows our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold respectful and inclusive behavior.
 
-## Getting Started
+---
 
-1. Fork the repository on GitHub
-2. Clone your fork locally
-3. Set up the development environment
-4. Make your changes
-5. Submit a pull request
+## Quick Start
+
+```bash
+# 1. Fork and clone
+git clone https://github.com/YOUR_USERNAME/venomqa.git
+cd venomqa
+
+# 2. Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 3. Install development dependencies
+pip install -e ".[dev]"
+
+# 4. Install pre-commit hooks
+pre-commit install
+
+# 5. Run tests
+pytest
+
+# 6. Create a branch and start coding
+git checkout -b feature/your-feature
+```
+
+---
 
 ## Development Setup
 
@@ -34,84 +59,126 @@ This project and everyone participating in it is governed by our [Code of Conduc
 - Git
 - Docker (for integration tests)
 
-### Setup Steps
+### Installation
 
 ```bash
-# Clone your fork
-git clone https://github.com/YOUR_USERNAME/venomqa.git
+# Clone repository
+git clone https://github.com/venomqa/venomqa.git
 cd venomqa
 
-# Create virtual environment
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
-# Install development dependencies
-pip install -e ".[dev]"
+# Install all dependencies
+pip install -e ".[dev,docs,postgres,redis]"
 
 # Install pre-commit hooks
 pre-commit install
 
-# Verify installation
+# Verify setup
 venomqa --version
+pytest --version
 ```
 
 ### Docker Setup (Optional)
 
-For running integration tests with PostgreSQL:
+For running integration tests:
 
 ```bash
 # Start test services
-docker compose -f docker-compose.test.yml up -d
+docker compose -f docker/docker-compose.ci.yml up -d
 
 # Run integration tests
-pytest tests/test_integration.py
+pytest -m integration
 
 # Stop services
-docker compose -f docker-compose.test.yml down
+docker compose -f docker/docker-compose.ci.yml down
 ```
+
+---
+
+## Project Structure
+
+```
+venomqa/
+├── venomqa/                  # Main package
+│   ├── cli/                  # Command-line interface
+│   ├── clients/              # HTTP/GraphQL/gRPC clients
+│   ├── core/                 # Core models and context
+│   ├── domains/              # Domain-specific test helpers
+│   ├── reporters/            # Report generators
+│   ├── state/                # Database state management
+│   ├── adapters/             # External service adapters
+│   └── tools/                # Utility tools
+├── tests/                    # Test suite
+│   ├── test_*.py             # Unit tests
+│   └── scenarios/            # Integration test scenarios
+├── docs/                     # Documentation
+├── examples/                 # Example projects
+│   ├── todo_app/             # Todo app example
+│   ├── fastapi-example/      # FastAPI integration
+│   └── quickstart/           # Quick start template
+└── docker/                   # Docker configurations
+```
+
+---
 
 ## Making Changes
 
 ### Branch Naming
 
-Create a branch with a descriptive name:
+Use descriptive branch names:
 
 - `feature/add-mysql-backend` - New features
-- `fix/parallel-execution-race` - Bug fixes
-- `docs/api-reference` - Documentation updates
+- `fix/context-memory-leak` - Bug fixes
+- `docs/quickstart-guide` - Documentation
 - `refactor/reporter-interface` - Code refactoring
+- `test/journey-edge-cases` - Test additions
 
 ### Commit Messages
 
-Follow these guidelines for commit messages:
+Follow conventional commits:
 
 ```
-<type>: <subject>
+<type>(<scope>): <description>
 
-<body (optional)>
+<body>
 
-<footer (optional)>
+<footer>
 ```
 
-Types:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, etc.)
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
+**Types:**
+- `feat` - New feature
+- `fix` - Bug fix
+- `docs` - Documentation
+- `style` - Code style (formatting)
+- `refactor` - Code refactoring
+- `test` - Tests
+- `chore` - Maintenance
 
-Example:
+**Examples:**
+
 ```
-feat: add MySQL state backend support
+feat(state): add MySQL backend support
 
 - Implement MySQLStateManager class
-- Add connection pooling support
-- Update documentation with MySQL examples
+- Add connection pooling
+- Update configuration schema
 
 Closes #123
 ```
+
+```
+fix(cli): handle missing config file gracefully
+
+Previously the CLI would crash if venomqa.yaml was missing.
+Now it provides a helpful error message.
+
+Fixes #456
+```
+
+---
 
 ## Testing
 
@@ -122,7 +189,7 @@ Closes #123
 pytest
 
 # Run with coverage
-pytest --cov=venomqa
+pytest --cov=venomqa --cov-report=html
 
 # Run specific test file
 pytest tests/test_runner.py
@@ -130,57 +197,71 @@ pytest tests/test_runner.py
 # Run specific test
 pytest tests/test_runner.py::test_journey_execution
 
-# Run with verbose output
-pytest -v
-
-# Run only unit tests
+# Run only unit tests (fast)
 pytest -m "not integration"
 
-# Run integration tests
+# Run integration tests (requires Docker)
 pytest -m integration
+
+# Run with verbose output
+pytest -v
 ```
 
 ### Writing Tests
 
-Place tests in the `tests/` directory. Follow these conventions:
+Place tests in the `tests/` directory:
 
 ```python
 # tests/test_example.py
 import pytest
-from venomqa import Journey, Step, JourneyRunner, Client
+from venomqa import Journey, Step
+from venomqa.core.context import ExecutionContext
+
 
 class TestJourneyExecution:
     """Tests for journey execution."""
-    
+
     def test_simple_journey_passes(self):
-        """Test that a simple journey executes successfully."""
-        # Arrange
+        """A simple journey should execute successfully."""
         def simple_action(client, context):
-            return client.get("/health")
-        
+            context["called"] = True
+            return MockResponse(status_code=200)
+
         journey = Journey(
-            name="test",
-            steps=[Step(name="health", action=simple_action)],
+            name="test_journey",
+            steps=[Step(name="step1", action=simple_action)],
         )
-        
-        # Act
-        runner = JourneyRunner(client=Client(base_url="http://localhost:8000"))
-        result = runner.run(journey)
-        
-        # Assert
+
+        # Test execution
+        result = execute_journey(journey)
+
         assert result.success
-    
+        assert result.context["called"] is True
+
     @pytest.mark.integration
-    def test_with_database(self):
+    def test_with_database(self, db_connection):
         """Integration test requiring database."""
+        # Test with real database
+        pass
+
+    @pytest.mark.parametrize("status_code,expected", [
+        (200, True),
+        (201, True),
+        (400, False),
+        (500, False),
+    ])
+    def test_status_code_handling(self, status_code, expected):
+        """Test various status code outcomes."""
         pass
 ```
 
-### Test Categories
+### Test Markers
 
-- **Unit Tests**: Fast, isolated tests with no external dependencies
-- **Integration Tests**: Tests with database, API, or Docker dependencies
-- **End-to-End Tests**: Full journey tests with real services
+- `@pytest.mark.integration` - Requires external services
+- `@pytest.mark.slow` - Long-running tests
+- `@pytest.mark.skip` - Temporarily skipped
+
+---
 
 ## Code Style
 
@@ -189,14 +270,17 @@ class TestJourneyExecution:
 We use Ruff for linting and formatting:
 
 ```bash
-# Check code style
+# Check style
 ruff check .
+
+# Fix issues automatically
+ruff check . --fix
 
 # Format code
 ruff format .
 
-# Check with all rules
-ruff check . --select ALL
+# Check types
+mypy venomqa
 ```
 
 ### Type Hints
@@ -204,20 +288,31 @@ ruff check . --select ALL
 Use type hints for all public functions:
 
 ```python
+from typing import Any
+
+from venomqa.core.models import Journey, JourneyResult
+from venomqa.config.settings import QAConfig
+
+
 def run_journey(
     journey: Journey,
     config: QAConfig | None = None,
+    verbose: bool = False,
 ) -> JourneyResult:
     """Run a journey with optional configuration.
-    
+
     Args:
         journey: The journey to execute.
         config: Optional configuration overrides.
-    
+        verbose: Enable verbose logging.
+
     Returns:
         The journey execution result.
+
+    Raises:
+        ConfigurationError: If configuration is invalid.
     """
-    pass
+    ...
 ```
 
 ### Docstrings
@@ -227,29 +322,27 @@ Use Google-style docstrings:
 ```python
 def checkpoint(self, name: str) -> None:
     """Create a database savepoint.
-    
+
     Creates a SAVEPOINT in the current transaction that can be
     rolled back to later using the rollback() method.
-    
+
     Args:
         name: Unique identifier for the checkpoint. Must be
-            alphanumeric with underscores.
-    
+            alphanumeric with underscores only.
+
     Raises:
         RuntimeError: If not connected to the database.
         ValueError: If name contains invalid characters.
-    
+
     Example:
-        >>> state_manager.checkpoint("before_order")
-        >>> # ... make changes ...
-        >>> state_manager.rollback("before_order")
+        >>> state_manager.checkpoint("before_payment")
+        >>> # Make changes...
+        >>> state_manager.rollback("before_payment")
     """
-    pass
+    ...
 ```
 
 ### Import Order
-
-Imports should be ordered:
 
 1. Standard library
 2. Third-party packages
@@ -270,58 +363,93 @@ from venomqa.core.models import Journey
 from venomqa.state.base import StateManager
 ```
 
+---
+
 ## Pull Request Process
 
 ### Before Submitting
 
-1. **Update tests**: Ensure new code is tested
-2. **Update documentation**: Update relevant docs
-3. **Run linting**: `ruff check .`
-4. **Run tests**: `pytest --cov=venomqa`
-5. **Update changelog**: Add entry to CHANGELOG.md
+1. **Write tests** for new functionality
+2. **Update documentation** if needed
+3. **Run the full test suite:** `pytest`
+4. **Run linting:** `ruff check .`
+5. **Run type checking:** `mypy venomqa`
+6. **Update CHANGELOG.md** if applicable
 
 ### PR Checklist
 
-- [ ] Code follows project style guidelines
 - [ ] Tests pass locally
 - [ ] New tests added for new functionality
+- [ ] Code follows project style guidelines
 - [ ] Documentation updated
-- [ ] Changelog updated
-- [ ] PR description is clear and complete
+- [ ] Changelog updated (for user-facing changes)
+- [ ] PR description explains the changes
 
 ### PR Template
 
 ```markdown
 ## Description
-Brief description of changes
+
+Brief description of changes.
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
-- [ ] Documentation update
+- [ ] Documentation
 
 ## Testing
-- [ ] Tests added/updated
+
+- [ ] Unit tests added/updated
+- [ ] Integration tests added/updated
 - [ ] All tests pass
 
 ## Checklist
+
 - [ ] Code follows style guidelines
+- [ ] Self-review completed
 - [ ] Documentation updated
-- [ ] Changelog updated
 ```
 
 ### Review Process
 
-1. Maintainers will review your PR
-2. Address any feedback
-3. Once approved, a maintainer will merge
+1. Open a PR against `main`
+2. Automated checks run (tests, linting)
+3. Maintainer reviews the code
+4. Address any feedback
+5. Once approved, maintainer merges
 
-## Reporting Issues
+---
+
+## Release Process
+
+Releases are handled by maintainers:
+
+1. Update version in `pyproject.toml`
+2. Update `CHANGELOG.md`
+3. Create a git tag: `git tag v0.3.0`
+4. Push tag: `git push --tags`
+5. GitHub Actions builds and publishes to PyPI
+
+---
+
+## Ways to Contribute
+
+### Good First Issues
+
+Look for issues labeled [`good first issue`](https://github.com/venomqa/venomqa/issues?q=label%3A%22good+first+issue%22).
+
+### Documentation
+
+- Fix typos or unclear explanations
+- Add examples
+- Improve the getting started guide
+- Translate documentation
 
 ### Bug Reports
 
-Use the bug report template and include:
+Use the bug report template:
 
 - Python version
 - VenomQA version
@@ -332,24 +460,37 @@ Use the bug report template and include:
 
 ### Feature Requests
 
-Use the feature request template and include:
+Use the feature request template:
 
 - Use case description
 - Proposed solution
 - Alternative solutions considered
 - Additional context
 
+### Code Contributions
+
+- Fix bugs
+- Add new adapters (MySQL, MongoDB, etc.)
+- Add new reporters
+- Improve performance
+- Add CLI commands
+
+---
+
 ## Getting Help
 
-- **GitHub Issues**: For bugs and feature requests
-- **Discussions**: For questions and general discussion
-- **Documentation**: Check the `docs/` directory
+- **GitHub Issues:** Bug reports and feature requests
+- **GitHub Discussions:** Questions and general discussion
+- **Documentation:** [docs/](docs/)
+
+---
 
 ## Recognition
 
 Contributors are recognized in:
+
 - Git commit history
 - Release notes
-- Contributors file
+- README contributors section
 
 Thank you for contributing to VenomQA!
