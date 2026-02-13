@@ -1,0 +1,803 @@
+openapi: "3.0.3"
+info:
+  title: Comprehensive Test API
+  description: A comprehensive OpenAPI spec for testing all features
+  version: "2.0.0"
+  contact:
+    email: api@example.com
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+  - url: http://localhost:3000
+    description: Development server
+
+tags:
+  - name: users
+    description: User management
+  - name: products
+    description: Product catalog
+  - name: orders
+    description: Order processing
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+paths:
+  /users:
+    get:
+      tags: [users]
+      summary: List all users
+      description: Returns a paginated list of users with filtering options
+      operationId: getUsers
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          description: Filter by user status
+          schema:
+            type: string
+            enum: [active, inactive, pending]
+            default: active
+        - name: search
+          in: query
+          description: Search by name or email
+          schema:
+            type: string
+            minLength: 3
+        - name: X-Correlation-ID
+          in: header
+          description: Correlation ID for request tracing
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      tags: [users]
+      summary: Create a new user
+      operationId: createUser
+      security: []  # Public endpoint - no auth required
+      requestBody:
+        $ref: '#/components/requestBodies/CreateUserBody'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+
+    get:
+      tags: [users]
+      summary: Get user by ID
+      operationId: getUserById
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithProfile'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags: [users]
+      summary: Update user
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUser'
+      responses:
+        '200':
+          description: User updated
+
+    delete:
+      tags: [users]
+      summary: Delete user
+      operationId: deleteUser
+      responses:
+        '204':
+          description: User deleted
+
+  /users/{userId}/profile:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+
+    get:
+      tags: [users]
+      summary: Get user profile
+      operationId: getUserProfile
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+
+    patch:
+      tags: [users]
+      summary: Partially update profile
+      operationId: patchUserProfile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePatch'
+            examples:
+              updateBio:
+                summary: Update bio only
+                value:
+                  bio: "This is my new bio"
+              updateAvatar:
+                summary: Update avatar
+                value:
+                  avatar_url: "https://example.com/avatar.jpg"
+      responses:
+        '200':
+          description: Profile updated
+
+  /users/{userId}/avatar:
+    parameters:
+      - $ref: '#/components/parameters/UserIdParam'
+
+    post:
+      tags: [users]
+      summary: Upload user avatar
+      operationId: uploadAvatar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Avatar image file
+                description:
+                  type: string
+                  description: Optional description
+      responses:
+        '200':
+          description: Avatar uploaded
+
+  /products:
+    get:
+      tags: [products]
+      summary: List products
+      operationId: getProducts
+      security: []  # Public
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            exclusiveMinimum: false
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [name, price, createdAt]
+            default: createdAt
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+    post:
+      tags: [products]
+      summary: Create product
+      operationId: createProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProduct'
+            example:
+              name: "Premium Widget"
+              description: "A high-quality widget"
+              price: 99.99
+              category: "widgets"
+              inventory: 100
+              attributes:
+                color: "blue"
+                size: "medium"
+      responses:
+        '201':
+          description: Product created
+
+  /products/{productId}:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        description: The product ID
+        schema:
+          type: string
+          format: uuid
+        example: "123e4567-e89b-12d3-a456-426614174000"
+
+    get:
+      tags: [products]
+      summary: Get product details
+      operationId: getProductById
+      security: []
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductWithVariants'
+
+  /orders:
+    get:
+      tags: [orders]
+      summary: List orders
+      operationId: getOrders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, shipped, delivered, cancelled]
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2024-01-01"
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: customerId
+          in: query
+          schema:
+            type: integer
+        - name: X-Session-ID
+          in: cookie
+          schema:
+            type: string
+          example: "session_abc123"
+      responses:
+        '200':
+          description: List of orders
+
+    post:
+      tags: [orders]
+      summary: Create order
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrder'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+
+    get:
+      tags: [orders]
+      summary: Get order details
+      operationId: getOrderById
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderWithItems'
+
+    patch:
+      tags: [orders]
+      summary: Update order status
+      operationId: updateOrderStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [processing, shipped, delivered, cancelled]
+                trackingNumber:
+                  type: string
+                  example: "1Z999AA10123456784"
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Order updated
+
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+
+  /webhooks:
+    post:
+      summary: Register webhook
+      operationId: registerWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                events:
+                  type: array
+                  items:
+                    type: string
+                    enum: [order.created, order.updated, user.created]
+                secret:
+                  type: string
+                  format: password
+      responses:
+        '201':
+          description: Webhook registered
+
+components:
+  schemas:
+    User:
+      type: object
+      required: [id, email, name]
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        name:
+          type: string
+          example: "John Doe"
+        status:
+          type: string
+          enum: [active, inactive, pending]
+          default: active
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserWithProfile:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            profile:
+              $ref: '#/components/schemas/Profile'
+
+    Profile:
+      type: object
+      properties:
+        bio:
+          type: string
+          maxLength: 500
+          example: "Software developer and coffee enthusiast"
+        avatar_url:
+          type: string
+          format: uri
+        location:
+          type: string
+        website:
+          type: string
+          format: uri
+        social_links:
+          type: object
+          additionalProperties:
+            type: string
+
+    ProfilePatch:
+      type: object
+      properties:
+        bio:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+        location:
+          type: string
+
+    CreateUser:
+      type: object
+      required: [email, name, password]
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        password:
+          type: string
+          format: password
+          minLength: 8
+        role:
+          type: string
+          enum: [admin, user, guest]
+          default: user
+
+    UpdateUser:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [active, inactive]
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    Product:
+      type: object
+      required: [id, name, price]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          minimum: 0
+        category:
+          type: string
+        inventory:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+
+    ProductWithVariants:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          properties:
+            variants:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductVariant'
+
+    ProductVariant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+        price:
+          type: number
+        inventory:
+          type: integer
+
+    CreateProduct:
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          minimum: 0
+        category:
+          type: string
+        inventory:
+          type: integer
+          default: 0
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+
+    Order:
+      type: object
+      required: [id, status, total]
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processing, shipped, delivered, cancelled]
+        total:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderWithItems:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderItem'
+            shippingAddress:
+              $ref: '#/components/schemas/Address'
+
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+        subtotal:
+          type: number
+
+    CreateOrder:
+      type: object
+      required: [items, shippingAddress]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+                minimum: 1
+        shippingAddress:
+          $ref: '#/components/schemas/Address'
+        billingAddress:
+          $ref: '#/components/schemas/Address'
+        notes:
+          type: string
+
+    Address:
+      type: object
+      required: [street, city, country, postalCode]
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        postalCode:
+          type: string
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      description: Unique user identifier
+      schema:
+        type: integer
+        minimum: 1
+      example: 42
+
+  requestBodies:
+    CreateUserBody:
+      description: User creation payload
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreateUser'
+          example:
+            email: "newuser@example.com"
+            name: "New User"
+            password: "securePassword123"
+            role: "user"
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Unauthorized"
+              message:
+                type: string
+                example: "Valid authentication credentials required"
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Validation Error"
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field:
+                      type: string
+                    message:
+                      type: string
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Not Found"
+              message:
+                type: string
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key passed in header
