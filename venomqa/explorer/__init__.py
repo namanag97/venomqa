@@ -30,7 +30,7 @@ from venomqa.explorer.models import (
 )
 from venomqa.explorer.discoverer import APIDiscoverer
 from venomqa.explorer.detector import StateDetector
-from venomqa.explorer.engine import ExplorationEngine, ExplorationStrategy
+from venomqa.explorer.engine import ExplorationEngine, ExplorationStrategy, ExplorationError
 from venomqa.explorer.visualizer import GraphVisualizer, OutputFormat
 from venomqa.explorer.reporter import ExplorationReporter, ReportFormat
 from venomqa.explorer.explorer import StateExplorer
