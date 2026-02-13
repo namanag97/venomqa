@@ -133,6 +133,91 @@ Example:
 """
 '''
 
+SAMPLE_ACTION_PY = '''"""Sample actions for your QA tests.
+
+Modify these actions or add new ones for your specific API.
+"""
+
+from typing import Any
+
+
+def health_check(client: Any, context: dict) -> Any:
+    """Check API health status."""
+    response = client.get("/health")
+    if response.status_code == 200:
+        context["api_healthy"] = True
+    return response
+
+
+def get_items(client: Any, context: dict) -> Any:
+    """List all items."""
+    response = client.get("/api/items")
+    if response.status_code == 200:
+        context["items"] = response.json()
+    return response
+
+
+def create_item(client: Any, context: dict, name: str = "Test Item", **kwargs) -> Any:
+    """Create a new item."""
+    payload = {
+        "name": name,
+        "description": kwargs.get("description", "Created by VenomQA"),
+    }
+    response = client.post("/api/items", json=payload)
+    if response.status_code in (200, 201):
+        context["created_item"] = response.json()
+    return response
+'''
+
+SAMPLE_JOURNEY_PY = '''"""Sample journey for your QA tests.
+
+This journey demonstrates basic CRUD operations.
+Modify it for your specific API.
+"""
+
+import sys
+from pathlib import Path
+
+# Add the parent directory to path for action imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from venomqa import Journey, Step, Checkpoint
+
+from actions.sample_actions import health_check, get_items, create_item
+
+
+# Define the journey
+journey = Journey(
+    name="sample_journey",
+    description="Sample CRUD journey",
+    steps=[
+        Step(
+            name="health_check",
+            action=health_check,
+            description="Verify API is healthy",
+            expected_status=200,
+        ),
+        Step(
+            name="list_items",
+            action=get_items,
+            description="List existing items",
+            expected_status=200,
+        ),
+        Step(
+            name="create_item",
+            action=create_item,
+            args={"name": "My Test Item"},
+            description="Create a new item",
+            expected_status=[200, 201],
+        ),
+        Checkpoint(
+            name="item_created",
+            description="Item has been created",
+        ),
+    ],
+)
+'''
+
 
 def setup_logging(verbose: bool) -> None:
     """Configure logging based on verbosity level."""
