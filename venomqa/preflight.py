@@ -139,11 +139,39 @@ class PreflightChecker:
 
     def _register_default_checks(self) -> None:
         """Register the default set of preflight checks."""
+        # Python version check (required)
+        self.register_check(
+            "python_version",
+            self._check_python_version,
+            required=True,
+        )
+
+        # Required dependencies check (required)
+        self.register_check(
+            "required_dependencies",
+            self._check_required_dependencies,
+            required=True,
+        )
+
+        # Config validation (required)
+        self.register_check(
+            "config_validation",
+            self._check_config_validation,
+            required=True,
+        )
+
         # Target API check (required)
         self.register_check(
             "target_api",
             self._check_target_api,
             required=True,
+        )
+
+        # Docker availability check (optional)
+        self.register_check(
+            "docker",
+            self._check_docker,
+            required=False,
         )
 
         # Docker compose file check (required if docker_compose_file is set)
@@ -169,13 +197,6 @@ class PreflightChecker:
                 self._check_database,
                 required=False,
             )
-
-        # Config validation (required)
-        self.register_check(
-            "config_validation",
-            self._check_config_validation,
-            required=True,
-        )
 
         # Journeys directory check (required)
         self.register_check(
