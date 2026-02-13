@@ -208,11 +208,14 @@ class StateExplorer:
         Returns:
             List of discovered Action objects
         """
-        # TODO: Implement endpoint discovery
-        # 1. Call discoverer.discover()
-        # 2. Cache results
-        # 3. Return actions
-        raise NotImplementedError("discover_endpoints() not yet implemented")
+        # Try to discover endpoints using the discoverer
+        try:
+            actions = await self.discoverer.discover()
+        except NotImplementedError:
+            # If discover() is not implemented, return seed endpoints
+            actions = self.discoverer.get_discovered_actions()
+
+        return actions
 
     async def authenticate(
         self,
