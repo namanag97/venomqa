@@ -289,10 +289,7 @@ def complete_cart(cart_id: str):
         "created_at": datetime.utcnow().isoformat()
     }
 
-    # BUG: Return wrong order_id - doesn't match what's stored
-    fake_response = orders_db[order_id].copy()
-    fake_response["id"] = "order_WRONG_ID_12345"
-    return {"data": fake_response}
+    return {"data": orders_db[order_id]}
 
 
 @app.get("/store/orders/{order_id}")
