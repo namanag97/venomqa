@@ -406,6 +406,54 @@ class APIDiscoverer:
 
         return None
 
+    def _resolve_ref(self, ref: str) -> Dict[str, Any]:
+        """
+        Resolve a JSON $ref pointer to its target schema.
+
+        Supports references to:
+        - #/components/schemas/...
+        - #/components/parameters/...
+        - #/components/requestBodies/...
+        - #/components/responses/...
+
+        Args:
+            ref: The $ref string (e.g., "#/components/schemas/User")
+
+        Returns:
+            The resolved schema dictionary, or empty dict if not found
+        """
+        if not ref.startswith("#/"):
+            # External refs not supported
+            return {}
+
+        # Parse the reference path
+        parts = ref[2:].split("/")  # Remove "#/" prefix and split
+
+        # Navigate to the target
+        current = {"components": self._spec_components}
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return {}
+
+        return current if isinstance(current, dict) else {}
+
+    def _resolve_parameter(self, param: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Resolve a parameter, following $ref if present.
+
+        Args:
+            param: Parameter object, potentially with $ref
+
+        Returns:
+            Resolved parameter dictionary
+        """
+        if "$ref" in param:
+            resolved = self._resolve_ref(param["$ref"])
+            return resolved if resolved else param
+        return param
+
     def _build_example_from_schema(
         self,
         schema: Dict[str, Any],
@@ -413,6 +461,8 @@ class APIDiscoverer:
     ) -> Any:
         """
         Build an example value from an OpenAPI schema.
+
+        Properly resolves $ref references to build complete example objects.
 
         Args:
             schema: OpenAPI schema object
@@ -424,26 +474,69 @@ class APIDiscoverer:
         if visited is None:
             visited = set()
 
-        # Check for direct example
+        # Check for direct example first
         if "example" in schema:
             return schema["example"]
 
-        # Handle $ref (we don't resolve refs, just return placeholder)
+        # Handle $ref - resolve it and build example from resolved schema
         if "$ref" in schema:
             ref = schema["$ref"]
             if ref in visited:
-                return {}
+                return {}  # Circular reference, return empty
+            visited = visited.copy()
             visited.add(ref)
+
+            resolved = self._resolve_ref(ref)
+            if resolved:
+                return self._build_example_from_schema(resolved, visited)
             return {}
 
-        schema_type = schema.get("type", "object")
+        # Handle allOf - merge all schemas
+        if "allOf" in schema:
+            result = {}
+            for sub_schema in schema["allOf"]:
+                sub_example = self._build_example_from_schema(sub_schema, visited)
+                if isinstance(sub_example, dict):
+                    result.update(sub_example)
+            return result
+
+        # Handle oneOf/anyOf - use first option
+        if "oneOf" in schema and schema["oneOf"]:
+            return self._build_example_from_schema(schema["oneOf"][0], visited)
+        if "anyOf" in schema and schema["anyOf"]:
+            return self._build_example_from_schema(schema["anyOf"][0], visited)
+
+        # Determine schema type
+        schema_type = schema.get("type")
+
+        # If no type, try to infer from other properties
+        if not schema_type:
+            if "properties" in schema:
+                schema_type = "object"
+            elif "items" in schema:
+                schema_type = "array"
+            elif "enum" in schema:
+                # Return first enum value
+                return schema["enum"][0]
+            else:
+                schema_type = "object"
 
         if schema_type == "object":
             result = {}
             properties = schema.get("properties", {})
+            required = schema.get("required", [])
+
+            # Build example for each property
             for prop_name, prop_schema in properties.items():
                 if isinstance(prop_schema, dict):
                     result[prop_name] = self._build_example_from_schema(prop_schema, visited)
+
+            # Handle additionalProperties if present and properties is empty
+            if not properties and schema.get("additionalProperties"):
+                add_props = schema["additionalProperties"]
+                if isinstance(add_props, dict):
+                    result["additionalProp1"] = self._build_example_from_schema(add_props, visited)
+
             return result
 
         elif schema_type == "array":
@@ -455,6 +548,12 @@ class APIDiscoverer:
         elif schema_type == "string":
             format_type = schema.get("format", "")
             enum = schema.get("enum")
+            default = schema.get("default")
+            min_length = schema.get("minLength", 0)
+            pattern = schema.get("pattern")
+
+            if default is not None:
+                return default
             if enum:
                 return enum[0]
             if format_type == "email":
@@ -465,20 +564,68 @@ class APIDiscoverer:
                 return "2024-01-01T00:00:00Z"
             if format_type == "uuid":
                 return "123e4567-e89b-12d3-a456-426614174000"
-            if format_type == "uri":
+            if format_type == "uri" or format_type == "url":
                 return "https://example.com"
+            if format_type == "hostname":
+                return "example.com"
+            if format_type == "ipv4":
+                return "192.168.1.1"
+            if format_type == "ipv6":
+                return "::1"
+            if format_type == "password":
+                return "password123"
+            if format_type == "byte":
+                return "dGVzdA=="  # Base64 encoded "test"
+            if format_type == "binary":
+                return "binary_data"
+            if format_type == "time":
+                return "12:00:00"
+            if format_type == "duration":
+                return "P1D"
+
+            # Generate string based on minLength
+            if min_length > 0:
+                return "x" * min_length
             return "string"
 
         elif schema_type == "integer":
-            minimum = schema.get("minimum", 0)
-            return int(minimum) if minimum else 0
+            default = schema.get("default")
+            if default is not None:
+                return default
+            enum = schema.get("enum")
+            if enum:
+                return enum[0]
+            minimum = schema.get("minimum")
+            exclusive_min = schema.get("exclusiveMinimum")
+            if minimum is not None:
+                return int(minimum)
+            if exclusive_min is not None:
+                return int(exclusive_min) + 1
+            return 0
 
         elif schema_type == "number":
-            minimum = schema.get("minimum", 0.0)
-            return float(minimum) if minimum else 0.0
+            default = schema.get("default")
+            if default is not None:
+                return default
+            enum = schema.get("enum")
+            if enum:
+                return enum[0]
+            minimum = schema.get("minimum")
+            exclusive_min = schema.get("exclusiveMinimum")
+            if minimum is not None:
+                return float(minimum)
+            if exclusive_min is not None:
+                return float(exclusive_min) + 0.1
+            return 0.0
 
         elif schema_type == "boolean":
+            default = schema.get("default")
+            if default is not None:
+                return default
             return True
+
+        elif schema_type == "null":
+            return None
 
         return None
 
