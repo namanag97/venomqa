@@ -15,7 +15,10 @@ import hashlib
 import json
 import re
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # For any future type imports
 
 import re
 from venomqa.explorer.models import Action, State, StateID
