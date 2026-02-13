@@ -39,8 +39,17 @@ from venomqa.explorer.engine import (
 )
 from venomqa.explorer.detector import (
     extract_context,
+    substitute_path_params as substitute_path_params_legacy,
+    generate_state_name as generate_state_name_legacy,
+)
+from venomqa.explorer.context import (
+    ExplorationContext,
+    extract_context_from_response,
     substitute_path_params,
     generate_state_name,
+    has_unresolved_placeholders,
+    get_required_placeholders,
+    can_resolve_endpoint,
 )
 from venomqa.explorer.visualizer import GraphVisualizer, OutputFormat
 from venomqa.explorer.reporter import ExplorationReporter, ReportFormat
