@@ -125,12 +125,18 @@ class StateDetector:
         Returns:
             List of available Action objects
         """
-        # TODO: Implement action detection
-        # 1. Try custom action extractors
-        # 2. Look for HATEOAS links
-        # 3. Analyze response structure for implicit actions
-        # 4. Return list of detected actions
-        raise NotImplementedError("detect_available_actions() not yet implemented")
+        actions: List[Action] = []
+
+        # Try custom action extractors first
+        for extractor in self.action_extractors:
+            extracted_actions = extractor(response)
+            actions.extend(extracted_actions)
+
+        # Look for HATEOAS links
+        hateoas_actions = self._extract_links(response)
+        actions.extend(hateoas_actions)
+
+        return actions
 
     def add_state_extractor(
         self,
