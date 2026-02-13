@@ -313,11 +313,24 @@ class StateDetector:
         Returns:
             A human-readable state name
         """
-        # TODO: Implement state name inference
-        # 1. Use status/state fields if present
-        # 2. Use endpoint context
-        # 3. Generate from response structure
-        raise NotImplementedError("_infer_state_name() not yet implemented")
+        # Use status/state fields if present
+        for field in ["status", "state", "phase", "stage"]:
+            if field in response:
+                value = response[field]
+                if isinstance(value, str):
+                    return value.replace("_", " ").title()
+
+        # Use endpoint context
+        if endpoint:
+            # Clean up endpoint to make a name
+            name = endpoint.strip("/").replace("/", "_").replace("{", "").replace("}", "")
+            return f"State_{name}" if name else "State_Root"
+
+        # Generate from response structure
+        if "type" in response:
+            return f"State_{response['type']}"
+
+        return "Unknown_State"
 
     def is_same_state(self, state1: State, state2: State) -> bool:
         """
