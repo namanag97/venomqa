@@ -154,7 +154,9 @@ class ExplorationEngine:
         self.issues: List[Issue] = []
         self.visited_states: Set[StateID] = set()
         self.visited_transitions: Set[Tuple[StateID, str, str]] = set()
-        self._action_executor: Optional[Callable[[Action], Any]] = None
+        self._action_executor: Optional[
+            Callable[[Action], Union[Any, Coroutine[Any, Any, Any]]]
+        ] = None
         self._state_detector: Optional[
             Callable[[Dict[str, Any], Optional[str], Optional[str]], State]
         ] = None
@@ -163,6 +165,8 @@ class ExplorationEngine:
         self._current_depth = 0
         self._all_discovered_actions: Set[Action] = set()
         self._executed_actions: Set[Action] = set()
+        # For sync exploration with VenomQA client
+        self._venomqa_sync_client: Optional[Any] = None
 
     def set_action_executor(
         self,
