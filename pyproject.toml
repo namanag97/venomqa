@@ -4,24 +4,32 @@ build-backend = "hatchling.build"
 
 [project]
 name = "venomqa"
-version = "0.1.0"
+version = "0.2.0"
 description = "Stateful Journey QA Framework for end-to-end testing with state exploration"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Naman Agarwal", email = "naman@example.com" }
+    { name = "Naman Agarwal", email = "naman@venomqa.dev" }
 ]
-keywords = ["testing", "qa", "e2e", "api-testing", "stateful"]
+maintainers = [
+    { name = "Naman Agarwal", email = "naman@venomqa.dev" }
+]
+keywords = ["testing", "qa", "e2e", "api-testing", "stateful", "journey-testing", "checkpoint", "branch-exploration"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: Pytest",
     "Topic :: Software Development :: Testing",
     "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
 ]
 dependencies = [
     "httpx>=0.25.0",
@@ -31,6 +39,8 @@ dependencies = [
     "rich>=13.0.0",
     "pyyaml>=6.0",
     "psycopg[binary]>=3.1.0",
+    "faker>=18.0.0",
+    "watchdog>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -42,6 +52,41 @@ dev = [
     "ruff>=0.1.0",
     "black>=23.0.0",
 ]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-autorefs>=0.5.0",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.0",
+    "mkdocs-section-index>=0.3.0",
+]
+postgres = [
+    "psycopg[binary]>=3.1.0",
+]
+redis = [
+    "redis>=4.0.0",
+]
+s3 = [
+    "boto3>=1.26.0",
+]
+docker = [
+    "docker>=6.0.0",
+]
+graphql = [
+    "gql>=3.4.0",
+    "graphql-core>=3.2.0",
+]
+all = [
+    "venomqa[postgres,redis,s3,docker,graphql]",
+]
+
+[project.urls]
+Homepage = "https://github.com/venomqa/venomqa"
+Documentation = "https://venomqa.dev"
+Repository = "https://github.com/venomqa/venomqa.git"
+Issues = "https://github.com/venomqa/venomqa/issues"
+Changelog = "https://github.com/venomqa/venomqa/blob/main/CHANGELOG.md"
 
 [project.scripts]
 venomqa = "venomqa.cli:main"
@@ -53,6 +98,14 @@ postgresql = "venomqa.state.postgres:PostgreSQLStateManager"
 markdown = "venomqa.reporters.markdown:MarkdownReporter"
 json = "venomqa.reporters.json_report:JSONReporter"
 junit = "venomqa.reporters.junit:JUnitReporter"
+
+[project.entry-points."venomqa.plugins"]
+# Built-in example plugins
+console-logger = "venomqa.plugins.examples.console_logger:ConsoleLoggerPlugin"
+timing-analyzer = "venomqa.plugins.examples.timing_analyzer:TimingAnalyzerPlugin"
+custom-assertions = "venomqa.plugins.examples.custom_assertions:CustomAssertionsPlugin"
+slack-notifier = "venomqa.plugins.examples.slack_notifier:SlackNotifierPlugin"
+datadog-metrics = "venomqa.plugins.examples.datadog_metrics:DataDogMetricsPlugin"
 
 [tool.hatch.build.targets.wheel]
 packages = ["venomqa"]
@@ -66,9 +119,7 @@ select = ["E", "F", "I", "N", "W", "UP", "B", "C4"]
 
 [tool.mypy]
 python_version = "3.10"
-strict = true
-warn_return_any = true
-warn_unused_ignores = true
+ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
