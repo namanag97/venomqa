@@ -1,0 +1,142 @@
+# VenomQA Docker Compose Configuration
+#
+# This file is for running VenomQA itself in Docker.
+# Use this when you want to run VenomQA in a containerized environment.
+#
+# Usage:
+#   # Build and run with your QA files
+#   docker compose -f docker/docker-compose.yml up venomqa
+#
+#   # Run specific journey
+#   docker compose -f docker/docker-compose.yml run --rm venomqa run checkout_journey
+#
+#   # Run with environment variables
+#   API_BASE_URL=http://api:8000 docker compose -f docker/docker-compose.yml up venomqa
+#
+# For test infrastructure (API, database, etc.), see templates/docker-compose.qa.yml
+
+version: "3.8"
+
+services:
+  # ==========================================================================
+  # VenomQA Runner
+  # ==========================================================================
+  venomqa:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: base
+    image: venomqa:latest
+    container_name: venomqa-runner
+
+    # Mount your QA files and output directory
+    volumes:
+      # Your QA test files (read-only for safety)
+      - ../qa:/app/qa:ro
+      # Reports output
+      - ../reports:/app/reports
+      # Optional: mount custom config
+      # - ./venomqa.yaml:/app/qa/venomqa.yaml:ro
+
+    environment:
+      # VenomQA configuration
+      - VENOMQA_BASE_URL=${API_BASE_URL:-http://host.docker.internal:8000}
+      - VENOMQA_TIMEOUT=${TIMEOUT:-30}
+      - VENOMQA_REPORT_DIR=/app/reports
+      - VENOMQA_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - VENOMQA_FAIL_FAST=${FAIL_FAST:-false}
+
+    # Add host.docker.internal for macOS/Windows Docker Desktop
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Default command - run all journeys
+    command: ["run"]
+
+    # Network for connecting to test services
+    networks:
+      - venomqa-network
+
+  # ==========================================================================
+  # VenomQA with Full Tools (for CI/CD)
+  # ==========================================================================
+  venomqa-full:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: full
+    image: venomqa:full
+    container_name: venomqa-full
+
+    volumes:
+      - ../qa:/app/qa:ro
+      - ../reports:/app/reports
+
+    environment:
+      - VENOMQA_BASE_URL=${API_BASE_URL:-http://host.docker.internal:8000}
+      - VENOMQA_TIMEOUT=${TIMEOUT:-30}
+      - VENOMQA_REPORT_DIR=/app/reports
+      - VENOMQA_LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    profiles:
+      - full
+
+    networks:
+      - venomqa-network
+
+  # ==========================================================================
+  # VenomQA Development Container
+  # ==========================================================================
+  venomqa-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: dev
+    image: venomqa:dev
+    container_name: venomqa-dev
+
+    volumes:
+      # Mount source code for development
+      - ..:/app
+      - ../qa:/app/qa
+      - ../reports:/app/reports
+
+    environment:
+      - VENOMQA_BASE_URL=${API_BASE_URL:-http://host.docker.internal:8000}
+      - VENOMQA_LOG_LEVEL=DEBUG
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Keep container running for interactive use
+    stdin_open: true
+    tty: true
+
+    profiles:
+      - dev
+
+    networks:
+      - venomqa-network
+
+  # ==========================================================================
+  # HTML Report Server (optional)
+  # ==========================================================================
+  report-server:
+    image: nginx:alpine
+    container_name: venomqa-reports
+    ports:
+      - "${REPORT_PORT:-9000}:80"
+    volumes:
+      - ../reports:/usr/share/nginx/html:ro
+    profiles:
+      - reports
+    networks:
+      - venomqa-network
+
+networks:
+  venomqa-network:
+    driver: bridge
+    name: venomqa-network
