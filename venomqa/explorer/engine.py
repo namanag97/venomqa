@@ -947,3 +947,453 @@ class ExplorationEngine:
         self._current_depth = 0
         self._all_discovered_actions.clear()
         self._executed_actions.clear()
+
+    # =========================================================================
+    # SYNCHRONOUS BFS EXPLORATION API
+    # =========================================================================
+
+    def explore_bfs(self, initial_state: State) -> StateGraph:
+        """
+        Synchronous BFS exploration - the main entry point for sync usage.
+
+        This method implements Breadth-First Search exploration synchronously,
+        making real HTTP calls to explore the API state space.
+
+        The exploration:
+        1. Starts from the initial state
+        2. Executes all available actions from the current state
+        3. Detects resulting states from responses
+        4. Records transitions in the state graph
+        5. Continues until max_states reached or no more actions
+
+        Args:
+            initial_state: The starting state with available actions
+
+        Returns:
+            StateGraph: The explored state graph with all states and transitions
+
+        Raises:
+            ExplorationError: If exploration fails critically
+
+        Example:
+            >>> from venomqa.explorer.engine import ExplorationEngine
+            >>> from venomqa.explorer.models import State, Action, ExplorationConfig
+            >>>
+            >>> config = ExplorationConfig(max_states=10, max_depth=3)
+            >>> engine = ExplorationEngine(
+            ...     config=config,
+            ...     base_url="http://localhost:8000",
+            ... )
+            >>>
+            >>> initial = State(
+            ...     id="initial",
+            ...     name="Initial",
+            ...     available_actions=[
+            ...         Action(method="GET", endpoint="/api/users"),
+            ...     ]
+            ... )
+            >>>
+            >>> graph = engine.explore_bfs(initial)
+            >>> print(f"Found {len(graph.states)} states")
+        """
+        # Reset state for new exploration
+        self.reset()
+
+        # Initialize queue with (state, depth)
+        queue: Deque[Tuple[State, int]] = deque()
+        queue.append((initial_state, 0))
+
+        # Add initial state to graph
+        self.graph.add_state(initial_state)
+        self.visited_states.add(initial_state.id)
+
+        # Track discovered actions
+        for action in initial_state.available_actions:
+            self._all_discovered_actions.add(action)
+
+        max_states = self.config.max_states
+
+        while queue and len(self.visited_states) < max_states:
+            current_state, depth = queue.popleft()
+
+            # Skip if already at max depth
+            if depth >= self.config.max_depth:
+                continue
+
+            # Process each available action
+            for action in current_state.available_actions:
+                # Check if we should explore this action
+                if not self._should_explore_action(action):
+                    continue
+
+                # Check if we've already executed this action from this state
+                action_key = (current_state.id, f"{action.method}:{action.endpoint}")
+                if any(t[0] == action_key[0] and t[1] == action_key[1]
+                       for t in self.visited_transitions):
+                    continue
+
+                # Check state limit before executing
+                if len(self.visited_states) >= max_states:
+                    break
+
+                try:
+                    # Execute the action synchronously
+                    response = self._execute_action_sync(action)
+
+                    # Detect the resulting state
+                    new_state = self._detect_state_from_response(
+                        response,
+                        action,
+                        current_state,
+                    )
+
+                    # Create and record transition
+                    transition = Transition(
+                        from_state=current_state.id,
+                        action=action,
+                        to_state=new_state.id,
+                        response=response.get("data", response),
+                        status_code=response.get("status_code"),
+                        duration_ms=response.get("duration_ms", 0.0),
+                        success=response.get("success", True),
+                        error=response.get("error"),
+                        discovered_at=datetime.now(),
+                    )
+                    self.graph.add_transition(transition)
+
+                    # Mark transition as visited
+                    self._mark_transition_visited(
+                        current_state.id, action, new_state.id
+                    )
+                    self._executed_actions.add(action)
+
+                    # Add new state to graph and queue if not visited
+                    if new_state.id not in self.visited_states:
+                        self.graph.add_state(new_state)
+                        self.visited_states.add(new_state.id)
+                        queue.append((new_state, depth + 1))
+
+                        # Track new actions
+                        for new_action in new_state.available_actions:
+                            self._all_discovered_actions.add(new_action)
+
+                except Exception as e:
+                    # Record the issue but continue exploring
+                    self._record_issue(
+                        severity=IssueSeverity.HIGH,
+                        error=f"Failed to execute {action.method} {action.endpoint}: {e}",
+                        state=current_state.id,
+                        action=action,
+                        suggestion="Check if the endpoint is reachable",
+                    )
+                    logger.warning(
+                        f"Action execution failed: {action.method} {action.endpoint}: {e}"
+                    )
+
+        return self.graph
+
+    def _execute_action_sync(self, action: Action) -> Dict[str, Any]:
+        """
+        Execute an action synchronously using httpx.
+
+        This method makes actual HTTP requests to the configured base_url.
+
+        Args:
+            action: The action to execute
+
+        Returns:
+            Dict containing response data, status_code, duration_ms, success, and error
+
+        Raises:
+            ExplorationError: If the request fails critically
+        """
+        start_time = time.time()
+        result: Dict[str, Any] = {
+            "data": {},
+            "status_code": None,
+            "duration_ms": 0.0,
+            "success": True,
+            "error": None,
+        }
+
+        # Build URL
+        url = action.endpoint
+        if not url.startswith("http"):
+            url = f"{self.base_url.rstrip('/')}/{url.lstrip('/')}"
+
+        # Build headers
+        headers = dict(self.config.headers)
+        if action.headers:
+            headers.update(action.headers)
+        if self.config.auth_token:
+            headers["Authorization"] = f"Bearer {self.config.auth_token}"
+
+        try:
+            # Use httpx for synchronous requests
+            with httpx.Client(
+                timeout=self.config.request_timeout_seconds,
+                follow_redirects=self.config.follow_redirects,
+                verify=self.config.verify_ssl,
+            ) as client:
+                response = client.request(
+                    method=action.method,
+                    url=url,
+                    params=action.params,
+                    json=action.body,
+                    headers=headers,
+                )
+
+                result["status_code"] = response.status_code
+
+                # Parse response body
+                try:
+                    result["data"] = response.json()
+                except Exception:
+                    result["data"] = {"raw": response.text}
+
+                # Check for HTTP errors
+                if response.status_code >= 400:
+                    result["success"] = False
+                    result["error"] = f"HTTP {response.status_code}"
+
+        except httpx.TimeoutException as e:
+            result["success"] = False
+            result["error"] = f"Timeout: {e}"
+            logger.warning(f"Request timeout for {action.method} {url}")
+
+        except httpx.RequestError as e:
+            result["success"] = False
+            result["error"] = f"Request error: {e}"
+            logger.warning(f"Request error for {action.method} {url}: {e}")
+
+        except Exception as e:
+            result["success"] = False
+            result["error"] = str(e)
+            raise ExplorationError(
+                f"Failed to execute action: {e}",
+                action=action,
+                cause=e,
+            )
+
+        finally:
+            result["duration_ms"] = (time.time() - start_time) * 1000
+
+        return result
+
+    def _detect_state_from_response(
+        self,
+        response: Dict[str, Any],
+        action: Action,
+        from_state: State,
+    ) -> State:
+        """
+        Detect state from an HTTP response.
+
+        Uses the configured state detector if available, otherwise creates
+        a default state based on response characteristics.
+
+        Args:
+            response: The response dict from _execute_action_sync
+            action: The action that was executed
+            from_state: The state from which the action was executed
+
+        Returns:
+            The detected or created State
+        """
+        response_data = response.get("data", {})
+        status_code = response.get("status_code")
+        success = response.get("success", True)
+
+        # Try custom state detector first
+        if self._state_detector:
+            try:
+                detected = self._state_detector(
+                    response_data,
+                    action.endpoint,
+                    str(status_code) if status_code else None,
+                )
+                if detected:
+                    return detected
+            except Exception as e:
+                logger.warning(f"State detector failed: {e}")
+
+        # Fall back to default state creation
+        return self._create_default_state(
+            action=action,
+            from_state=from_state,
+            response_data=response_data,
+            status_code=status_code,
+            success=success,
+        )
+
+    def execute_action_sync(
+        self,
+        action: Action,
+        from_state: Optional[State] = None,
+    ) -> Tuple[State, Transition]:
+        """
+        Execute a single action synchronously and return the result.
+
+        This is a public API for executing individual actions outside
+        of the full exploration loop.
+
+        Args:
+            action: The action to execute
+            from_state: Optional state context (creates a default if not provided)
+
+        Returns:
+            Tuple of (resulting State, Transition)
+
+        Raises:
+            ExplorationError: If action execution fails
+
+        Example:
+            >>> engine = ExplorationEngine(base_url="http://localhost:8000")
+            >>> action = Action(method="GET", endpoint="/api/users")
+            >>> state, transition = engine.execute_action_sync(action)
+            >>> print(f"Status: {transition.status_code}")
+        """
+        if from_state is None:
+            from_state = State(
+                id="synthetic_start",
+                name="Synthetic Start State",
+                available_actions=[action],
+            )
+
+        response = self._execute_action_sync(action)
+        new_state = self._detect_state_from_response(response, action, from_state)
+
+        transition = Transition(
+            from_state=from_state.id,
+            action=action,
+            to_state=new_state.id,
+            response=response.get("data", {}),
+            status_code=response.get("status_code"),
+            duration_ms=response.get("duration_ms", 0.0),
+            success=response.get("success", True),
+            error=response.get("error"),
+            discovered_at=datetime.now(),
+        )
+
+        return new_state, transition
+
+    def explore_with_venomqa_client(
+        self,
+        initial_state: State,
+        client: Any,
+    ) -> StateGraph:
+        """
+        Synchronous BFS exploration using a VenomQA Client instance.
+
+        This method allows using the full-featured VenomQA HTTP client
+        with request history, retry logic, and authentication support.
+
+        Args:
+            initial_state: The starting state with available actions
+            client: A venomqa.client.Client instance (already connected)
+
+        Returns:
+            StateGraph: The explored state graph
+
+        Example:
+            >>> from venomqa.client import Client
+            >>> from venomqa.explorer.engine import ExplorationEngine
+            >>> from venomqa.explorer.models import State, Action
+            >>>
+            >>> with Client("http://localhost:8000") as client:
+            ...     client.set_auth_token("my-token")
+            ...     engine = ExplorationEngine()
+            ...     initial = State(
+            ...         id="init",
+            ...         name="Initial",
+            ...         available_actions=[Action(method="GET", endpoint="/api/users")]
+            ...     )
+            ...     graph = engine.explore_with_venomqa_client(initial, client)
+        """
+        # Store the client for use in action execution
+        self._venomqa_sync_client = client
+
+        # Override base_url from client if not set
+        if hasattr(client, "base_url") and not self.base_url:
+            self.base_url = client.base_url
+
+        # Use explore_bfs with a custom executor
+        original_executor = self._execute_action_sync
+
+        def venomqa_executor(action: Action) -> Dict[str, Any]:
+            """Execute action using VenomQA client."""
+            start_time = time.time()
+            result: Dict[str, Any] = {
+                "data": {},
+                "status_code": None,
+                "duration_ms": 0.0,
+                "success": True,
+                "error": None,
+            }
+
+            try:
+                # Use the appropriate HTTP method
+                method = action.method.upper()
+                path = action.endpoint
+
+                kwargs: Dict[str, Any] = {}
+                if action.params:
+                    kwargs["params"] = action.params
+                if action.body:
+                    kwargs["json"] = action.body
+                if action.headers:
+                    kwargs["headers"] = action.headers
+
+                if method == "GET":
+                    response = client.get(path, **kwargs)
+                elif method == "POST":
+                    response = client.post(path, **kwargs)
+                elif method == "PUT":
+                    response = client.put(path, **kwargs)
+                elif method == "PATCH":
+                    response = client.patch(path, **kwargs)
+                elif method == "DELETE":
+                    response = client.delete(path, **kwargs)
+                else:
+                    response = client.request(method, path, **kwargs)
+
+                result["status_code"] = response.status_code
+
+                try:
+                    result["data"] = response.json()
+                except Exception:
+                    result["data"] = {"raw": response.text}
+
+                if response.status_code >= 400:
+                    result["success"] = False
+                    result["error"] = f"HTTP {response.status_code}"
+
+            except Exception as e:
+                result["success"] = False
+                result["error"] = str(e)
+                logger.warning(f"VenomQA client error: {e}")
+
+            finally:
+                result["duration_ms"] = (time.time() - start_time) * 1000
+
+            return result
+
+        # Temporarily replace the executor
+        self._execute_action_sync = venomqa_executor
+
+        try:
+            return self.explore_bfs(initial_state)
+        finally:
+            # Restore original executor
+            self._execute_action_sync = original_executor
+            self._venomqa_sync_client = None
+
+    @property
+    def max_states(self) -> int:
+        """Get the maximum number of states to explore."""
+        return self.config.max_states
+
+    @max_states.setter
+    def max_states(self, value: int) -> None:
+        """Set the maximum number of states to explore."""
+        self.config.max_states = value

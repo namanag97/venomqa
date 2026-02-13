@@ -593,7 +593,9 @@ class TestEdgeCases:
             "info": {"title": "Test", "version": "1.0.0"},
             "paths": {
                 "/minimal": {
-                    "get": {},  # Minimal operation
+                    "get": {
+                        "responses": {"200": {"description": "OK"}},
+                    },  # Minimal operation with required responses field
                 }
             },
         }
