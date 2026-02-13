@@ -102,11 +102,13 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/venomqa/venomqa"
-Documentation = "https://venomqa.dev"
-Repository = "https://github.com/venomqa/venomqa.git"
-Issues = "https://github.com/venomqa/venomqa/issues"
+Homepage = "https://venomqa.dev"
+Documentation = "https://venomqa.dev/docs"
+Repository = "https://github.com/venomqa/venomqa"
+"Source Code" = "https://github.com/venomqa/venomqa"
+"Bug Tracker" = "https://github.com/venomqa/venomqa/issues"
 Changelog = "https://github.com/venomqa/venomqa/blob/main/CHANGELOG.md"
+"Getting Started" = "https://github.com/venomqa/venomqa/blob/main/docs/QUICKSTART.md"
 
 [project.scripts]
 venomqa = "venomqa.cli:main"
