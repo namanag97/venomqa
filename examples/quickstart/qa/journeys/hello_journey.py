@@ -67,10 +67,8 @@ journey = Journey(
         ),
 
         # Checkpoint: Save state here for branching
-        Checkpoint(
-            name="item_created",
-            description="Item has been created, ready for update or delete",
-        ),
+        # Note: Checkpoint captures state, enabling rollback for branch exploration
+        Checkpoint(name="item_created"),
 
         # Branch: Test both update and delete paths
         Branch(
