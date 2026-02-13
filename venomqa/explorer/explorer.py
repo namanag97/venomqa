@@ -284,11 +284,11 @@ class StateExplorer:
         Returns:
             ExplorationResult from exploration
         """
-        # TODO: Implement exploration from state
-        # 1. Set state as current
-        # 2. Run exploration
-        # 3. Return results
-        raise NotImplementedError("explore_from_state() not yet implemented")
+        # Set state as initial
+        self.set_initial_state(state)
+
+        # Run exploration
+        return await self.explore(initial_actions=state.available_actions)
 
     async def execute_action(
         self,
