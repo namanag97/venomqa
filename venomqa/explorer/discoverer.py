@@ -201,6 +201,10 @@ class APIDiscoverer:
         if not openapi_version:
             raise ValueError("Invalid OpenAPI spec: missing 'openapi' or 'swagger' field")
 
+        # Cache components for $ref resolution
+        self._spec_components = spec_dict.get("components", {})
+        self._spec_security_schemes = self._spec_components.get("securitySchemes", {})
+
         # Extract paths
         paths = spec_dict.get("paths", {})
         if not paths:
