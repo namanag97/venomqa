@@ -215,6 +215,98 @@ def create_item(client: Any, context: dict, name: str = "Test Item", **kwargs) -
     return response
 '''
 
+README_TEMPLATE = '''# VenomQA Test Suite
+
+This directory contains your VenomQA test suite.
+
+## Directory Structure
+
+```
+{base_path}/
+├── venomqa.yaml           # Configuration file
+├── docker-compose.qa.yml  # Docker Compose for test infrastructure
+├── actions/               # Reusable test actions
+│   └── __init__.py
+├── fixtures/              # Test fixtures and data
+│   └── __init__.py
+├── journeys/              # Journey definitions
+│   └── __init__.py
+└── reports/               # Generated test reports
+```
+
+## Quick Start
+
+1. **Configure your environment**
+   Edit `venomqa.yaml` to set your API base URL and other settings.
+
+2. **Start test infrastructure** (if using Docker)
+   ```bash
+   docker compose -f docker-compose.qa.yml up -d
+   ```
+
+3. **Run preflight checks**
+   ```bash
+   venomqa preflight
+   ```
+
+4. **Run tests**
+   ```bash
+   venomqa run                    # Run all journeys
+   venomqa run journey_name       # Run specific journey
+   venomqa run --debug            # Run with debug logging
+   venomqa run --fail-fast        # Stop on first failure
+   ```
+
+5. **Generate reports**
+   ```bash
+   venomqa report -f html -o reports/report.html
+   ```
+
+## Creating Actions
+
+Actions are reusable functions that interact with your API.
+Create them in `actions/`:
+
+```python
+# actions/my_actions.py
+def login(client, context, email: str, password: str):
+    """Log in a user."""
+    response = client.post("/api/auth/login", json={
+        "email": email,
+        "password": password
+    })
+    if response.status_code == 200:
+        context["token"] = response.json()["token"]
+    return response
+```
+
+## Creating Journeys
+
+Journeys define complete user scenarios. Create them in `journeys/`:
+
+```python
+# journeys/my_journey.py
+from venomqa import Journey, Step, Checkpoint
+from actions.my_actions import login, create_item
+
+journey = Journey(
+    name="my_journey",
+    description="Test user workflow",
+    steps=[
+        Step(name="login", action=login, args={"email": "test@example.com"}),
+        Checkpoint(name="authenticated"),
+        Step(name="create", action=create_item),
+    ],
+)
+```
+
+## Documentation
+
+- [VenomQA Documentation](https://venomqa.dev/docs)
+- [Getting Started Guide](https://venomqa.dev/docs/getting-started)
+- [API Reference](https://venomqa.dev/docs/api)
+'''
+
 SAMPLE_JOURNEY_PY = '''"""Sample journey for your QA tests.
 
 This journey demonstrates basic CRUD operations.
