@@ -1456,14 +1456,16 @@ class ExplorationEngine:
         # Reset state
         self.reset()
 
-        # Initialize context
-        context = dict(initial_context) if initial_context else {}
+        # Initialize context using ExplorationContext
+        context = ExplorationContext()
+        if initial_context:
+            context.update(initial_context)
 
         # Create initial chain state
         initial_state = ChainState(
             id="initial",
-            name=generate_state_name(context),
-            context=context.copy(),
+            name=generate_state_name(context, {}),
+            context=context.to_dict(),
             response=None,
             available_actions=initial_actions,
             depth=0,
@@ -1479,8 +1481,8 @@ class ExplorationEngine:
         # Track chain states separately (with full context)
         chain_states: Dict[StateID, ChainState] = {initial_state.id: initial_state}
 
-        # BFS queue: (ChainState, context_copy)
-        queue: Deque[Tuple[ChainState, Dict[str, Any]]] = deque()
+        # BFS queue: (ChainState, ExplorationContext)
+        queue: Deque[Tuple[ChainState, ExplorationContext]] = deque()
         queue.append((initial_state, context.copy()))
 
         # Track visited (state_id, action_key) to avoid loops
