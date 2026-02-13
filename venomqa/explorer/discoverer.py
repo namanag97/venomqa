@@ -96,13 +96,351 @@ class APIDiscoverer:
         Returns:
             List of discovered Action objects
         """
-        # TODO: Implement OpenAPI parsing
-        # 1. Fetch spec from spec_url or try common paths (/openapi.json, /swagger.json)
-        # 2. Parse the specification
-        # 3. Extract paths, methods, parameters
-        # 4. Build Action objects for each endpoint
-        # 5. Include authentication requirements
-        raise NotImplementedError("discover_from_openapi() not yet implemented")
+        import httpx
+
+        # Try to fetch spec from URL
+        spec_urls_to_try = []
+        if spec_url:
+            spec_urls_to_try.append(spec_url)
+        else:
+            # Try common OpenAPI spec paths
+            spec_urls_to_try = [
+                f"{self.base_url}/openapi.json",
+                f"{self.base_url}/swagger.json",
+                f"{self.base_url}/api/openapi.json",
+                f"{self.base_url}/api/swagger.json",
+                f"{self.base_url}/v1/openapi.json",
+                f"{self.base_url}/docs/openapi.json",
+            ]
+
+        spec_data: Optional[Dict[str, Any]] = None
+        async with httpx.AsyncClient(
+            timeout=self.config.request_timeout_seconds,
+            verify=self.config.verify_ssl,
+            follow_redirects=self.config.follow_redirects,
+        ) as client:
+            for url in spec_urls_to_try:
+                try:
+                    response = await client.get(url)
+                    if response.status_code == 200:
+                        spec_data = response.json()
+                        break
+                except (httpx.RequestError, json.JSONDecodeError):
+                    continue
+
+        if not spec_data:
+            raise ValueError(
+                f"Could not fetch OpenAPI spec from any of: {spec_urls_to_try}"
+            )
+
+        return self.parse_openapi_spec(spec_data)
+
+    def parse_openapi_spec(
+        self,
+        spec: Union[Dict[str, Any], str, Path],
+    ) -> List[Action]:
+        """
+        Parse an OpenAPI specification and extract endpoints as Action objects.
+
+        This method supports OpenAPI 3.0.x and 3.1.x specifications.
+
+        Args:
+            spec: OpenAPI spec as a dict, JSON/YAML string, or file path
+
+        Returns:
+            List of discovered Action objects
+
+        Raises:
+            ValueError: If the spec is invalid or cannot be parsed
+        """
+        # Load spec from various formats
+        spec_dict = self._load_spec(spec)
+
+        # Validate it looks like an OpenAPI spec
+        if not isinstance(spec_dict, dict):
+            raise ValueError("OpenAPI spec must be a dictionary")
+
+        # Check for OpenAPI version
+        openapi_version = spec_dict.get("openapi", spec_dict.get("swagger", ""))
+        if not openapi_version:
+            raise ValueError("Invalid OpenAPI spec: missing 'openapi' or 'swagger' field")
+
+        # Extract paths
+        paths = spec_dict.get("paths", {})
+        if not paths:
+            return []
+
+        # Extract global security requirements
+        global_security = spec_dict.get("security", [])
+
+        # Parse each path and operation
+        actions: List[Action] = []
+        for path, path_item in paths.items():
+            if not isinstance(path_item, dict):
+                continue
+
+            # Normalize path (ensure leading slash)
+            normalized_path = self._normalize_endpoint(path)
+
+            # Check include/exclude patterns
+            if not self._should_include_endpoint(normalized_path):
+                continue
+
+            # Get path-level parameters
+            path_params = path_item.get("parameters", [])
+
+            # Process each HTTP method
+            http_methods = ["get", "post", "put", "delete", "patch", "head", "options"]
+            for method in http_methods:
+                operation = path_item.get(method)
+                if not operation or not isinstance(operation, dict):
+                    continue
+
+                action = self._parse_operation(
+                    method=method.upper(),
+                    path=normalized_path,
+                    operation=operation,
+                    path_params=path_params,
+                    global_security=global_security,
+                )
+
+                if action:
+                    actions.append(action)
+                    self.discovered_actions.add(action)
+                    self.discovered_endpoints.add(normalized_path)
+
+        return actions
+
+    def _load_spec(
+        self,
+        spec: Union[Dict[str, Any], str, Path],
+    ) -> Dict[str, Any]:
+        """
+        Load OpenAPI spec from various formats.
+
+        Args:
+            spec: OpenAPI spec as dict, JSON/YAML string, or file path
+
+        Returns:
+            Parsed spec as dictionary
+        """
+        if isinstance(spec, dict):
+            return spec
+
+        if isinstance(spec, Path):
+            spec = str(spec)
+
+        # Check if it's a file path
+        if isinstance(spec, str):
+            path = Path(spec)
+            if path.exists() and path.is_file():
+                content = path.read_text()
+                if path.suffix.lower() in (".yaml", ".yml"):
+                    return yaml.safe_load(content)
+                else:
+                    return json.loads(content)
+
+            # Try to parse as JSON/YAML string
+            try:
+                return json.loads(spec)
+            except json.JSONDecodeError:
+                try:
+                    return yaml.safe_load(spec)
+                except yaml.YAMLError:
+                    raise ValueError(f"Could not parse spec: not valid JSON or YAML")
+
+        raise ValueError(f"Invalid spec type: {type(spec)}")
+
+    def _parse_operation(
+        self,
+        method: str,
+        path: str,
+        operation: Dict[str, Any],
+        path_params: List[Dict[str, Any]],
+        global_security: List[Dict[str, List[str]]],
+    ) -> Optional[Action]:
+        """
+        Parse an OpenAPI operation into an Action.
+
+        Args:
+            method: HTTP method
+            path: Endpoint path
+            operation: Operation object from spec
+            path_params: Path-level parameters
+            global_security: Global security requirements
+
+        Returns:
+            Action object or None if operation should be skipped
+        """
+        # Get operation description
+        description = operation.get("summary") or operation.get("description")
+        if description and len(description) > 200:
+            description = description[:197] + "..."
+
+        # Combine path-level and operation-level parameters
+        all_params = list(path_params) + operation.get("parameters", [])
+
+        # Extract query parameters
+        query_params: Dict[str, Any] = {}
+        for param in all_params:
+            if not isinstance(param, dict):
+                continue
+            if param.get("in") == "query":
+                param_name = param.get("name", "")
+                if param_name:
+                    # Use example value if available, otherwise use placeholder
+                    example = param.get("example")
+                    schema = param.get("schema", {})
+                    if example is not None:
+                        query_params[param_name] = example
+                    elif schema.get("default") is not None:
+                        query_params[param_name] = schema.get("default")
+                    elif schema.get("example") is not None:
+                        query_params[param_name] = schema.get("example")
+
+        # Extract request body schema (for POST, PUT, PATCH)
+        body: Optional[Dict[str, Any]] = None
+        request_body = operation.get("requestBody", {})
+        if request_body and method in ("POST", "PUT", "PATCH"):
+            body = self._extract_request_body_example(request_body)
+
+        # Determine if authentication is required
+        operation_security = operation.get("security", global_security)
+        requires_auth = bool(operation_security)
+
+        # Build headers from parameters
+        headers: Dict[str, str] = {}
+        for param in all_params:
+            if not isinstance(param, dict):
+                continue
+            if param.get("in") == "header":
+                param_name = param.get("name", "")
+                if param_name and param_name.lower() not in ("authorization", "content-type"):
+                    example = param.get("example", param.get("schema", {}).get("example"))
+                    if example:
+                        headers[param_name] = str(example)
+
+        return Action(
+            method=method,
+            endpoint=path,
+            params=query_params if query_params else None,
+            body=body,
+            headers=headers if headers else None,
+            description=description,
+            requires_auth=requires_auth,
+        )
+
+    def _extract_request_body_example(
+        self,
+        request_body: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Extract an example request body from OpenAPI requestBody.
+
+        Args:
+            request_body: OpenAPI requestBody object
+
+        Returns:
+            Example body dictionary or None
+        """
+        content = request_body.get("content", {})
+
+        # Prefer application/json
+        json_content = content.get("application/json", {})
+        if json_content:
+            # Check for direct example
+            if "example" in json_content:
+                return json_content["example"]
+
+            # Check for examples (multiple)
+            examples = json_content.get("examples", {})
+            if examples:
+                first_example = next(iter(examples.values()), {})
+                if "value" in first_example:
+                    return first_example["value"]
+
+            # Try to build from schema
+            schema = json_content.get("schema", {})
+            if schema:
+                return self._build_example_from_schema(schema)
+
+        return None
+
+    def _build_example_from_schema(
+        self,
+        schema: Dict[str, Any],
+        visited: Optional[Set[str]] = None,
+    ) -> Any:
+        """
+        Build an example value from an OpenAPI schema.
+
+        Args:
+            schema: OpenAPI schema object
+            visited: Set of visited $ref paths to prevent infinite recursion
+
+        Returns:
+            Example value based on schema
+        """
+        if visited is None:
+            visited = set()
+
+        # Check for direct example
+        if "example" in schema:
+            return schema["example"]
+
+        # Handle $ref (we don't resolve refs, just return placeholder)
+        if "$ref" in schema:
+            ref = schema["$ref"]
+            if ref in visited:
+                return {}
+            visited.add(ref)
+            return {}
+
+        schema_type = schema.get("type", "object")
+
+        if schema_type == "object":
+            result = {}
+            properties = schema.get("properties", {})
+            for prop_name, prop_schema in properties.items():
+                if isinstance(prop_schema, dict):
+                    result[prop_name] = self._build_example_from_schema(prop_schema, visited)
+            return result
+
+        elif schema_type == "array":
+            items = schema.get("items", {})
+            if items:
+                return [self._build_example_from_schema(items, visited)]
+            return []
+
+        elif schema_type == "string":
+            format_type = schema.get("format", "")
+            enum = schema.get("enum")
+            if enum:
+                return enum[0]
+            if format_type == "email":
+                return "user@example.com"
+            if format_type == "date":
+                return "2024-01-01"
+            if format_type == "date-time":
+                return "2024-01-01T00:00:00Z"
+            if format_type == "uuid":
+                return "123e4567-e89b-12d3-a456-426614174000"
+            if format_type == "uri":
+                return "https://example.com"
+            return "string"
+
+        elif schema_type == "integer":
+            minimum = schema.get("minimum", 0)
+            return int(minimum) if minimum else 0
+
+        elif schema_type == "number":
+            minimum = schema.get("minimum", 0.0)
+            return float(minimum) if minimum else 0.0
+
+        elif schema_type == "boolean":
+            return True
+
+        return None
 
     async def discover_from_html(
         self,

@@ -343,11 +343,21 @@ class StateDetector:
         Returns:
             True if states are equivalent
         """
-        # TODO: Implement state comparison
-        # 1. Compare state IDs
-        # 2. If different, compare key properties
-        # 3. Return equivalence result
-        raise NotImplementedError("is_same_state() not yet implemented")
+        # Compare state IDs first
+        if state1.id == state2.id:
+            return True
+
+        # If different IDs, compare key properties
+        if self.state_key_fields:
+            for field in self.state_key_fields:
+                val1 = state1.properties.get(field)
+                val2 = state2.properties.get(field)
+                if val1 != val2:
+                    return False
+            return True
+
+        # If no key fields, states with different IDs are different
+        return False
 
     def get_known_state(self, state_id: StateID) -> Optional[State]:
         """
