@@ -411,7 +411,7 @@ class TestCycleDetection:
 
     @pytest.mark.asyncio
     async def test_transition_tracking(self):
-        """Test that transitions are properly tracked."""
+        """Test that transitions are properly tracked via explore_from_state."""
         engine = ExplorationEngine()
 
         async def mock_executor(action):
@@ -419,11 +419,24 @@ class TestCycleDetection:
 
         engine.set_action_executor(mock_executor)
 
-        action = Action(method="GET", endpoint="/test")
-        from_state = State(id="s1", name="State 1")
+        def state_detector(response, endpoint, status):
+            return State(id="s2", name="State 2")
 
-        # Execute action once
-        await engine.execute_action(action, from_state)
+        engine.set_state_detector(state_detector)
+
+        # Create a state with an action
+        from_state = State(
+            id="s1",
+            name="State 1",
+            available_actions=[Action(method="GET", endpoint="/test")],
+        )
+
+        # Add to graph first
+        engine.graph.add_state(from_state)
+        engine.visited_states.add(from_state.id)
+
+        # Explore from state (this marks transitions as visited)
+        await engine.explore_from_state(from_state, depth=0)
 
         # Check that transition was tracked
         assert len(engine.visited_transitions) > 0
