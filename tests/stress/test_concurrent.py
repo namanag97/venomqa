@@ -387,7 +387,7 @@ class TestResourceCleanup:
     """Tests for resource cleanup under load."""
 
     def test_client_disconnect_under_load(self) -> None:
-        from venomqa.client import Client
+        from venomqa.http import Client
         from unittest.mock import patch
 
         with patch("venomqa.http.rest.httpx.Client") as mock_httpx:
