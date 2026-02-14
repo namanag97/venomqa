@@ -490,8 +490,11 @@ def preflight(ctx: click.Context, output_json: bool) -> None:
 
 
 @cli.command("smoke-test")
-@click.argument("base_url")
+@click.argument("base_url", required=False, default=None)
+@click.option("--config", "-c", "config_file", default=None, help="YAML config file for smoke tests")
+@click.option("--init", "init_config", is_flag=True, help="Print an example config file to stdout")
 @click.option("--token", "-t", default=None, help="Bearer token for authenticated checks")
+@click.option("--base-url", "base_url_override", default=None, help="Override base URL from config")
 @click.option("--health-path", default="/health", help="Health endpoint path")
 @click.option("--auth-path", default="/api/v1/workspaces", help="Auth-protected endpoint path")
 @click.option("--create-path", default=None, help="POST endpoint to test resource creation")
@@ -505,8 +508,11 @@ def preflight(ctx: click.Context, output_json: bool) -> None:
     help="Auto-discover checks from OpenAPI spec URL",
 )
 def smoke_test(
-    base_url: str,
+    base_url: str | None,
+    config_file: str | None,
+    init_config: bool,
     token: str | None,
+    base_url_override: str | None,
     health_path: str,
     auth_path: str,
     create_path: str | None,
@@ -521,19 +527,71 @@ def smoke_test(
     Validates that the API is minimally functional by checking health,
     authentication, and optionally resource creation and listing.
 
+    Supports three modes:
+    1. Config file: --config preflight.yaml
+    2. Command-line args: venomqa smoke-test http://localhost:8000
+    3. Auto-discovery: --auto-openapi /openapi.json
+
     \b
     Examples:
         venomqa smoke-test http://localhost:8000
+        venomqa smoke-test --config preflight.yaml
+        venomqa smoke-test --config preflight.yaml --base-url http://staging:8000
         venomqa smoke-test http://localhost:8000 --token $TOKEN
-        venomqa smoke-test http://localhost:8000 --token $TOKEN \\
-            --create-path /api/v1/items --create-payload '{"name": "test"}'
         venomqa smoke-test http://localhost:8000 --auto-openapi /openapi.json
+        venomqa smoke-test --init > preflight.yaml
 
     Exit codes:
         0 - All checks passed, API is ready
         1 - One or more checks failed
     """
     import json as json_module
+
+    # --init mode: print example config and exit
+    if init_config:
+        from venomqa.preflight.config import generate_example_config
+
+        click.echo(generate_example_config())
+        sys.exit(EXIT_SUCCESS)
+
+    # Config file mode
+    if config_file:
+        from venomqa.preflight import PreflightConfig, SmokeTest
+
+        try:
+            config = PreflightConfig.from_yaml(config_file)
+        except FileNotFoundError:
+            click.echo(f"Error: Config file not found: {config_file}", err=True)
+            sys.exit(EXIT_CONFIG_ERROR)
+        except Exception as e:
+            click.echo(f"Error loading config: {e}", err=True)
+            sys.exit(EXIT_CONFIG_ERROR)
+
+        # Apply CLI overrides
+        if base_url_override:
+            config.base_url = base_url_override
+        elif base_url:
+            config.base_url = base_url
+        if token:
+            config.token = token
+
+        smoke = SmokeTest.from_config(config)
+        report = smoke.run_all()
+
+        if output_json:
+            click.echo(json_module.dumps(report.to_dict(), indent=2))
+        else:
+            report.print_report()
+
+        sys.exit(EXIT_SUCCESS if report.passed else EXIT_FAILURE)
+
+    # Non-config modes require a base_url argument
+    if not base_url:
+        click.echo(
+            "Error: BASE_URL is required unless using --config or --init.",
+            err=True,
+        )
+        sys.exit(EXIT_CONFIG_ERROR)
 
     # Parse create payload from JSON string
     parsed_payload: dict[str, Any] | None = None
