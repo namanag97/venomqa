@@ -61,11 +61,11 @@ class TestSubstituteEnvVars:
         monkeypatch.delenv("TEST_VAR_MISSING_99", raising=False)
         assert substitute_env_vars("${TEST_VAR_MISSING_99:fallback}") == "fallback"
 
-    def test_env_var_missing_no_default_raises(self, monkeypatch):
-        """${VAR} without a default raises ValueError when not set."""
+    def test_env_var_missing_no_default_left_as_is(self, monkeypatch):
+        """${VAR} without a default is left as-is (template placeholder)."""
         monkeypatch.delenv("DEFINITELY_NOT_SET_XYZ", raising=False)
-        with pytest.raises(ValueError, match="DEFINITELY_NOT_SET_XYZ"):
-            substitute_env_vars("${DEFINITELY_NOT_SET_XYZ}")
+        result = substitute_env_vars("${DEFINITELY_NOT_SET_XYZ}")
+        assert result == "${DEFINITELY_NOT_SET_XYZ}"
 
     def test_random_special_var(self):
         """${RANDOM} produces an 8-char hex string."""
