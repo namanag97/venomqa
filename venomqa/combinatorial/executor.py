@@ -399,3 +399,27 @@ class CombinatorialExecutor:
             duration_ms=duration_ms,
             context_snapshot=dict(context),
         )
+
+    def _run_preflight_checks(self) -> None:
+        """Run preflight smoke tests to validate the API is reachable.
+
+        Extracts base_url and auth_token from the client and runs
+        a quick health + auth check. Raises APINotReadyError if the
+        API is not functional.
+        """
+        from venomqa.preflight import SmokeTest
+
+        base_url = getattr(self.client, "base_url", None)
+        if not base_url:
+            logger.debug("Skipping preflight: client has no base_url attribute")
+            return
+
+        auth_token = getattr(self.client, "_auth_token", None)
+        # Strip "Bearer " prefix if present -- SmokeTest adds it back
+        if auth_token and auth_token.lower().startswith("bearer "):
+            auth_token = auth_token[7:]
+
+        smoke = SmokeTest(base_url=base_url, token=auth_token)
+        logger.info("Running preflight smoke test...")
+        smoke.assert_ready()  # raises APINotReadyError on failure
+        logger.info("Preflight passed -- API is ready")
