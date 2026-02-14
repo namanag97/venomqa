@@ -85,7 +85,7 @@ class EnvironmentBackend(SecretBackend):
         """Load secrets from a .env file."""
         env_path = Path(env_file)
         if not env_path.exists():
-            logger.warning(f"Environment file not found: {env_path}")
+            logger.debug(f"Environment file not found: {env_path}")
             return
 
         try:
