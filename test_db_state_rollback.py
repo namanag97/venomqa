@@ -10,7 +10,7 @@ sys.path.insert(0, '.')
 
 from venomqa import Client, Journey, Step, Checkpoint, Branch, Path
 from venomqa.runner import JourneyRunner
-from venomqa.state import MemoryStateManager
+from venomqa.state import InMemoryStateManager
 
 BASE_URL = "http://localhost:5001"
 
