@@ -766,8 +766,6 @@ class JourneyRunner:
         Returns:
             Formatted body string.
         """
-        import json
-
         if body is None:
             return "(empty)"
 
