@@ -120,8 +120,11 @@ def check_package(package: str) -> Tuple[bool, str]:
         Tuple of (success, message) indicating if package is installed.
     """
     try:
-        mod = __import__(package)
-        version = getattr(mod, "__version__", "installed")
+        __import__(package)
+        try:
+            version = importlib.metadata.version(package)
+        except importlib.metadata.PackageNotFoundError:
+            version = "installed"
         return True, f"{package} {version}"
     except ImportError:
         return False, f"{package} not installed"
