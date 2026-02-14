@@ -148,9 +148,13 @@ def discover_journeys(path: str | Path) -> dict[str, Journey]:
     """Scan a directory for journey files and register them.
 
     Looks for:
-    - Python files matching pattern: *_journey.py or journey_*.py
+    - All Python files in the directory (excluding __init__.py and private files)
     - Functions decorated with @journey
-    - Direct Journey instances assigned to module-level variables
+    - Direct Journey instances assigned to module-level variables named 'journey'
+    - Any module-level object with a 'steps' attribute (Journey-like)
+
+    This approach ensures consistent discovery regardless of file naming convention.
+    Users can name files like 'checkout.py', 'user_journey.py', or 'journey_login.py'.
 
     Args:
         path: Directory path to scan for journey files
@@ -163,19 +167,25 @@ def discover_journeys(path: str | Path) -> dict[str, Journey]:
         raise FileNotFoundError(f"Journey path does not exist: {path}")
 
     registry = get_registry()
-
-    patterns = ["*_journey.py", "journey_*.py"]
     journey_files: list[Path] = []
 
     if path.is_file() and path.suffix == ".py":
         journey_files = [path]
     elif path.is_dir():
-        for pattern in patterns:
-            journey_files.extend(path.glob(pattern))
-        journey_files = list(set(journey_files))
+        # Discover ALL .py files, not just specific patterns
+        # This matches the behavior in commands.py and prevents confusion
+        journey_files = [
+            f for f in path.glob("*.py")
+            if not f.name.startswith("_")
+        ]
 
     for file_path in journey_files:
-        _load_module_from_file(file_path)
+        try:
+            _load_module_from_file(file_path)
+        except Exception:
+            # If a file fails to load, log and continue with others
+            import logging
+            logging.debug(f"Could not load journey from {file_path}")
 
     return registry.get_all_journeys()
 
