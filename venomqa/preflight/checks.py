@@ -762,3 +762,148 @@ class OpenAPICheck(BaseCheck):
             duration_ms=duration,
             suggestion=_get_suggestion("openapi", last_code or 404),
         )
+
+
+# ---------------------------------------------------------------------------
+# CustomHTTPCheck
+# ---------------------------------------------------------------------------
+
+class CustomHTTPCheck(BaseCheck):
+    """A fully configurable HTTP check.
+
+    Supports any HTTP method, optional JSON payloads, extra headers, and
+    expected-status / expected-JSON validation.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        token: str | None = None,
+        timeout: float = 10.0,
+        auth_header: str = "Authorization",
+        auth_prefix: str = "Bearer",
+        *,
+        check_name: str = "Custom check",
+        method: str = "GET",
+        path: str = "/",
+        payload: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
+        expected_status: list[int] | None = None,
+        expected_json: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(base_url, token, timeout, auth_header, auth_prefix)
+        self.name = check_name
+        self.method = method.upper()
+        self.path = path
+        self.payload = payload
+        self.extra_headers = extra_headers or {}
+        self.expected_status = expected_status or [200]
+        self.expected_json = expected_json
+
+    def run(self) -> SmokeTestResult:
+        start = time.perf_counter()
+        try:
+            headers = self._headers()
+            headers.update(self.extra_headers)
+
+            with httpx.Client(timeout=self.timeout) as client:
+                kwargs: dict[str, Any] = {
+                    "url": self._url(self.path),
+                    "headers": headers,
+                }
+                if self.payload is not None and self.method in ("POST", "PUT", "PATCH"):
+                    kwargs["json"] = self.payload
+
+                resp = client.request(self.method, **kwargs)
+
+            duration = (time.perf_counter() - start) * 1000
+
+            if resp.status_code not in self.expected_status:
+                body_preview = resp.text[:500] if resp.text else ""
+                return SmokeTestResult(
+                    name=self.name,
+                    passed=False,
+                    status_code=resp.status_code,
+                    error=(
+                        f"Expected status {self.expected_status}, "
+                        f"got {resp.status_code}"
+                    ),
+                    duration_ms=duration,
+                    response_body=body_preview,
+                )
+
+            # Validate expected JSON (subset check)
+            if self.expected_json is not None:
+                try:
+                    body = resp.json()
+                    if not _is_json_superset(body, self.expected_json):
+                        return SmokeTestResult(
+                            name=self.name,
+                            passed=False,
+                            status_code=resp.status_code,
+                            error=(
+                                f"Response JSON does not match expected: "
+                                f"{self.expected_json!r}"
+                            ),
+                            duration_ms=duration,
+                            response_body=resp.text[:500],
+                        )
+                except Exception:
+                    return SmokeTestResult(
+                        name=self.name,
+                        passed=False,
+                        status_code=resp.status_code,
+                        error="Expected JSON response but could not parse body",
+                        duration_ms=duration,
+                    )
+
+            return SmokeTestResult(
+                name=self.name,
+                passed=True,
+                status_code=resp.status_code,
+                duration_ms=duration,
+            )
+
+        except (httpx.ConnectError, httpx.ConnectTimeout, OSError) as exc:
+            duration = (time.perf_counter() - start) * 1000
+            return SmokeTestResult(
+                name=self.name,
+                passed=False,
+                status_code=None,
+                error=str(exc),
+                duration_ms=duration,
+                suggestion=_connection_suggestion(exc),
+            )
+        except httpx.HTTPError as exc:
+            duration = (time.perf_counter() - start) * 1000
+            return SmokeTestResult(
+                name=self.name,
+                passed=False,
+                status_code=None,
+                error=str(exc),
+                duration_ms=duration,
+            )
+
+
+def _is_json_superset(actual: Any, expected: Any) -> bool:
+    """Check if *actual* is a superset of *expected* (recursive dict match).
+
+    For dicts, every key in *expected* must appear in *actual* with a
+    matching value.  For lists, *actual* must contain all elements of
+    *expected*.  Scalars are compared with ``==``.
+    """
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict):
+            return False
+        return all(
+            k in actual and _is_json_superset(actual[k], v)
+            for k, v in expected.items()
+        )
+    if isinstance(expected, list):
+        if not isinstance(actual, list):
+            return False
+        return all(
+            any(_is_json_superset(a, e) for a in actual)
+            for e in expected
+        )
+    return actual == expected
