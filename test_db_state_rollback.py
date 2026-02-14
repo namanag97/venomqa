@@ -76,13 +76,7 @@ def test_db_state_rollback_without_state_manager():
 
     print(f"\n  Journey Result: {'PASSED' if result.success else 'FAILED'}")
 
-    # Cleanup
-    todo_id = None
-    for rec in client.history:
-        if rec.operation.startswith("POST") and rec.response_body:
-            todo_id = rec.response_body.get("id")
-    if todo_id:
-        client.delete(f"/todos/{todo_id}")
+    # No cleanup needed for investigation
 
     return result
 
