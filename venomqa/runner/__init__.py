@@ -238,6 +238,13 @@ class JourneyRunner:
         """Execute all paths in a branch, rolling back after each."""
         logger.info(f"Exploring branch with {len(branch.paths)} paths")
 
+        if not self.state_manager:
+            logger.warning(
+                f"Branch at checkpoint '{branch.checkpoint_name}' is being executed but no StateManager "
+                "configured. Rollback between paths will not work - each path will see state changes "
+                "from previous paths. Configure a StateManager for proper branch isolation."
+            )
+
         if self.output:
             self.output.branch_start(branch.checkpoint_name, len(branch.paths))
 
