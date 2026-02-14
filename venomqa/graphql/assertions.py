@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from typing import Any, TypeVar
 
-from venomqa.clients.graphql import GraphQLError, GraphQLResponse
+from venomqa.http.graphql import GraphQLError, GraphQLResponse
 
 T = TypeVar("T")
 
