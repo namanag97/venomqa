@@ -1,0 +1,48 @@
+# VenomQA Preflight - FastAPI Application
+# Smoke tests for a FastAPI app with OpenAPI docs and standard endpoints.
+
+base_url: "${API_URL:http://localhost:8000}"
+timeout: 10.0
+
+auth:
+  token_env_var: "API_TOKEN"
+  header: "Authorization"
+  prefix: "Bearer"
+
+health_checks:
+  - path: /health
+    expected_status: [200]
+    expected_json:
+      status: "healthy"
+
+auth_checks:
+  - path: /api/v1/users/me
+    expected_status: [200]
+
+crud_checks:
+  - name: "Create test item"
+    path: /api/v1/items
+    payload:
+      name: "Preflight Test ${RANDOM}"
+      description: "Created by VenomQA preflight"
+    expected_status: [200, 201, 409]
+
+list_checks:
+  - path: /api/v1/items
+    expected_type: array
+
+custom_checks:
+  - name: "OpenAPI JSON spec"
+    method: GET
+    path: /openapi.json
+    expected_status: [200]
+
+  - name: "Swagger UI available"
+    method: GET
+    path: /docs
+    expected_status: [200]
+
+  - name: "ReDoc available"
+    method: GET
+    path: /redoc
+    expected_status: [200]
