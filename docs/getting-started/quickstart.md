@@ -2,6 +2,43 @@
 
 Get VenomQA up and running in 5 minutes.
 
+## Prerequisites
+
+Before starting, you need:
+
+1. **Python 3.10+** installed
+2. **An API to test** - If you don't have one, use our test server:
+
+### Option A: Use the VenomQA Test Server (Recommended for beginners)
+
+We provide a simple test server so you can start immediately:
+
+```bash
+# Clone the repo (if you haven't already)
+git clone https://github.com/namanagarwal/venomqa.git
+cd venomqa/examples/quickstart
+
+# Install the test server dependencies
+pip install fastapi uvicorn pydantic
+
+# Start the test server
+python test_server.py
+```
+
+The test server runs at `http://localhost:8000` and provides:
+- `GET /health` - Health check
+- `GET /items` - List items
+- `POST /items` - Create item
+- `GET /items/{id}` - Get item
+- `PUT /items/{id}` - Update item
+- `DELETE /items/{id}` - Delete item
+
+**Keep this terminal running** and open a new terminal for the next steps.
+
+### Option B: Use Your Own API
+
+If you have an existing API, update the `base_url` in `venomqa.yaml` to point to it.
+
 ## Install VenomQA
 
 ```bash
@@ -13,6 +50,18 @@ Verify the installation:
 ```bash
 venomqa --version
 ```
+
+## Which API Should I Use?
+
+VenomQA offers multiple approaches. Here's when to use each:
+
+| Approach | Best For | Complexity |
+|----------|----------|------------|
+| **Journey** | Linear user flows (login -> action -> verify) | Simple |
+| **StateGraph** | Testing all state transitions systematically | Medium |
+| **CLI** | Quick tests, CI/CD integration | Simple |
+
+**For beginners: Start with Journey** - it's the most intuitive.
 
 ## Create Your First Journey
 
@@ -42,20 +91,22 @@ from venomqa import Journey, Step
 
 def health_check(client, context):
     """Check if the API is healthy."""
-    return client.get("/health")
-
-def get_version(client, context):
-    """Get API version information."""
-    response = client.get("/api/version")
-    context["version"] = response.json().get("version")
+    response = client.get("/health")
+    # Store the result for later steps
+    if response.status_code == 200:
+        context["api_status"] = response.json()["status"]
     return response
+
+def list_items(client, context):
+    """List all items from the API."""
+    return client.get("/items")
 
 journey = Journey(
     name="hello_world",
     description="My first VenomQA journey",
     steps=[
         Step(name="check_health", action=health_check),
-        Step(name="get_version", action=get_version),
+        Step(name="list_items", action=list_items),
     ],
 )
 ```
@@ -71,9 +122,73 @@ You should see output like:
 ```
 Running journey: hello_world
   [PASS] check_health (45ms)
-  [PASS] get_version (32ms)
+  [PASS] list_items (32ms)
 
 Journey completed: 2/2 steps passed
+```
+
+## CRUD Example (Create, Read, Delete)
+
+Here's a more complete example that creates, reads, and deletes an item:
+
+```python
+# journeys/crud_flow.py
+from venomqa import Journey, Step, Checkpoint, Branch, Path
+
+def create_item(client, context):
+    """Create a new item."""
+    response = client.post("/items", json={
+        "name": "Test Item",
+        "description": "Created by VenomQA",
+        "price": 19.99,
+    })
+    if response.status_code == 201:
+        context["item_id"] = response.json()["id"]
+    return response
+
+def get_item(client, context):
+    """Fetch the created item."""
+    item_id = context.get("item_id")
+    return client.get(f"/items/{item_id}")
+
+def delete_item(client, context):
+    """Delete the item."""
+    item_id = context.get("item_id")
+    return client.delete(f"/items/{item_id}")
+
+def verify_deleted(client, context):
+    """Verify item was deleted (expect 404)."""
+    item_id = context.get("item_id")
+    return client.get(f"/items/{item_id}")
+
+journey = Journey(
+    name="crud_flow",
+    description="Test create, read, and delete operations",
+    steps=[
+        Step(name="create_item", action=create_item),
+        Step(name="get_item", action=get_item),
+        Checkpoint(name="item_exists"),
+        Branch(
+            checkpoint_name="item_exists",
+            paths=[
+                Path(name="delete_flow", steps=[
+                    Step(name="delete_item", action=delete_item),
+                    Step(
+                        name="verify_deleted",
+                        action=verify_deleted,
+                        expect_failure=True,  # We expect 404
+                    ),
+                ]),
+            ],
+        ),
+    ],
+)
+```
+
+Run it:
+
+```bash
+venomqa run crud_flow
 ```
 
 ## Add Authentication
@@ -299,6 +414,82 @@ Or skip if services are already running:
 venomqa run --no-infra
 ```
 
+## Troubleshooting
+
+### "Connection refused" error
+
+**Problem:** `ConnectionRefusedError: [Errno 111] Connection refused`
+
+**Solutions:**
+1. Make sure your API server is running
+2. Check if the `base_url` in `venomqa.yaml` is correct
+3. If using the test server, ensure it's running in another terminal
+
+```bash
+# Check if something is running on port 8000
+lsof -i :8000
+
+# Start the test server if needed
+cd examples/quickstart && python test_server.py
+```
+
+### "Journey not found" error
+
+**Problem:** `JourneyNotFound: Could not find journey 'my_journey'`
+
+**Solutions:**
+1. Check that your journey file is in the `journeys/` directory
+2. Ensure the file has a `journey` variable at module level
+3. Verify the journey `name` matches what you're running
+
+```bash
+# List available journeys
+venomqa list
+```
+
+### "Context key not found" error
+
+**Problem:** `KeyError: 'item_id'`
+
+**Solutions:**
+1. A previous step didn't set the expected context value
+2. The previous step may have failed silently
+3. Use `context.get("key", default)` instead of `context["key"]`
+
+```python
+# Instead of:
+item_id = context["item_id"]  # Raises KeyError if missing
+
+# Use:
+item_id = context.get("item_id")  # Returns None if missing
+if not item_id:
+    raise ValueError("item_id not set by previous step")
+```
+
+### Import errors
+
+**Problem:** `ModuleNotFoundError: No module named 'venomqa'`
+
+**Solutions:**
+1. Make sure VenomQA is installed: `pip install venomqa`
+2. Check you're in the right virtual environment
+3. Try reinstalling: `pip uninstall venomqa && pip install venomqa`
+
+### HTTP 422 Validation Error
+
+**Problem:** `422 Unprocessable Entity`
+
+**Solutions:**
+1. Check your request body matches the API schema
+2. Ensure required fields are provided
+3. Verify data types (e.g., integers vs strings)
+
+```python
+# Check the actual error in the response
+response = client.post("/items", json={"name": 123})  # Wrong type!
+print(response.json())  # Shows validation errors
+```
+
 ## Next Steps
 
 You've learned the basics! Now explore:
@@ -307,3 +498,4 @@ You've learned the basics! Now explore:
 - [Configuration](configuration.md) - All configuration options
 - [Tutorials](../tutorials/index.md) - Step-by-step guides for specific scenarios
 - [CLI Reference](../reference/cli.md) - Complete CLI documentation
+- [FAQ](../faq.md) - Common questions and answers
