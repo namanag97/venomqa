@@ -1,0 +1,213 @@
+# Site metadata
+site_name: VenomQA
+site_url: https://venomqa.dev
+site_description: Stateful Journey Testing for Modern APIs
+site_author: Naman Agarwal
+repo_name: venomqa/venomqa
+repo_url: https://github.com/venomqa/venomqa
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; 2024 Naman Agarwal
+
+# Theme configuration
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/snake
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+    - content.action.view
+    - toc.follow
+
+# Navigation
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Quickstart: getting-started/quickstart.md
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+  - Concepts:
+    - concepts/index.md
+    - Journeys: concepts/journeys.md
+    - Checkpoints & Branching: concepts/branching.md
+    - State Management: concepts/state.md
+    - Ports & Adapters: concepts/ports-adapters.md
+  - Tutorials:
+    - tutorials/index.md
+    - Your First Journey: tutorials/first-journey.md
+    - Testing Payment Flows: tutorials/payment-flows.md
+    - CI/CD Integration: tutorials/ci-cd.md
+  - Reference:
+    - reference/index.md
+    - API Reference: reference/api.md
+    - CLI Reference: reference/cli.md
+    - Configuration: reference/config.md
+    - Database Backends: reference/backends.md
+    - Adapters: reference/adapters.md
+    - Reporters: reference/reporters.md
+  - Examples:
+    - examples/index.md
+    - CRUD Operations: examples/crud.md
+    - Authentication Flows: examples/auth.md
+    - E-commerce Checkout: examples/checkout.md
+  - Advanced:
+    - advanced/index.md
+    - Custom Reporters: advanced/custom-reporters.md
+    - Custom Backends: advanced/custom-backends.md
+    - Performance: advanced/performance.md
+    - Testing Patterns: advanced/testing-patterns.md
+  - Community:
+    - FAQ: faq.md
+    - Comparison: comparison.md
+    - Contributing: contributing.md
+    - Changelog: changelog.md
+    - Roadmap: roadmap.md
+  - Specifications:
+    - Framework Spec: specs/framework-spec.md
+    - Sample App Spec: specs/sample-app-spec.md
+    - State Chain: specs/state-chain.md
+    - State Explorer: specs/state-explorer.md
+    - State Explorer Project: specs/state-explorer-project.md
+    - State Explorer Tasks: specs/state-explorer-tasks.md
+    - Strategy: specs/strategy.md
+    - Validation Report: specs/validation-report.md
+    - Improvements: specs/improvements.md
+    - Publishing: specs/publishing.md
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            show_submodules: false
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+            members_order: source
+            filters:
+              - "!^_"
+              - "^__init__$"
+            inherited_members: true
+            separate_signature: true
+            unwrap_annotated: true
+
+# Markdown extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      auto_title: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: venomqa
+      repo: venomqa
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Extra configuration
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/venomqa/venomqa
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/venomqa/
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/venomqa
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX
+  version:
+    provider: mike
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+# Watch for changes
+watch:
+  - venomqa
