@@ -1,0 +1,43 @@
+# VenomQA Preflight - Django REST Framework Application
+# Smoke tests for a Django app with DRF.
+
+base_url: "${API_URL:http://localhost:8000}"
+timeout: 15.0
+
+auth:
+  token_env_var: "API_TOKEN"
+  # Django REST Framework typically uses "Token" prefix:
+  header: "Authorization"
+  prefix: "Token"
+
+health_checks:
+  - path: /health/
+    expected_status: [200]
+  - path: /api/
+    expected_status: [200]
+
+auth_checks:
+  - path: /api/v1/users/me/
+    expected_status: [200]
+
+crud_checks:
+  - name: "Create resource"
+    path: /api/v1/resources/
+    payload:
+      name: "Preflight Test ${RANDOM}"
+    expected_status: [201, 400]  # 400 if already exists (DRF validation)
+
+list_checks:
+  - path: /api/v1/resources/
+    expected_type: paginated  # DRF uses {count, next, previous, results}
+
+custom_checks:
+  - name: "Admin site accessible"
+    method: GET
+    path: /admin/login/
+    expected_status: [200]
+
+  - name: "DRF browsable API"
+    method: GET
+    path: /api/
+    expected_status: [200]
