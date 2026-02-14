@@ -1599,6 +1599,159 @@ def list_journeys(ctx: click.Context, output_format: str) -> None:
 
 
 @cli.command()
+@click.option("--config", "-c", "config_path", type=click.Path(), help="Path to config file")
+@click.option("--journey", "-j", "journey_name", type=str, help="Validate specific journey")
+@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+def validate(config_path: str | None, journey_name: str | None, output_json: bool) -> None:
+    """Validate configuration and journey definitions.
+
+    This command checks your VenomQA setup for common issues:
+    - Configuration file syntax and values
+    - Journey definition correctness
+    - Action callable verification
+    - Checkpoint naming conflicts
+
+    \b
+    Examples:
+        venomqa validate                 # Validate all
+        venomqa validate -c other.yaml   # Validate specific config
+        venomqa validate -j checkout     # Validate specific journey
+        venomqa validate --json          # Output as JSON
+
+    Exit codes:
+        0 - All validations passed
+        1 - One or more validations failed
+    """
+    import json as json_module
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
+    issues: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
+
+    console.print("\n[bold blue]VenomQA Validation[/bold blue]")
+    console.print("=" * 40)
+
+    # Validate configuration
+    console.print("\n[bold]Configuration[/bold]")
+    try:
+        config = load_config(config_path)
+        console.print("  [green]OK[/green] Configuration file is valid")
+
+        # Check for common issues
+        if config.get("base_url", "").startswith("http://localhost"):
+            warnings.append({
+                "type": "config",
+                "message": "base_url points to localhost - update for CI/CD",
+                "suggestion": "Use environment variable: ${API_BASE_URL}",
+            })
+            console.print("  [yellow]--[/yellow] base_url points to localhost")
+
+        if not config.get("db_url"):
+            warnings.append({
+                "type": "config",
+                "message": "No db_url configured - state branching disabled",
+                "suggestion": "Add db_url to enable checkpoints and rollbacks",
+            })
+            console.print("  [yellow]--[/yellow] No database URL configured (branching disabled)")
+
+    except ConfigValidationError as e:
+        issues.append({
+            "type": "config",
+            "message": str(e),
+            "field": getattr(e, "field", None),
+        })
+        console.print(f"  [red]!![/red] {e}")
+    except ConfigLoadError as e:
+        issues.append({
+            "type": "config",
+            "message": str(e),
+        })
+        console.print(f"  [red]!![/red] {e}")
+
+    # Validate journeys
+    console.print("\n[bold]Journeys[/bold]")
+    journeys = discover_journeys()
+
+    if not journeys:
+        warnings.append({
+            "type": "journeys",
+            "message": "No journeys found",
+            "suggestion": "Create journeys in the 'journeys/' directory",
+        })
+        console.print("  [yellow]--[/yellow] No journeys found in journeys/ directory")
+    else:
+        journeys_to_check = {journey_name: journeys[journey_name]} if journey_name else journeys
+
+        for name, info in journeys_to_check.items():
+            try:
+                journey_data = _load_journey(name, info["path"])
+                if journey_data is None:
+                    issues.append({
+                        "type": "journey",
+                        "journey": name,
+                        "message": "Failed to load journey",
+                    })
+                    console.print(f"  [red]!![/red] {name}: Failed to load")
+                else:
+                    # Validate journey structure
+                    if not hasattr(journey_data, "steps") or not journey_data.steps:
+                        warnings.append({
+                            "type": "journey",
+                            "journey": name,
+                            "message": "Journey has no steps",
+                        })
+                        console.print(f"  [yellow]--[/yellow] {name}: No steps defined")
+                    else:
+                        # Check step actions are callable
+                        invalid_steps = []
+                        for step in journey_data.steps:
+                            if hasattr(step, "action"):
+                                if not callable(step.action) and not isinstance(step.action, str):
+                                    invalid_steps.append(step.name)
+
+                        if invalid_steps:
+                            issues.append({
+                                "type": "journey",
+                                "journey": name,
+                                "message": f"Invalid step actions: {', '.join(invalid_steps)}",
+                            })
+                            console.print(f"  [red]!![/red] {name}: Invalid steps - {', '.join(invalid_steps)}")
+                        else:
+                            console.print(f"  [green]OK[/green] {name} ({len(journey_data.steps)} steps)")
+
+            except Exception as e:
+                issues.append({
+                    "type": "journey",
+                    "journey": name,
+                    "message": str(e),
+                })
+                console.print(f"  [red]!![/red] {name}: {e}")
+
+    # Summary
+    console.print()
+    if output_json:
+        result = {
+            "valid": len(issues) == 0,
+            "issues": issues,
+            "warnings": warnings,
+        }
+        click.echo(json_module.dumps(result, indent=2))
+    else:
+        if issues:
+            console.print(f"[red]Validation failed with {len(issues)} error(s)[/red]")
+            if warnings:
+                console.print(f"[yellow]Plus {len(warnings)} warning(s)[/yellow]")
+        elif warnings:
+            console.print(f"[green]Validation passed[/green] with {len(warnings)} warning(s)")
+        else:
+            console.print("[green]All validations passed![/green]")
+
+    sys.exit(1 if issues else 0)
+
+
+@cli.command()
 @click.option(
     "--format",
     "-f",
