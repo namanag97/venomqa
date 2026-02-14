@@ -155,6 +155,100 @@ Step(
 | `timeout` | `float` | `None` | Max execution time in seconds |
 | `retries` | `int` | `0` | Number of retry attempts |
 | `expect_failure` | `bool` | `False` | If True, step passes when action fails |
+| `args` | `dict` | `{}` | Additional keyword arguments passed to the action |
+
+### The `args` Parameter
+
+The `args` parameter allows you to pass additional keyword arguments to your action function. This is useful for:
+
+- **Reusing actions** with different parameters
+- **Parameterizing tests** without creating new functions
+- **Passing configuration** to actions at runtime
+
+#### How it works
+
+When a Step has `args`, those arguments are passed as keyword arguments to the action function:
+
+```python
+# Define an action that accepts extra parameters
+def create_item(client, context, name="default", price=0.0, category=None):
+    return client.post("/api/items", json={
+        "name": name,
+        "price": price,
+        "category": category,
+    })
+
+# Use args to pass different values
+journey = Journey(
+    name="item_creation",
+    steps=[
+        Step(
+            name="create_basic_item",
+            action=create_item,
+            args={"name": "Basic Widget", "price": 9.99},
+        ),
+        Step(
+            name="create_premium_item",
+            action=create_item,
+            args={"name": "Premium Widget", "price": 99.99, "category": "premium"},
+        ),
+    ],
+)
+```
+
+#### Action Function Signature with args
+
+When using `args`, your action function should accept `**kwargs` or explicit keyword parameters:
+
+```python
+# Option 1: Explicit parameters (recommended)
+def login(client, context, email="test@example.com", password="secret"):
+    return client.post("/api/auth/login", json={
+        "email": email,
+        "password": password,
+    })
+
+# Option 2: Using **kwargs
+def create_user(client, context, **kwargs):
+    name = kwargs.get("name", "Default User")
+    role = kwargs.get("role", "user")
+    return client.post("/api/users", json={"name": name, "role": role})
+```
+
+#### Using args with the same action
+
+This pattern is powerful for testing variations:
+
+```python
+def make_payment(client, context, method="card", amount=None):
+    amount = amount or context.get("cart_total", 100)
+    return client.post("/api/checkout/pay", json={
+        "method": method,
+        "amount": amount,
+    })
+
+journey = Journey(
+    name="payment_methods",
+    steps=[
+        Step(name="setup_cart", action=setup_cart),
+        Checkpoint(name="cart_ready"),
+        Branch(
+            checkpoint_name="cart_ready",
+            paths=[
+                Path(name="card_payment", steps=[
+                    Step(name="pay", action=make_payment, args={"method": "card"}),
+                ]),
+                Path(name="paypal_payment", steps=[
+                    Step(name="pay", action=make_payment, args={"method": "paypal"}),
+                ]),
+                Path(name="crypto_payment", steps=[
+                    Step(name="pay", action=make_payment, args={"method": "crypto"}),
+                ]),
+            ],
+        ),
+    ],
+)
+```
 
 ### Using Lambda Functions
 
