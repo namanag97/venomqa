@@ -7,7 +7,7 @@ Demonstrates:
 """
 
 from venomqa import Checkpoint, Journey, Step
-from venomqa.client import Client
+from venomqa.http import Client
 
 
 class PasswordActions:
