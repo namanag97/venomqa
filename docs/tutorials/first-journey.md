@@ -124,9 +124,7 @@ Tests the complete flow of:
 """
 from venomqa import Journey, Step
 
-# Import our reusable actions
-import sys
-sys.path.insert(0, '.')
+# Import our reusable actions (works automatically when run via venomqa run)
 from actions.auth import login, login_invalid, get_profile
 
 
