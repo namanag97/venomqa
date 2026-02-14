@@ -297,8 +297,11 @@ class PreflightChecker:
 
         for import_name, package_name in required_packages:
             try:
-                module = __import__(import_name)
-                version = getattr(module, "__version__", "installed")
+                __import__(import_name)
+                try:
+                    version = importlib.metadata.version(package_name)
+                except importlib.metadata.PackageNotFoundError:
+                    version = "installed"
                 installed.append(f"{package_name}=={version}")
             except ImportError:
                 missing.append(package_name)
