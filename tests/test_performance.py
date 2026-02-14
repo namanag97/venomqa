@@ -74,7 +74,7 @@ class TestRetryMechanism:
     """Tests for retry mechanism performance."""
 
     def test_retry_on_server_error(self, mock_client: MockClient) -> None:
-        from venomqa.client import Client
+        from venomqa.http import Client
 
         with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
@@ -105,7 +105,7 @@ class TestRetryMechanism:
             assert mock_instance.request.call_count == 3
 
     def test_retry_exhausted_returns_error_response(self) -> None:
-        from venomqa.client import Client
+        from venomqa.http import Client
 
         with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
@@ -125,7 +125,7 @@ class TestRetryMechanism:
             assert mock_instance.request.call_count == 3
 
     def test_no_retry_on_client_error(self) -> None:
-        from venomqa.client import Client
+        from venomqa.http import Client
 
         with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
