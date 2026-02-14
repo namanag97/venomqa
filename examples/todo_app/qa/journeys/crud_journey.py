@@ -1,14 +1,8 @@
 """CRUD journey - test full Create, Read, Update, Delete cycle."""
 
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
 from venomqa import Journey, Step, Checkpoint, Branch, Path
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "actions"))
-from todo_actions import create_todo, get_todo, list_todos, update_todo, delete_todo, health_check
+from ..actions import create_todo, get_todo, list_todos, update_todo, delete_todo, health_check
 
 crud_journey = Journey(
     name="crud_operations",
@@ -37,7 +31,9 @@ crud_journey = Journey(
         ),
         Step(
             name="update_todo",
-            action=update_todo,
+            action=lambda client, ctx: update_todo(
+                client, ctx, title="Updated Todo Title", description="Updated description"
+            ),
             description="Update the todo title",
         ),
         Checkpoint(name="todo_updated"),
