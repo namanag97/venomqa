@@ -328,7 +328,7 @@ def demo(port: int, server_only: bool, keep_running: bool) -> None:
     console.print("  4. [cyan]venomqa run[/cyan]            Run your tests")
     console.print()
     console.print("[dim]Documentation: https://venomqa.dev[/dim]")
-    console.print("[dim]GitHub: https://github.com/namanagarwal/venomqa[/dim]")
+    console.print("[dim]GitHub: https://github.com/namanag97/venomqa[/dim]")
     console.print()
 
     if keep_running:
