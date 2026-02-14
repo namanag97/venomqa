@@ -1,4 +1,22 @@
-"""Custom validators for VenomQA configuration."""
+"""Custom validators for VenomQA configuration.
+
+This module provides comprehensive configuration validation with:
+- JSON Schema validation for structure
+- Semantic validation for URLs, paths, formats
+- Helpful error messages with suggestions
+- Production readiness warnings
+
+Example:
+    from venomqa.config.validators import validate_config
+
+    try:
+        validate_config(my_config)
+    except ConfigValidationError as e:
+        for error in e.errors:
+            print(f"Field: {error.get('field')}")
+            print(f"Error: {error.get('message')}")
+            print(f"Hint: {error.get('hint')}")
+"""
 
 from __future__ import annotations
 
@@ -11,25 +29,62 @@ from venomqa.config.schema import VENOMQA_CONFIG_SCHEMA
 
 
 class ConfigValidationError(Exception):
-    """Raised when configuration validation fails."""
+    """Raised when configuration validation fails.
+
+    Provides structured access to all validation errors with:
+    - path: Where in the config the error occurred
+    - message: What went wrong
+    - hint: How to fix it
+    - value: The invalid value (if applicable)
+
+    Attributes:
+        errors: List of error dictionaries with details
+    """
 
     def __init__(self, errors: list[dict[str, Any]]) -> None:
         self.errors = errors
         messages = []
         for error in errors:
             path = " -> ".join(str(p) for p in error.get("path", []))
+            if error.get("field"):
+                path = error["field"]
             message = error.get("message", "Unknown error")
             if path:
                 messages.append(f"{path}: {message}")
             else:
                 messages.append(message)
-        super().__init__("Configuration validation failed:\n  " + "\n  ".join(messages))
+
+        # Build user-friendly error message
+        error_text = "Configuration validation failed:\n  " + "\n  ".join(messages)
+
+        # Add hints if available
+        hints = [e.get("hint") for e in errors if e.get("hint")]
+        if hints:
+            error_text += "\n\nHints:"
+            for hint in hints[:3]:  # Show up to 3 hints
+                error_text += f"\n  - {hint}"
+
+        super().__init__(error_text)
+
+    @property
+    def suggestions(self) -> list[str]:
+        """Get list of suggestions for fixing the errors."""
+        suggestions = []
+        for error in self.errors:
+            if error.get("hint"):
+                suggestions.append(error["hint"])
+            elif error.get("allowed"):
+                suggestions.append(f"Allowed values: {error['allowed']}")
+            elif error.get("valid_formats"):
+                suggestions.append(f"Valid formats: {error['valid_formats']}")
+        return suggestions
 
     def to_dict(self) -> dict[str, Any]:
         """Return error details as dictionary."""
         return {
             "error_type": "config_validation",
             "errors": self.errors,
+            "suggestions": self.suggestions,
         }
 
 
