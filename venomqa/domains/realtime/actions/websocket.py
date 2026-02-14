@@ -5,8 +5,8 @@ Reusable WebSocket connection and messaging actions.
 
 import asyncio
 
-from venomqa.client import Client
-from venomqa.clients.websocket import AsyncWebSocketClient
+from venomqa.http import Client
+from venomqa.http.websocket import AsyncWebSocketClient
 
 
 class WebSocketActions:
