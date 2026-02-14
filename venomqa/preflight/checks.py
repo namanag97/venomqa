@@ -161,10 +161,14 @@ class BaseCheck:
         base_url: str,
         token: str | None = None,
         timeout: float = 10.0,
+        auth_header: str = "Authorization",
+        auth_prefix: str = "Bearer",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
+        self.auth_header = auth_header
+        self.auth_prefix = auth_prefix
 
     def _headers(self) -> dict[str, str]:
         """Build request headers including auth if available."""
@@ -173,11 +177,12 @@ class BaseCheck:
             "User-Agent": "VenomQA-Preflight/1.0",
         }
         if self.token:
+            prefix_lower = self.auth_prefix.lower() + " "
             # Support both raw tokens and pre-formatted "Bearer <token>"
-            if self.token.lower().startswith("bearer "):
-                headers["Authorization"] = self.token
+            if self.token.lower().startswith(prefix_lower):
+                headers[self.auth_header] = self.token
             else:
-                headers["Authorization"] = f"Bearer {self.token}"
+                headers[self.auth_header] = f"{self.auth_prefix} {self.token}"
         return headers
 
     def _url(self, path: str) -> str:
