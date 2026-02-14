@@ -811,10 +811,7 @@ class ExplorationResult(BaseModel):
     )
     success: bool = Field(default=True, description="Whether exploration succeeded")
 
-    class Config:
-        """Pydantic config."""
-
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
