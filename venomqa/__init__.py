@@ -409,10 +409,16 @@ from venomqa.plugins import (
     reset_plugin_manager,
 )
 from venomqa.preflight import (
+    APINotReadyError,
+    AutoPreflight,
     CheckResult,
     CheckStatus,
     PreflightChecker,
+    PreflightError,
     PreflightResult,
+    SmokeTest,
+    SmokeTestReport,
+    SmokeTestResult,
     run_preflight_checks,
     run_preflight_checks_with_output,
 )
