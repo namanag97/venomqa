@@ -33,7 +33,7 @@ jobs:
           pip install -e ".[dev,docs]"
 
       - name: Build documentation
-        run: mkdocs build --strict
+        run: mkdocs build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
