@@ -137,11 +137,49 @@ def extension(name: str) -> Callable:
 
 
 def _load_module_from_file(file_path: Path) -> None:
+    """Load a Python module and register any Journey instances found.
+
+    This function:
+    1. Loads the module from the file
+    2. Triggers @journey decorated functions (they auto-register)
+    3. Finds and registers Journey instances in module-level variables
+
+    Supports multiple discovery patterns:
+    - @journey decorator (auto-registers on decoration)
+    - Direct Journey assignment: journey = Journey(name="...", ...)
+    - Any Journey instance in module scope
+    """
     spec = importlib.util.spec_from_file_location(file_path.stem, file_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot load module from {file_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+
+    # After loading, also look for Journey instances that weren't decorated
+    # This supports the common pattern: journey = Journey(name="...", ...)
+    registry = get_registry()
+
+    for attr_name in dir(module):
+        if attr_name.startswith("_"):
+            continue
+
+        attr = getattr(module, attr_name, None)
+        if attr is None:
+            continue
+
+        # Check if it's a Journey instance
+        if isinstance(attr, Journey):
+            # Only register if not already registered
+            existing = registry.get_all_journeys()
+            if attr.name not in existing:
+                registry.register_journey(attr)
+        # Also check for journey-like objects with steps attribute
+        elif hasattr(attr, "steps") and hasattr(attr, "name"):
+            # Duck-typing check for Journey-like objects
+            if isinstance(attr, Journey):
+                existing = registry.get_all_journeys()
+                if attr.name not in existing:
+                    registry.register_journey(attr)
 
 
 def discover_journeys(path: str | Path) -> dict[str, Journey]:
