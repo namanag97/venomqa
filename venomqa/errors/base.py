@@ -705,38 +705,93 @@ class ResetError(StateError):
 
 
 class JourneyError(VenomQAError):
-    """Journey execution error."""
+    """Journey execution failed.
+
+    An error occurred during journey execution. Check the context
+    for which step failed and the underlying cause.
+    """
 
     error_code = ErrorCode.JOURNEY_FAILED
     default_message = "Journey execution failed"
+    default_suggestions = [
+        "Check the step that failed in the error context",
+        "Run with --verbose for detailed step output",
+        "Review the 'cause' attribute for underlying error",
+        "Use checkpoints to isolate failing sections",
+    ]
+    docs_path = "concepts/journeys"
 
 
 class JourneyTimeoutError(JourneyError):
-    """Journey execution timed out."""
+    """Journey execution exceeded the time limit.
+
+    The entire journey took longer than the allowed timeout.
+    Consider:
+    - Breaking the journey into smaller pieces
+    - Increasing the overall timeout
+    - Optimizing slow steps
+    """
 
     error_code = ErrorCode.JOURNEY_TIMEOUT
     default_message = "Journey execution timed out"
+    default_suggestions = [
+        "Identify slow steps using --verbose or --profile",
+        "Break long journeys into smaller focused journeys",
+        "Set step-specific timeouts for known slow operations",
+        "Consider parallel execution for independent steps",
+    ]
 
 
 class JourneyAbortedError(JourneyError):
-    """Journey was aborted."""
+    """Journey was explicitly aborted.
+
+    The journey was stopped before completion, either due to:
+    - User interrupt (Ctrl+C)
+    - fail_fast mode after a failure
+    - External abort signal
+    """
 
     error_code = ErrorCode.JOURNEY_ABORTED
     default_message = "Journey was aborted"
+    default_suggestions = [
+        "Check if this was intentional (fail_fast mode)",
+        "Review preceding step failures",
+        "Re-run without fail_fast to see all failures",
+    ]
 
 
 class BranchError(JourneyError):
-    """Branch execution error."""
+    """Branch execution failed.
+
+    One or more paths within a branch failed. Branches fork
+    execution from a checkpoint to test multiple scenarios.
+    """
 
     error_code = ErrorCode.BRANCH_FAILED
     default_message = "Branch execution failed"
+    default_suggestions = [
+        "Check which paths within the branch failed",
+        "Verify the checkpoint state is correct before branching",
+        "Run individual paths to isolate the failure",
+        "Use --verbose to see path execution order",
+    ]
+    docs_path = "concepts/branches"
 
 
 class PathError(JourneyError):
-    """Path execution error."""
+    """Path execution within a branch failed.
+
+    A specific execution path failed. The checkpoint state
+    was rolled back for this path.
+    """
 
     error_code = ErrorCode.PATH_FAILED
     default_message = "Path execution failed"
+    default_suggestions = [
+        "Check which step in the path failed",
+        "Verify path-specific preconditions are met",
+        "Ensure checkpoint rollback completed successfully",
+    ]
 
 
 class CircuitOpenError(VenomQAError):
