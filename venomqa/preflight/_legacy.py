@@ -15,6 +15,7 @@ Preflight checks include:
 
 from __future__ import annotations
 
+import importlib.metadata
 import shutil
 import socket
 import subprocess
