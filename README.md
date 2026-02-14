@@ -20,6 +20,35 @@ Traditional API testing checks endpoints in isolation. **VenomQA tests like a hu
 
 ---
 
+## First 5 Minutes Checklist
+
+Get up and running fast:
+
+```
+[ ] 1. Install VenomQA
+      pip install venomqa
+
+[ ] 2. Start a test server (or use your own API)
+      cd examples/quickstart
+      pip install fastapi uvicorn
+      python test_server.py
+
+[ ] 3. Create venomqa.yaml
+      base_url: "http://localhost:8000"
+      timeout: 30
+
+[ ] 4. Write your first journey
+      mkdir journeys
+      # Create journeys/hello.py (see Quick Start below)
+
+[ ] 5. Run it
+      venomqa run hello_world
+```
+
+Need help? See [Troubleshooting](docs/getting-started/quickstart.md#troubleshooting) or [FAQ](docs/faq.md).
+
+---
+
 ## Quick Start
 
 ```bash
