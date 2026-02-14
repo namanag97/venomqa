@@ -575,17 +575,14 @@ class JourneyRunner:
             if self.output:
                 self.output.step_fail(step.name, error or "Unknown error", duration_ms)
 
-            # Print enhanced error information
-            if exception_raised:
-                error_output = format_error(
-                    step_name=step.name,
-                    journey_name=journey_name,
-                    error=exception_raised,
-                    request=request,
-                    response=response,
-                    verbose=self.debug_logger is not None,
-                )
-                print(error_output)
+            # Always print request/response details on failure (TD-004)
+            error_output = self._format_step_failure(
+                step_name=step.name,
+                error=error or "Unknown error",
+                request=request,
+                response=response,
+            )
+            print(error_output)
         else:
             if self.output:
                 self.output.step_pass(step.name, duration_ms)
