@@ -1,4 +1,29 @@
-"""CLI commands for VenomQA."""
+"""CLI commands for VenomQA.
+
+VenomQA CLI provides a comprehensive interface for:
+- Running test journeys and exploring state graphs
+- Managing test infrastructure with Docker
+- Diagnosing issues with doctor command
+- Running smoke tests for API validation
+
+Exit Codes:
+    0 (EXIT_SUCCESS): All operations completed successfully
+    1 (EXIT_FAILURE): Tests failed or operation error
+    2 (EXIT_CONFIG_ERROR): Configuration validation error
+
+Environment Variables:
+    VENOMQA_BASE_URL: Override API base URL
+    VENOMQA_PROFILE: Configuration profile (dev, staging, prod)
+    VENOMQA_VERBOSE: Enable verbose output (true/false)
+    VENOMQA_TIMEOUT: HTTP timeout in seconds
+
+Example Usage:
+    venomqa init                    # Create new project
+    venomqa run                     # Run all journeys
+    venomqa run login_flow          # Run specific journey
+    venomqa doctor                  # Check system health
+    venomqa smoke-test http://api   # Quick API health check
+"""
 
 from __future__ import annotations
 
@@ -22,9 +47,56 @@ from venomqa.errors.debug import (
 from venomqa.runner import JourneyRunner
 
 # Exit codes for CI/CD integration
-EXIT_SUCCESS = 0  # All journeys passed
-EXIT_FAILURE = 1  # Some journeys failed
-EXIT_CONFIG_ERROR = 2  # Configuration error
+# These are documented in the CLI help and used by CI systems
+EXIT_SUCCESS = 0  # All journeys passed, operation successful
+EXIT_FAILURE = 1  # Some journeys failed, tests did not pass
+EXIT_CONFIG_ERROR = 2  # Configuration validation failed
+
+
+def format_error_for_cli(error: Exception) -> str:
+    """Format an error for CLI output with helpful suggestions.
+
+    This function creates user-friendly error messages with:
+    - Clear error description
+    - Actionable suggestions when available
+    - Documentation links
+
+    Args:
+        error: The exception to format
+
+    Returns:
+        Formatted error string suitable for CLI output
+    """
+    from venomqa.errors import VenomQAError
+
+    lines = []
+
+    if isinstance(error, VenomQAError):
+        # Use the rich error formatting from VenomQAError
+        lines.append(f"Error [{error.error_code.value}]: {error.message}")
+
+        # Add location context
+        location = error.context.format_location()
+        if location != "unknown location":
+            lines.append(f"Location: {location}")
+
+        # Add suggestions
+        if error.suggestions:
+            lines.append("")
+            lines.append("What to try:")
+            for i, suggestion in enumerate(error.suggestions[:4], 1):
+                lines.append(f"  {i}. {suggestion}")
+
+        # Add documentation link
+        lines.append("")
+        lines.append(f"Documentation: {error.docs_url}")
+    else:
+        # Generic exception formatting
+        lines.append(f"Error: {error}")
+        lines.append("")
+        lines.append("For help, run: venomqa doctor")
+
+    return "\n".join(lines)
 
 VENVOMQA_YAML_TEMPLATE = """# VenomQA Configuration
 # Documentation: https://venomqa.dev/docs/configuration
