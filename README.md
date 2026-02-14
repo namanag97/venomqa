@@ -1,158 +1,122 @@
 # VenomQA
 
-**Stateful Journey Testing Framework** - Test APIs like a human QA would.
+**State-Based API Testing Framework** - Test your entire app, not just endpoints.
 
 [![PyPI version](https://badge.fury.io/py/venomqa.svg)](https://pypi.org/project/venomqa/)
 [![Python versions](https://img.shields.io/pypi/pyversions/venomqa.svg)](https://pypi.org/project/venomqa/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 ---
 
-## Why VenomQA?
+## The Problem
 
-Traditional API testing treats each request in isolation. But real users follow journeys through your application, and bugs emerge from specific state combinations.
+Every action in your app has **cascading effects**. When a user uploads a file:
+- Does it appear in the file list?
+- Does the storage usage update?
+- Does the quota remaining decrease?
+- Can search find it?
 
-**VenomQA is different:**
-
-| Problem | VenomQA Solution |
-|---------|------------------|
-| Manually tracking IDs between requests | **Context-aware testing** - IDs flow automatically |
-| Writing separate tests for each path | **State chain exploration** - discover all API paths |
-| Isolated endpoint testing | **Real journeys** - test complete user flows |
-| Missing edge cases | **Smart issue detection** - catches calculation bugs, data inconsistencies |
+Traditional API testing checks endpoints in isolation. **VenomQA tests like a human QA** - verifying consistency across your entire application after every action.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Install
 pip install venomqa
+```
 
-# Initialize project
-venomqa init my-project
-cd my-project
+```python
+from venomqa import Client, StateGraph
 
-# Run preflight checks
-venomqa preflight
+# Define your app as a state graph
+graph = StateGraph(name="my_app")
 
-# Run tests
-venomqa run
+# Add states (nodes)
+graph.add_node("empty", initial=True)
+graph.add_node("has_data")
+
+# Add transitions (edges)
+graph.add_edge("empty", "has_data", action=create_item, name="create")
+graph.add_edge("has_data", "empty", action=delete_item, name="delete")
+
+# Add invariants (rules that must ALWAYS be true)
+graph.add_invariant(
+    "count_matches",
+    check=lambda client, db, ctx: api_count == db_count,
+    description="API count must match database"
+)
+
+# Explore ALL paths and verify invariants
+client = Client(base_url="http://localhost:8000")
+result = graph.explore(client)
+
+print(result.summary())
+# Paths explored: 18
+# Invariant violations: 0
+# ALL PATHS PASSED
 ```
 
 ---
 
-## Example Journey
+## Key Features
+
+### State Graph Testing
+Model your app as states and transitions. VenomQA explores **all possible paths** automatically.
+
+```
+┌─────────┐  create   ┌──────────┐  complete  ┌───────────┐
+│  empty  │──────────▶│ has_data │───────────▶│ completed │
+└─────────┘           └──────────┘            └───────────┘
+     ▲                      │                       │
+     └──────── delete ──────┴───────────────────────┘
+```
+
+### Invariants
+Define rules that must hold after **every** action:
 
 ```python
-from venomqa import Journey, Step
+graph.add_invariant("usage_accurate",
+    check=lambda c, db, ctx: ctx["api_usage"] == ctx["db_usage"],
+    description="Storage usage must be accurate")
+```
 
-def create_cart(client, context):
-    response = client.post("/api/cart")
-    context["cart_id"] = response.json()["id"]
-    return response
+### Journey Testing
+Chain steps together with automatic context flow:
 
-def add_item(client, context):
-    return client.post(f"/api/cart/{context['cart_id']}/items", json={
-        "product_id": 123,
-        "quantity": 2
-    })
-
-def checkout(client, context):
-    response = client.post(f"/api/cart/{context['cart_id']}/checkout")
-    context["order_id"] = response.json()["order_id"]
-    return response
-
-def verify_order(client, context):
-    return client.get(f"/api/orders/{context['order_id']}")
-
+```python
 journey = Journey(
-    name="checkout_flow",
-    description="Complete checkout with automatic ID chaining",
+    name="checkout",
     steps=[
-        Step("create_cart", create_cart),       # Returns cart_id
-        Step("add_item", add_item),             # Uses cart_id
-        Step("checkout", checkout),             # Uses cart_id, returns order_id
-        Step("verify_order", verify_order),     # Uses order_id
+        Step("create_cart", create_cart),      # stores cart_id
+        Step("add_item", add_item),            # uses cart_id
+        Step("checkout", checkout),            # uses cart_id, stores order_id
+        Step("verify", verify_order),          # uses order_id
     ]
 )
 ```
 
-**Key insight:** Context flows between steps automatically. No manual ID tracking.
-
----
-
-## State Chain Exploration
-
-Test multiple paths from a single checkpoint:
+### Cross-Feature Consistency
+Test that changes in one feature reflect correctly everywhere:
 
 ```python
-from venomqa import Journey, Step, Checkpoint, Branch, Path
-
-journey = Journey(
-    name="payment_methods",
-    steps=[
-        Step("login", login),
-        Step("add_to_cart", add_to_cart),
-        Checkpoint("ready_to_pay"),  # Save database state
-        Branch(
-            checkpoint_name="ready_to_pay",
-            paths=[
-                Path("credit_card", [Step("pay_card", pay_card)]),
-                Path("paypal", [Step("pay_paypal", pay_paypal)]),
-                Path("crypto", [Step("pay_crypto", pay_crypto)]),
-            ]
-        ),
-    ]
-)
+# After file upload, verify:
+# - File appears in listing
+# - Usage increased
+# - Quota decreased
+# - Search can find it
 ```
 
-Each payment path runs from the same database state. No flaky tests from inconsistent data.
-
 ---
 
-## Features
-
-### Core Testing
-- **Stateful journeys** with automatic context passing
-- **State chain exploration** with checkpoints and branches
-- **Smart assertions** that catch data inconsistencies
-
-### Integration
-- **OpenAPI spec parsing** for automatic endpoint discovery
-- **GraphQL support** with query/mutation testing
-- **gRPC support** for microservices
-
-### Infrastructure
-- **Docker Compose integration** for test environments
-- **Multiple database backends** (PostgreSQL, MySQL, SQLite)
-- **Redis, S3, and queue adapters**
-
-### Reporting
-- **HTML reports** with visual test results
-- **JSON output** for CI/CD integration
-- **JUnit XML** for Jenkins/GitHub Actions
-- **Slack/Discord notifications**
-
-### Performance
-- **Load testing** capabilities
-- **Security scanning** integration
-- **Parallel execution** support
-
----
-
-## Installation Options
+## Installation
 
 ```bash
-# Basic installation
+# Basic
 pip install venomqa
 
-# With PostgreSQL state management
+# With PostgreSQL
 pip install "venomqa[postgres]"
-
-# With Redis adapters
-pip install "venomqa[redis]"
 
 # With all features
 pip install "venomqa[all]"
@@ -162,138 +126,95 @@ pip install "venomqa[all]"
 
 ---
 
-## CLI Commands
+## Examples
 
-```bash
-# Initialize new project
-venomqa init
+### Test a REST API
 
-# Run all journeys
-venomqa run
+```python
+from venomqa import Client, StateGraph
 
-# Run specific journey
-venomqa run checkout_flow
+graph = StateGraph(name="todo_api")
+graph.add_node("empty", initial=True)
+graph.add_node("has_todos")
 
-# Run with verbose output
-venomqa run --verbose
+def create_todo(client, ctx):
+    resp = client.post("/todos", json={"title": "Test"})
+    ctx["todo_id"] = resp.json()["id"]
+    return resp
 
-# List available journeys
-venomqa list
+def delete_todo(client, ctx):
+    return client.delete(f"/todos/{ctx['todo_id']}")
 
-# Validate configuration
-venomqa validate
+graph.add_edge("empty", "has_todos", action=create_todo)
+graph.add_edge("has_todos", "empty", action=delete_todo)
 
-# Generate reports
-venomqa report --format html --output reports/
+graph.add_invariant("api_matches_db", check_api_db_consistency)
+
+result = graph.explore(Client(base_url="http://localhost:8000"))
+```
+
+### Test Multiple User Paths
+
+```python
+# User can: view posts, view todos, view albums
+# From posts: select post, view comments
+# From todos: select todo, mark complete
+# VenomQA explores ALL combinations
+
+graph.add_node("start", initial=True)
+graph.add_node("viewing_posts")
+graph.add_node("viewing_todos")
+graph.add_node("viewing_comments")
+
+graph.add_edge("start", "viewing_posts", action=view_posts)
+graph.add_edge("start", "viewing_todos", action=view_todos)
+graph.add_edge("viewing_posts", "viewing_comments", action=select_post)
+# ... etc
+
+result = graph.explore(client, max_depth=5)
+# Explores all paths up to depth 5
 ```
 
 ---
 
-## Configuration
-
-Create `venomqa.yaml` in your project:
-
-```yaml
-base_url: "http://localhost:8000"
-db_url: "postgresql://qa:secret@localhost:5432/qa_test"
-db_backend: "postgresql"
-timeout: 30
-retry_count: 3
-
-report_formats:
-  - html
-  - junit
-```
-
-Override with environment variables:
+## CLI
 
 ```bash
-export VENOMQA_BASE_URL="http://api.staging.example.com"
-export VENOMQA_VERBOSE=true
+venomqa init           # Create new project
+venomqa run            # Run all tests
+venomqa run --verbose  # With detailed output
+venomqa list           # List journeys
+venomqa validate       # Check configuration
 ```
+
+---
+
+## Reporting
+
+- **HTML** - Visual reports with diagrams
+- **JSON** - For CI/CD pipelines
+- **JUnit XML** - For Jenkins/GitHub Actions
+- **Slack/Discord** - Notifications
 
 ---
 
 ## Documentation
 
-### Getting Started
-- [Quick Start Guide](docs/QUICKSTART.md) - Get running in 5 minutes
-- [Getting Started](docs/getting-started.md) - Full installation and setup
-- [Your First Journey](docs/tutorials/first-journey.md) - Step-by-step tutorial
-
-### Core Concepts
-- [Journeys](docs/journeys.md) - Writing effective test journeys
-- [State Explorer](docs/STATE_CHAIN_SPEC.md) - State chain exploration deep dive
-- [Branching](docs/concepts/branching.md) - Testing multiple paths
-
-### Reference
-- [CLI Reference](docs/cli.md) - All CLI commands and options
-- [API Reference](docs/api.md) - Complete API documentation
-- [Configuration](docs/reference/config.md) - All configuration options
-
-### Advanced
-- [Ports and Adapters](docs/ports.md) - Clean architecture patterns
-- [Custom Reporters](docs/advanced/custom-reporters.md) - Build your own reporters
-- [CI/CD Integration](docs/ci-cd.md) - GitHub Actions, GitLab CI
-
-### Examples
-- [Examples Gallery](docs/examples.md) - Real-world patterns
-- [Todo App Example](examples/todo_app/) - Complete working example
-- [FastAPI Example](examples/fastapi-example/) - FastAPI integration
+- [Getting Started](docs/getting-started/)
+- [State Graph Guide](docs/specs/VISION.md)
+- [Examples](examples/)
+- [API Reference](docs/reference/)
 
 ---
 
-## Project Structure
+## Why "Venom"?
 
-```
-my-project/
-├── venomqa.yaml              # Configuration
-├── docker-compose.qa.yml     # Test infrastructure
-├── actions/
-│   ├── auth.py               # Login, logout, register
-│   └── orders.py             # Order operations
-├── journeys/
-│   ├── checkout.py           # Checkout flows
-│   └── user_management.py    # User journeys
-└── reports/                  # Generated reports
-```
-
----
-
-## Comparison
-
-| Feature | VenomQA | Postman | pytest | Playwright |
-|---------|---------|---------|--------|------------|
-| Stateful journeys | Yes | Manual | Manual | Yes |
-| State branching | Yes | No | No | No |
-| Context auto-flow | Yes | Manual | Manual | Manual |
-| Database checkpoints | Yes | No | No | No |
-| OpenAPI integration | Yes | Yes | Plugin | No |
-| Load testing | Yes | Yes | Plugin | No |
-
----
-
-## Contributing
-
-We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for details.
-
-```bash
-# Clone and setup
-git clone https://github.com/venomqa/venomqa.git
-cd venomqa
-pip install -e ".[dev]"
-pre-commit install
-
-# Run tests
-pytest
-```
+Like venom spreading through a system, VenomQA **penetrates every corner** of your application to find inconsistencies that isolated tests miss.
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE)
 
----
-
-Built by [Naman Agarwal](https://github.com/namanagarwal) and contributors.
+Built by [Naman Agarwal](https://github.com/namanagarwal)
