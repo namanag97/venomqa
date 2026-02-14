@@ -67,6 +67,7 @@ nav:
     - Configuration: getting-started/configuration.md
   - Concepts:
     - concepts/index.md
+    - The Theory: concepts/theory.md
     - Journeys: concepts/journeys.md
     - Checkpoints & Branching: concepts/branching.md
     - State Management: concepts/state.md
