@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from venomqa.clients.base import ValidationError
+from venomqa.http.base import ValidationError
 from venomqa.errors import ConnectionError, RequestTimeoutError
 
 logger = logging.getLogger(__name__)
