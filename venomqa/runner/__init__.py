@@ -45,7 +45,7 @@ from venomqa.errors.retry import (
 )
 
 if TYPE_CHECKING:
-    from venomqa.client import Client
+    from venomqa.http import Client
     from venomqa.performance import ResponseCache
     from venomqa.performance.pool import ConnectionPool
     from venomqa.state import StateManager
