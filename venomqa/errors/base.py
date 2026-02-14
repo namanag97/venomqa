@@ -378,24 +378,49 @@ class ConnectionResetError(ConnectionError):
 
 
 class TimeoutError(VenomQAError):
-    """Operation timed out."""
+    """Operation timed out.
+
+    A generic timeout occurred during an operation. For HTTP-specific
+    timeouts, see RequestTimeoutError.
+    """
 
     error_code = ErrorCode.REQUEST_TIMEOUT
     default_message = "Operation timed out"
+    default_suggestions = [
+        "Increase the timeout value in venomqa.yaml",
+        "Check if the operation is expected to take this long",
+        "Consider breaking long operations into smaller steps",
+    ]
+    docs_path = "errors/timeouts"
 
 
 class RequestTimeoutError(TimeoutError):
-    """HTTP request timed out."""
+    """HTTP request timed out waiting for response.
+
+    The server did not respond within the configured timeout period.
+    This can indicate slow API endpoints or network issues.
+    """
 
     error_code = ErrorCode.REQUEST_TIMEOUT
     default_message = "HTTP request timed out"
+    default_suggestions = [
+        "Increase timeout in venomqa.yaml (e.g., timeout: 60)",
+        "Check if this endpoint is known to be slow",
+        "Add step-specific timeout: Step(name='slow_op', timeout=120)",
+        "Profile the endpoint to identify performance issues",
+    ]
 
 
 class RequestFailedError(VenomQAError):
-    """HTTP request failed."""
+    """HTTP request returned an error status code.
+
+    The server responded but indicated an error condition.
+    Check the status_code attribute for the specific HTTP status.
+    """
 
     error_code = ErrorCode.REQUEST_FAILED
     default_message = "HTTP request failed"
+    docs_path = "errors/http"
 
     def __init__(
         self,
@@ -404,7 +429,61 @@ class RequestFailedError(VenomQAError):
         **kwargs: Any,
     ) -> None:
         self.status_code = status_code
+        # Generate suggestions based on status code
+        if status_code:
+            kwargs.setdefault("suggestions", self._suggestions_for_status(status_code))
         super().__init__(message=message, **kwargs)
+
+    def _suggestions_for_status(self, status_code: int) -> list[str]:
+        """Generate suggestions based on HTTP status code."""
+        if status_code == 400:
+            return [
+                "Check request body/parameters match API specification",
+                "Validate JSON payload format",
+                "Review API documentation for required fields",
+            ]
+        elif status_code == 401:
+            return [
+                "Verify authentication token is valid and not expired",
+                "Check auth configuration in venomqa.yaml",
+                "Ensure login step runs before authenticated endpoints",
+            ]
+        elif status_code == 403:
+            return [
+                "Check user has required permissions for this endpoint",
+                "Verify API key/token has correct scopes",
+                "Review authorization rules in your application",
+            ]
+        elif status_code == 404:
+            return [
+                "Verify the endpoint URL is correct",
+                "Check if the resource exists (was it created in a prior step?)",
+                "Review base_url configuration",
+            ]
+        elif status_code == 422:
+            return [
+                "Check request validation errors in response body",
+                "Verify data types match expected schema",
+                "Review API documentation for field constraints",
+            ]
+        elif status_code == 429:
+            return [
+                "Add rate limiting handling with backoff",
+                "Reduce request frequency in your journey",
+                "Check 'retry_after' header for wait time",
+            ]
+        elif 500 <= status_code < 600:
+            return [
+                "Check server logs for error details",
+                "This is a server-side error - investigate your API",
+                "Capture logs with capture_logs: true in config",
+            ]
+        else:
+            return [
+                f"Received HTTP {status_code} response",
+                "Check response body for error details",
+                "Review API documentation for this endpoint",
+            ]
 
     def to_dict(self) -> dict[str, Any]:
         result = super().to_dict()
