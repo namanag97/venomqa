@@ -209,22 +209,34 @@ def run_demo_journey(base_url: str) -> dict[str, Any]:
 @click.option("--port", "-p", default=8000, help="Port for demo server (default: 8000)")
 @click.option("--server-only", is_flag=True, help="Only start the server, don't run journey")
 @click.option("--keep-running", "-k", is_flag=True, help="Keep server running after journey")
-def demo(port: int, server_only: bool, keep_running: bool) -> None:
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed step output")
+@click.option("--explain", "-e", is_flag=True, help="Explain each step as it runs")
+def demo(port: int, server_only: bool, keep_running: bool, verbose: bool, explain: bool) -> None:
     """Run a quick demo to see VenomQA in action.
 
-    This command:
-    1. Starts a built-in demo API server
-    2. Runs an example journey (CRUD operations)
-    3. Shows the results
+    The demo runs a complete CRUD journey against a built-in mock API:
 
-    No configuration needed - just run it!
+    \b
+    1. Health Check    - Verify API is responding
+    2. List Items      - GET /items (empty list)
+    3. Create Item     - POST /items with JSON body
+    4. Get Item        - GET /items/{id}
+    5. Update Item     - PUT /items/{id}
+    6. Delete Item     - DELETE /items/{id}
+    7. Verify Deleted  - GET /items/{id} (expect 404)
+
+    No configuration file needed - this works out of the box!
 
     \b
     Examples:
         venomqa demo                    # Run full demo
+        venomqa demo --explain          # Show what each step does
         venomqa demo --server-only      # Just start the server
         venomqa demo --keep-running     # Keep server after demo
         venomqa demo --port 9000        # Use different port
+
+    After running the demo, create your own project with:
+        venomqa init --with-sample
     """
     from rich.console import Console
     from rich.panel import Panel
