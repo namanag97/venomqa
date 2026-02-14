@@ -220,6 +220,53 @@ result = graph.explore(client, max_depth=5)
 
 ---
 
+## Preflight Smoke Tests
+
+Before running a full test suite, validate that your API is functional:
+
+```bash
+# Quick check
+venomqa smoke-test http://localhost:8000 --token $API_TOKEN
+
+# With configuration file
+venomqa smoke-test --config preflight.yaml
+```
+
+**Output:**
+```
+VenomQA Preflight Smoke Test
+==================================================
+  [PASS] Health check 200 (42ms)
+  [PASS] Auth check 200 (18ms)
+  [PASS] Create resource 201 (35ms)
+  [PASS] List resources 200 (22ms)
+
+All 4 checks passed. API is ready for testing. (117ms)
+```
+
+**Configure via YAML:**
+```yaml
+# preflight.yaml
+base_url: "${API_URL:http://localhost:8000}"
+
+auth:
+  token_env_var: "API_TOKEN"
+
+health_checks:
+  - path: /health
+    expected_json: { status: "healthy" }
+
+crud_checks:
+  - path: /api/v1/items
+    payload: { name: "Test ${RANDOM}" }
+```
+
+Supports environment variable substitution (`${VAR}`, `${VAR:default}`), special placeholders (`${RANDOM}`, `${UUID}`, `${TIMESTAMP}`), and multiple check types.
+
+See [Preflight Configuration](docs/preflight-configuration.md) for full documentation.
+
+---
+
 ## CLI
 
 ```bash
@@ -228,6 +275,7 @@ venomqa run            # Run all tests
 venomqa run --verbose  # With detailed output
 venomqa list           # List journeys
 venomqa validate       # Check configuration
+venomqa smoke-test     # Run preflight checks
 ```
 
 ---
