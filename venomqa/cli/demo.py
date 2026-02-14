@@ -312,24 +312,45 @@ def demo(port: int, server_only: bool, keep_running: bool, verbose: bool, explai
     base_url = f"http://127.0.0.1:{port}"
     results = run_demo_journey(base_url)
 
+    # Step explanations for explain mode
+    step_explanations = {
+        "health_check": "Calls GET /health to verify API is responding. Stores health status in context.",
+        "list_items": "Calls GET /items to list existing items. Should return empty array initially.",
+        "create_item": "Calls POST /items with JSON body. Stores created item ID in context['item_id'].",
+        "get_item": "Calls GET /items/{id} using context['item_id']. Verifies item was created.",
+        "update_item": "Calls PUT /items/{id} to modify the item. Updates name and price.",
+        "delete_item": "Calls DELETE /items/{id} to remove the item.",
+        "verify_deleted": "Calls GET /items/{id} expecting 404. Uses expect_failure=True.",
+    }
+
     # Display results
-    table = Table(
-        title="Demo Journey Results",
-        box=box.ROUNDED,
-        show_header=True,
-        header_style="bold cyan",
-    )
-    table.add_column("Step", style="white")
-    table.add_column("Status", justify="center")
-    table.add_column("Duration", justify="right")
+    if explain:
+        console.print("[bold]Step-by-Step Results:[/bold]")
+        console.print()
+        for i, step in enumerate(results["steps"], 1):
+            status_icon = "[green]✓[/green]" if step["success"] else "[red]✗[/red]"
+            console.print(f"  {status_icon} [bold]Step {i}:[/bold] {step['name']} ({step['duration_ms']:.0f}ms)")
+            if step["name"] in step_explanations:
+                console.print(f"     [dim]{step_explanations[step['name']]}[/dim]")
+            console.print()
+    else:
+        table = Table(
+            title="Demo Journey Results",
+            box=box.ROUNDED,
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("Step", style="white")
+        table.add_column("Status", justify="center")
+        table.add_column("Duration", justify="right")
 
-    for step in results["steps"]:
-        status = "[green]PASS[/green]" if step["success"] else "[red]FAIL[/red]"
-        duration = f"{step['duration_ms']:.0f}ms"
-        table.add_row(step["name"], status, duration)
+        for step in results["steps"]:
+            status = "[green]PASS[/green]" if step["success"] else "[red]FAIL[/red]"
+            duration = f"{step['duration_ms']:.0f}ms"
+            table.add_row(step["name"], status, duration)
 
-    console.print(table)
-    console.print()
+        console.print(table)
+        console.print()
 
     # Summary
     passed = sum(1 for s in results["steps"] if s["success"])
