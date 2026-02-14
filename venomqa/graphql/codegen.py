@@ -313,7 +313,7 @@ class ActionGenerator:
             "",
             "from typing import Any",
             "",
-            "from venomqa.clients.graphql import GraphQLClient, GraphQLResponse",
+            "from venomqa.http.graphql import GraphQLClient, GraphQLResponse",
             "from venomqa.graphql import query, mutation, subscription",
             "",
             "",
