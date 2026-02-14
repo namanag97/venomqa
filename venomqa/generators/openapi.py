@@ -958,7 +958,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from venomqa.client import Client
+    from venomqa.http import Client
     from venomqa.core.context import ExecutionContext as Context
     from httpx import Response
 
