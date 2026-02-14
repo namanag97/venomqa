@@ -3,7 +3,7 @@
 Reusable login and session management actions.
 """
 
-from venomqa.client import Client
+from venomqa.http import Client
 
 
 class LoginActions:
