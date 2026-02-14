@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from venomqa.client import Client
+from venomqa.http import Client
 from venomqa.core.models import (
     Branch,
     Checkpoint,
