@@ -463,36 +463,75 @@ def get_version() -> str:
         return "VenomQA (version unknown)"
 
 
-@click.group(invoke_without_command=True)
-@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
-@click.option("--config", "-c", type=click.Path(exists=True), help="Path to config file")
+EPILOG = """
+Examples:
+  venomqa init                    Create a new VenomQA project
+  venomqa run                     Run all test journeys
+  venomqa run checkout_flow       Run specific journey
+  venomqa run --debug             Run with detailed logging
+  venomqa run --fail-fast         Stop on first failure
+  venomqa doctor                  Check system dependencies
+  venomqa smoke-test URL          Quick API health check
+
+Exit Codes:
+  0  All tests passed / operation successful
+  1  One or more tests failed
+  2  Configuration error (check venomqa.yaml)
+
+Environment:
+  VENOMQA_BASE_URL    Override base URL
+  VENOMQA_PROFILE     Use config profile (dev/staging/prod)
+  VENOMQA_VERBOSE     Enable verbose output
+  VENOMQA_TIMEOUT     HTTP timeout in seconds
+
+Documentation: https://venomqa.dev/docs
+"""
+
+
+@click.group(invoke_without_command=True, epilog=EPILOG)
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output with detailed logging")
+@click.option("--config", "-c", type=click.Path(exists=True), help="Path to config file (default: venomqa.yaml)")
+@click.option("--profile", "-p", type=str, help="Configuration profile to use (dev, staging, prod)")
 @click.version_option(version=None, prog_name="VenomQA", message=get_version())
 @click.pass_context
-def cli(ctx: click.Context, verbose: bool, config: str | None) -> None:
-    """VenomQA - Stateful Journey QA Framework.
+def cli(ctx: click.Context, verbose: bool, config: str | None, profile: str | None) -> None:
+    """VenomQA - Enterprise-Grade Stateful API Testing Framework.
 
-    Exit codes:
-        0 - All journeys passed
-        1 - Some journeys failed
-        2 - Configuration error
+    VenomQA enables comprehensive API testing with state management,
+    branching execution paths, and automatic issue detection.
+
+    \b
+    Quick Start:
+      1. venomqa init          Create project structure
+      2. Edit venomqa.yaml     Configure your API URL
+      3. venomqa run           Execute test journeys
+
+    Run 'venomqa COMMAND --help' for command-specific help.
     """
     ctx.ensure_object(dict)
 
     # Don't load config for commands that don't need it
-    if ctx.invoked_subcommand in ("init", "doctor", "smoke-test"):
+    if ctx.invoked_subcommand in ("init", "doctor", "smoke-test", "demo"):
         ctx.obj["verbose"] = verbose
         setup_logging(verbose)
         return
 
+    # Show help if no command given
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+        return
+
     try:
-        config_obj = load_config(config)
+        config_obj = load_config(config, profile=profile)
     except (ConfigLoadError, ConfigValidationError) as e:
-        click.echo(f"Configuration error: {e}", err=True)
-        if hasattr(e, "details") and e.details:
-            if "suggestions" in e.details:
-                click.echo("\nSuggestions:", err=True)
-                for suggestion in e.details["suggestions"]:
-                    click.echo(f"  - {suggestion}", err=True)
+        # Use the new error formatter for better CLI output
+        click.echo(format_error_for_cli(e), err=True)
+
+        # Additional config-specific help
+        click.echo("\nQuick fixes:", err=True)
+        click.echo("  - Run 'venomqa validate' to check your configuration", err=True)
+        click.echo("  - Run 'venomqa init' to create a new config file", err=True)
+
         sys.exit(EXIT_CONFIG_ERROR)
 
     if verbose:
@@ -500,6 +539,7 @@ def cli(ctx: click.Context, verbose: bool, config: str | None) -> None:
 
     ctx.obj["config"] = config_obj
     ctx.obj["verbose"] = verbose
+    ctx.obj["profile"] = profile
 
     setup_logging(verbose)
 
