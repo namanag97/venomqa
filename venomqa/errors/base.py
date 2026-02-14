@@ -492,56 +492,124 @@ class RequestFailedError(VenomQAError):
 
 
 class ValidationError(VenomQAError):
-    """Validation failed."""
+    """Validation failed.
+
+    A validation check failed for configuration, journey definition,
+    or response schema. Check the 'field' and 'value' attributes
+    for specific details about what failed validation.
+    """
 
     error_code = ErrorCode.VALIDATION_FAILED
     default_message = "Validation failed"
     recoverable = False
+    default_suggestions = [
+        "Check the field name and value mentioned in the error",
+        "Run 'venomqa validate' to check configuration",
+        "Review the expected schema/format in documentation",
+    ]
+    docs_path = "errors/validation"
 
     def __init__(
         self,
         message: str | None = None,
         field: str | None = None,
         value: Any = None,
+        expected: str | None = None,
         **kwargs: Any,
     ) -> None:
         self.field = field
         self.value = value
+        self.expected = expected
         super().__init__(message=message, **kwargs)
+
+    def __str__(self) -> str:
+        base = super().__str__()
+        if self.field:
+            base = f"{base} (field: {self.field})"
+        return base
 
     def to_dict(self) -> dict[str, Any]:
         result = super().to_dict()
         result["field"] = self.field
         result["value"] = repr(self.value)
+        if self.expected:
+            result["expected"] = self.expected
         return result
 
 
 class ConfigValidationError(ValidationError):
-    """Configuration validation failed."""
+    """Configuration validation failed.
+
+    The venomqa.yaml configuration file contains invalid values.
+    Run 'venomqa validate' to see detailed validation errors.
+    """
 
     error_code = ErrorCode.INVALID_CONFIG
     default_message = "Invalid configuration"
+    default_suggestions = [
+        "Run 'venomqa validate' for detailed config errors",
+        "Check venomqa.yaml syntax with a YAML linter",
+        "Compare with example config: venomqa init --show-example",
+        "Review configuration reference: venomqa.dev/docs/configuration",
+    ]
+    docs_path = "configuration"
 
 
 class JourneyValidationError(ValidationError):
-    """Journey validation failed."""
+    """Journey validation failed.
+
+    The journey definition contains errors. Common issues:
+    - Missing required fields (name, steps)
+    - Invalid step references
+    - Checkpoint name conflicts
+    """
 
     error_code = ErrorCode.INVALID_JOURNEY
     default_message = "Invalid journey definition"
+    default_suggestions = [
+        "Ensure journey has 'name' and 'steps' defined",
+        "Check all step actions are callable or valid plugin references",
+        "Verify checkpoint names are unique within the journey",
+        "Run 'venomqa list --validate' to check all journeys",
+    ]
+    docs_path = "concepts/journeys"
 
 
 class StepValidationError(ValidationError):
-    """Step validation failed."""
+    """Step validation failed.
+
+    The step definition is invalid. Steps require at minimum:
+    - name: Unique identifier for the step
+    - action: Callable or plugin reference
+    """
 
     error_code = ErrorCode.INVALID_STEP
     default_message = "Invalid step definition"
+    default_suggestions = [
+        "Ensure step has 'name' and 'action' defined",
+        "Verify action is callable: def action(client, context): ...",
+        "Check action signature matches (client, context, **args)",
+        "If using plugin action, verify plugin is registered",
+    ]
+    docs_path = "concepts/steps"
 
 
 class SchemaMismatchError(ValidationError):
-    """Response schema mismatch."""
+    """Response schema mismatch.
+
+    The API response does not match the expected schema.
+    This could indicate API changes or incorrect expectations.
+    """
 
     error_code = ErrorCode.SCHEMA_MISMATCH
     default_message = "Response does not match expected schema"
+    default_suggestions = [
+        "Compare actual response with expected schema",
+        "Check if API has been updated/changed",
+        "Update your assertions to match current API behavior",
+        "Use 'venomqa run --verbose' to see full response",
+    ]
+    docs_path = "assertions/schema"
 
 
 class StateError(VenomQAError):
