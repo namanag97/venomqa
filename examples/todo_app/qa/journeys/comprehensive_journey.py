@@ -1,14 +1,8 @@
 """Comprehensive journey - tests all states and combined flows."""
 
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
 from venomqa import Journey, Step, Checkpoint, Branch, Path
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "actions"))
-from todo_actions import (
+from ..actions import (
     create_todo,
     get_todo,
     list_todos,
