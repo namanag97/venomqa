@@ -257,7 +257,12 @@ __all__ = [
     "wait_all",
     "wait_any",
     "wait_for_retry_success",
-    # Assertion tools
+    # Assertion tools (protocol-agnostic)
+    "assert_status",
+    "assert_json_path_generic",
+    "assert_header_generic",
+    "assert_schema",
+    # Assertion tools (httpx-specific)
     "assert_status_code",
     "assert_status_ok",
     "assert_status_created",
