@@ -10,7 +10,7 @@ sys.path.insert(0, '.')
 
 from venomqa import Client, Journey, Step, Checkpoint, Branch, Path
 from venomqa.runner import JourneyRunner
-from venomqa.state import InMemoryStateManager
+from venomqa.state import InInMemoryStateManager
 
 BASE_URL = "http://localhost:5001"
 
@@ -88,9 +88,9 @@ def test_db_state_rollback_without_state_manager():
 
 
 def test_db_state_rollback_with_memory_manager():
-    """Test with MemoryStateManager (not a real DB state manager)."""
+    """Test with InMemoryStateManager (not a real DB state manager)."""
     print("\n" + "="*60)
-    print("TEST B: Branch paths WITH MemoryStateManager")
+    print("TEST B: Branch paths WITH InMemoryStateManager")
     print("="*60)
     print("Note: Memory state manager only manages in-memory context,")
     print("      NOT actual database state.")
@@ -136,7 +136,7 @@ def test_db_state_rollback_with_memory_manager():
     )
 
     client = Client(base_url=BASE_URL)
-    state_manager = MemoryStateManager("memory://test")
+    state_manager = InMemoryStateManager("memory://test")
     runner = JourneyRunner(client=client, state_manager=state_manager)
     result = runner.run(journey)
 
@@ -239,7 +239,7 @@ VenomQA's checkpoint/rollback behavior:
 1. WITHOUT state_manager: Context snapshot is restored between paths,
    but DATABASE STATE IS NOT ROLLED BACK.
 
-2. WITH MemoryStateManager: Same as above - only context is restored.
+2. WITH InMemoryStateManager: Same as above - only context is restored.
 
 3. WITH PostgreSQLStateManager: Creates SAVEPOINTs in a separate
    connection, which CANNOT roll back changes made by the app's
