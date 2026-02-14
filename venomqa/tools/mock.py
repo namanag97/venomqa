@@ -25,7 +25,7 @@ import httpx
 from venomqa.errors import VenomQAError
 
 if TYPE_CHECKING:
-    from venomqa.client import Client
+    from venomqa.http import Client
     from venomqa.state.context import Context
 
 
