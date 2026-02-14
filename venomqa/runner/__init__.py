@@ -221,6 +221,11 @@ class JourneyRunner:
         if self.state_manager:
             self.state_manager.checkpoint(checkpoint.name)
             logger.debug(f"Created checkpoint: {checkpoint.name}")
+        else:
+            logger.warning(
+                f"Checkpoint '{checkpoint.name}' created but no StateManager configured. "
+                "Checkpoint/rollback will not work. Configure a StateManager or remove checkpoints."
+            )
         if self.output:
             self.output.checkpoint(checkpoint.name)
 
