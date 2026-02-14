@@ -613,39 +613,95 @@ class SchemaMismatchError(ValidationError):
 
 
 class StateError(VenomQAError):
-    """State management error."""
+    """State management error.
+
+    Errors related to database state management, checkpoints, and rollbacks.
+    State management requires a connected database backend.
+    """
 
     error_code = ErrorCode.STATE_NOT_CONNECTED
     default_message = "State management error"
+    default_suggestions = [
+        "Ensure db_url is configured in venomqa.yaml",
+        "Verify database is running and accessible",
+        "Check database credentials are correct",
+    ]
+    docs_path = "concepts/state-management"
 
 
 class StateNotConnectedError(StateError):
-    """State manager not connected."""
+    """State manager not connected to database.
+
+    The state manager needs to connect to a database before
+    performing checkpoint/rollback operations.
+    """
 
     error_code = ErrorCode.STATE_NOT_CONNECTED
     default_message = "State manager not connected. Call connect() first."
     recoverable = True
+    default_suggestions = [
+        "Add db_url to venomqa.yaml: db_url: postgresql://...",
+        "Or use environment variable: VENOMQA_DB_URL=postgresql://...",
+        "Verify database is running: docker compose up -d db",
+        "Run 'venomqa doctor' to check database connectivity",
+    ]
 
 
 class CheckpointError(StateError):
-    """Checkpoint operation failed."""
+    """Failed to create or access a checkpoint.
+
+    Checkpoints save database state for later rollback.
+    This error can occur if:
+    - Database connection lost
+    - Insufficient database permissions
+    - Transaction conflict
+    """
 
     error_code = ErrorCode.STATE_CHECKPOINT_FAILED
     default_message = "Checkpoint operation failed"
+    default_suggestions = [
+        "Check database connection is still active",
+        "Verify user has permission to create savepoints",
+        "Review database logs for transaction errors",
+        "Consider using transactional tests for faster checkpoints",
+    ]
+    docs_path = "concepts/checkpoints"
 
 
 class RollbackError(StateError):
-    """Rollback operation failed."""
+    """Failed to rollback to a checkpoint.
+
+    Rollback restores database state to a previous checkpoint.
+    This error can occur if:
+    - Checkpoint no longer exists
+    - Database connection lost
+    - Conflicting transactions
+    """
 
     error_code = ErrorCode.STATE_ROLLBACK_FAILED
     default_message = "Rollback operation failed"
+    default_suggestions = [
+        "Verify the checkpoint was created successfully",
+        "Check no conflicting transactions are active",
+        "Consider shorter transaction spans",
+        "Review PostgreSQL savepoint documentation",
+    ]
 
 
 class ResetError(StateError):
-    """Reset operation failed."""
+    """Failed to reset database state.
+
+    Reset clears all data and returns database to initial state.
+    This requires appropriate database permissions.
+    """
 
     error_code = ErrorCode.STATE_RESET_FAILED
     default_message = "Reset operation failed"
+    default_suggestions = [
+        "Verify user has TRUNCATE/DELETE permissions",
+        "Check for foreign key constraints blocking reset",
+        "Consider using a fresh database for each test run",
+    ]
 
 
 class JourneyError(VenomQAError):
