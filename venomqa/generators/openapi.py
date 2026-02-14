@@ -988,6 +988,316 @@ from typing import Any
 
         return "\n".join(lines) + "\n"
 
+    # ------------------------------------------------------------------
+    # Combinatorial integration: generate dimensions and transitions
+    # from OpenAPI specification for live API testing.
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_url(cls, url: str, config: GeneratorConfig | None = None) -> OpenAPIGenerator:
+        """Load an OpenAPI specification from a URL.
+
+        Downloads the spec (YAML or JSON) and creates an OpenAPIGenerator
+        instance ready for parsing and code/combinatorial generation.
+
+        Args:
+            url: HTTP(S) URL to the OpenAPI specification.
+            config: Optional generator configuration.
+
+        Returns:
+            OpenAPIGenerator instance with the spec loaded.
+
+        Raises:
+            OpenAPIParseError: If the spec cannot be downloaded or parsed.
+
+        Example:
+            >>> gen = OpenAPIGenerator.from_url("http://localhost:8000/openapi.json")
+            >>> schema = gen.load()
+            >>> print(schema.title)
+        """
+        import tempfile
+        import urllib.error
+        import urllib.request
+
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/json, application/yaml, */*"})
+            with urllib.request.urlopen(req, timeout=30) as response:
+                content = response.read().decode("utf-8")
+        except urllib.error.URLError as e:
+            raise OpenAPIParseError(f"Failed to download spec from {url}: {e}", path=url)
+
+        # Determine format from URL or content
+        suffix = ".json"
+        if url.endswith((".yaml", ".yml")) or content.lstrip().startswith(("openapi:", "swagger:", "info:")):
+            suffix = ".yaml"
+
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False, encoding="utf-8")
+        tmp.write(content)
+        tmp.close()
+
+        instance = cls(tmp.name, config=config)
+        instance.load()
+        return instance
+
+    def generate_dimensions(self) -> Any:
+        """Extract combinatorial dimensions from the OpenAPI specification.
+
+        Analyzes endpoints, HTTP methods, parameters, and authentication
+        requirements to produce a DimensionSpace suitable for combinatorial
+        test generation.
+
+        Returns:
+            DimensionSpace with dimensions derived from the spec:
+            - http_method: All HTTP methods in the spec
+            - auth_state: ["none", "valid", "invalid"] if security schemes exist
+            - content_type: Content types used in request bodies
+            - endpoint_group: Groups of endpoints (by tag)
+            - parameter_presence: ["all_required", "optional_only", "missing_required"]
+
+        Raises:
+            OpenAPIParseError: If specification is not loaded.
+
+        Example:
+            >>> gen = OpenAPIGenerator("api.yaml")
+            >>> gen.load()
+            >>> space = gen.generate_dimensions()
+            >>> print(space.dimension_names)
+        """
+        from venomqa.combinatorial.dimensions import Dimension, DimensionSpace
+
+        if self.schema is None:
+            self.load()
+
+        dimensions = []
+
+        # 1. HTTP method dimension
+        methods = sorted(set(ep.method.upper() for ep in self.schema.endpoints))
+        if methods:
+            dimensions.append(Dimension(
+                name="http_method",
+                values=methods,
+                description="HTTP method being tested",
+                default_value=methods[0],
+            ))
+
+        # 2. Auth state dimension (if security schemes are defined)
+        if self.schema.security_schemes:
+            dimensions.append(Dimension(
+                name="auth_state",
+                values=["none", "valid", "invalid"],
+                description="Authentication token state",
+                default_value="none",
+            ))
+
+        # 3. Content type dimension
+        content_types = set()
+        for ep in self.schema.endpoints:
+            if ep.request_body:
+                content_types.add(ep.request_body.content_type)
+        if not content_types:
+            content_types = {"application/json"}
+        ct_list = sorted(content_types)
+        dimensions.append(Dimension(
+            name="content_type",
+            values=ct_list,
+            description="Request content type",
+            default_value=ct_list[0],
+        ))
+
+        # 4. Endpoint group dimension (by tag)
+        tags = set()
+        for ep in self.schema.endpoints:
+            for tag in ep.tags:
+                tags.add(tag)
+        if not tags:
+            tags = {"default"}
+        tag_list = sorted(tags)
+        dimensions.append(Dimension(
+            name="endpoint_group",
+            values=tag_list,
+            description="API endpoint group (tag)",
+            default_value=tag_list[0],
+        ))
+
+        # 5. Parameter coverage dimension
+        dimensions.append(Dimension(
+            name="param_coverage",
+            values=["all_required", "optional_included", "missing_required"],
+            description="Which parameters are included in the request",
+            default_value="all_required",
+        ))
+
+        return DimensionSpace(dimensions)
+
+    def generate_transitions(self) -> list[Any]:
+        """Generate transition actions for each endpoint.
+
+        Creates TransitionAction objects that can be registered with a
+        CombinatorialGraphBuilder. Each transition represents invoking
+        an endpoint with specific parameters.
+
+        Returns:
+            List of TransitionAction objects.
+
+        Raises:
+            OpenAPIParseError: If specification is not loaded.
+
+        Example:
+            >>> gen = OpenAPIGenerator("api.yaml")
+            >>> gen.load()
+            >>> transitions = gen.generate_transitions()
+            >>> for t in transitions:
+            ...     print(t.name)
+        """
+        from venomqa.combinatorial.builder import TransitionAction, TransitionKey
+
+        if self.schema is None:
+            self.load()
+
+        transitions = []
+
+        for endpoint in self.schema.endpoints:
+            method = endpoint.method.upper()
+            func_name = self._sanitize_name(endpoint.operation_id)
+
+            # Create a transition for testing this endpoint
+            def _make_action(ep: EndpointInfo) -> Any:
+                """Create an action callable for the given endpoint."""
+                def action(client: Any, context: dict[str, Any]) -> Any:
+                    path = ep.path
+                    for param in ep.path_parameters:
+                        placeholder = f"{{{param.name}}}"
+                        value = context.get(param.name, f"test_{param.name}")
+                        path = path.replace(placeholder, str(value))
+
+                    kwargs: dict[str, Any] = {}
+                    if ep.query_parameters:
+                        params = {}
+                        for param in ep.query_parameters:
+                            if param.name in context:
+                                params[param.name] = context[param.name]
+                            elif param.default is not None:
+                                params[param.name] = param.default
+                        if params:
+                            kwargs["params"] = params
+
+                    if ep.request_body and ep.method.upper() in ("POST", "PUT", "PATCH"):
+                        body = {}
+                        props = ep.request_body.properties
+                        if ep.request_body.schema_ref and hasattr(client, "_schema"):
+                            pass  # Use schema ref if available
+                        for prop in props:
+                            if prop.name in context:
+                                body[prop.name] = context[prop.name]
+                            else:
+                                body[prop.name] = _default_for_type(prop.schema_type, prop.format)
+                        kwargs["json"] = body
+
+                    method_fn = getattr(client, ep.method.lower(), None)
+                    if method_fn is None:
+                        raise AttributeError(
+                            f"Client does not have method '{ep.method.lower()}'"
+                        )
+                    return method_fn(path, **kwargs)
+
+                action.__name__ = f"action_{ep.operation_id}"
+                action.__doc__ = f"{ep.method} {ep.path}: {ep.summary}"
+                return action
+
+            action = _make_action(endpoint)
+
+            # Create a TransitionAction (not registered to a builder yet)
+            trans = TransitionAction(
+                key=TransitionKey(
+                    dimension="http_method",
+                    from_value=method,
+                    to_value=method,
+                ),
+                action=action,
+                name=func_name,
+                description=f"{method} {endpoint.path}: {endpoint.summary}",
+            )
+            transitions.append(trans)
+
+        return transitions
+
+    def build_graph(self) -> Any:
+        """Build a complete CombinatorialGraphBuilder from the OpenAPI spec.
+
+        Combines generate_dimensions(), generate_transitions(), and
+        appropriate constraints into a ready-to-use builder.
+
+        Returns:
+            CombinatorialGraphBuilder configured from the spec.
+
+        Raises:
+            OpenAPIParseError: If specification is not loaded.
+
+        Example:
+            >>> gen = OpenAPIGenerator("api.yaml")
+            >>> gen.load()
+            >>> builder = gen.build_graph()
+            >>> graph = builder.build(strength=2)
+            >>> result = graph.explore(client)
+        """
+        from venomqa.combinatorial.builder import CombinatorialGraphBuilder
+        from venomqa.combinatorial.constraints import ConstraintSet, exclude
+
+        if self.schema is None:
+            self.load()
+
+        space = self.generate_dimensions()
+        transitions = self.generate_transitions()
+
+        # Build constraints
+        constraint_list = []
+
+        # Constraint: missing_required params should only be used with GET
+        # (POST/PUT with missing required fields is tested separately)
+        has_auth = any(d.name == "auth_state" for d in space.dimensions)
+        if has_auth:
+            constraint_list.append(exclude(
+                "no_write_without_auth",
+                auth_state="none",
+                http_method="POST",
+                description="Cannot write without authentication",
+            ))
+            constraint_list.append(exclude(
+                "no_delete_without_auth",
+                auth_state="none",
+                http_method="DELETE",
+                description="Cannot delete without authentication",
+            ))
+
+        constraints = ConstraintSet(constraint_list)
+
+        builder = CombinatorialGraphBuilder(
+            name=f"{self._sanitize_name(self.schema.title)}_combinatorial",
+            space=space,
+            constraints=constraints,
+            description=(
+                f"Combinatorial test graph generated from {self.schema.title} "
+                f"v{self.schema.version} OpenAPI specification"
+            ),
+        )
+
+        # Register transitions
+        for trans in transitions:
+            method = trans.key.from_value
+            methods = [d.values for d in space.dimensions if d.name == "http_method"]
+            if methods:
+                for from_method in methods[0]:
+                    if from_method != method:
+                        builder.register_transition(
+                            "http_method",
+                            from_method,
+                            method,
+                            action=trans.action,
+                            name=f"{trans.name}_from_{from_method.lower()}",
+                        )
+
+        return builder
+
     def _sanitize_name(self, name: str) -> str:
         """Convert a name to a valid Python identifier."""
         # Replace non-alphanumeric with underscore
