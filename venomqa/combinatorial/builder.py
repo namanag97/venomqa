@@ -352,7 +352,9 @@ class CombinatorialGraphBuilder:
             gen = CoveringArrayGenerator(
                 self.space, self.constraints, seed=self.seed
             )
-            combos = gen.generate(strength=strength)
+            # Cap strength at the number of dimensions
+            effective_strength = min(strength, len(self.space.dimensions))
+            combos = gen.generate(strength=effective_strength)
 
         if not combos:
             raise ValueError(
