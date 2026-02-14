@@ -58,6 +58,11 @@ from venomqa.combinatorial.builder import (
     TransitionAction,
     TransitionKey,
 )
+from venomqa.combinatorial.executor import (
+    CombinatorialExecutor,
+    ExecutionResult,
+    StepResult,
+)
 from venomqa.combinatorial.constraints import (
     Constraint,
     ConstraintPredicate,
