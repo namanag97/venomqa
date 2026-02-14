@@ -24,6 +24,7 @@ from venomqa.preflight.checks import (
     AuthCheck,
     BaseCheck,
     CRUDCheck,
+    CustomHTTPCheck,
     DatabaseCheck,
     HealthCheck,
     ListCheck,
