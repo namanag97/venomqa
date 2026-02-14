@@ -414,8 +414,13 @@ class SmokeTest:
     ) -> SmokeTestReport:
         """Run all standard smoke checks and return a report.
 
-        By default, runs health + auth checks. If create_path or
-        list_path are provided, those checks are included too.
+        When created via ``from_config()`` or ``from_yaml()``, runs only the
+        checks defined in the configuration (the positional arguments are
+        ignored).
+
+        When created directly, runs health + auth checks by default. If
+        ``create_path`` or ``list_path`` are provided, those checks are
+        included too.
 
         Args:
             health_path: Path for the health check.
@@ -430,25 +435,32 @@ class SmokeTest:
         self.results = []
         start = time.perf_counter()
 
-        # Always run health check
-        self.check_health(path=health_path)
+        if self._config is not None:
+            # Config-driven mode: all checks are pre-registered
+            for custom in self._custom_checks:
+                result = custom.run()
+                self.results.append(result)
+        else:
+            # Legacy mode: run default checks + any manually added custom checks
+            # Always run health check
+            self.check_health(path=health_path)
 
-        # Run auth check if token is available
-        if self.token:
-            self.check_auth(path=auth_path)
+            # Run auth check if token is available
+            if self.token:
+                self.check_auth(path=auth_path)
 
-        # Run create check if configured
-        if create_path:
-            self.check_create(path=create_path, payload=create_payload)
+            # Run create check if configured
+            if create_path:
+                self.check_create(path=create_path, payload=create_payload)
 
-        # Run list check if configured
-        if list_path:
-            self.check_list(path=list_path)
+            # Run list check if configured
+            if list_path:
+                self.check_list(path=list_path)
 
-        # Run any custom checks
-        for custom in self._custom_checks:
-            result = custom.run()
-            self.results.append(result)
+            # Run any custom checks
+            for custom in self._custom_checks:
+                result = custom.run()
+                self.results.append(result)
 
         total_duration = (time.perf_counter() - start) * 1000
 
