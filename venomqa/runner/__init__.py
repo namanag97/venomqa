@@ -115,6 +115,17 @@ class JourneyRunner:
         """Execute a complete journey with all branches."""
         logger.info(f"Starting journey: {journey.name}")
 
+        # Validate journey structure before execution
+        if hasattr(journey, 'validate'):
+            issues = journey.validate()
+            if issues:
+                logger.warning(
+                    f"Journey '{journey.name}' has validation issues: {issues}"
+                )
+                # Log each issue for visibility
+                for issue in issues:
+                    logger.warning(f"  - {issue}")
+
         started_at = datetime.now()
         self._issues = []
 
