@@ -20,7 +20,7 @@ class TestConnectionPooling:
     """Tests for HTTP connection pooling behavior."""
 
     def test_client_reuses_connection(self) -> None:
-        with patch("venomqa.client.httpx.Client") as mock_httpx_client:
+        with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -40,7 +40,7 @@ class TestConnectionPooling:
             mock_httpx_client.assert_called_once()
 
     def test_client_disconnect_closes_connection(self) -> None:
-        with patch("venomqa.client.httpx.Client") as mock_httpx_client:
+        with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
             mock_httpx_client.return_value = mock_instance
 
@@ -51,7 +51,7 @@ class TestConnectionPooling:
             mock_instance.close.assert_called_once()
 
     def test_lazy_connection_on_first_request(self) -> None:
-        with patch("venomqa.client.httpx.Client") as mock_httpx_client:
+        with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -76,7 +76,7 @@ class TestRetryMechanism:
     def test_retry_on_server_error(self, mock_client: MockClient) -> None:
         from venomqa.client import Client
 
-        with patch("venomqa.client.httpx.Client") as mock_httpx_client:
+        with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
             mock_response_fail = MagicMock()
             mock_response_fail.status_code = 500
@@ -107,7 +107,7 @@ class TestRetryMechanism:
     def test_retry_exhausted_returns_error_response(self) -> None:
         from venomqa.client import Client
 
-        with patch("venomqa.client.httpx.Client") as mock_httpx_client:
+        with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 500
@@ -127,7 +127,7 @@ class TestRetryMechanism:
     def test_no_retry_on_client_error(self) -> None:
         from venomqa.client import Client
 
-        with patch("venomqa.client.httpx.Client") as mock_httpx_client:
+        with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             mock_instance = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 404
@@ -475,3 +475,468 @@ class TestCachingBehavior:
         assert snapshot1 is not snapshot2
         assert "key2" not in snapshot1["data"]
         assert "key2" in snapshot2["data"]
+
+
+class TestConnectionPool:
+    """Tests for the generic ConnectionPool."""
+
+    def test_pool_creates_min_connections(self) -> None:
+        from venomqa.performance.pool import ConnectionPool
+
+        created_count = 0
+
+        def factory():
+            nonlocal created_count
+            created_count += 1
+            return object()
+
+        pool = ConnectionPool(factory=factory, max_size=5, min_size=2)
+        assert created_count == 2
+        pool.close()
+
+    def test_pool_acquires_and_releases(self) -> None:
+        from venomqa.performance.pool import ConnectionPool
+
+        pool = ConnectionPool(factory=lambda: object(), max_size=2, min_size=1)
+
+        with pool.acquire() as conn:
+            assert conn is not None
+            stats = pool.get_stats()
+            assert stats.active_connections == 1
+
+        stats = pool.get_stats()
+        assert stats.active_connections == 0
+        pool.close()
+
+    def test_pool_max_size_limit(self) -> None:
+        from venomqa.performance.pool import ConnectionPool
+
+        pool = ConnectionPool(factory=lambda: object(), max_size=2, min_size=1)
+
+        with pool.acquire(timeout=1.0) as conn1:
+            with pool.acquire(timeout=1.0) as conn2:
+                stats = pool.get_stats()
+                assert stats.total_connections == 2
+
+        pool.close()
+
+    def test_pool_stats_tracking(self) -> None:
+        from venomqa.performance.pool import ConnectionPool
+
+        pool = ConnectionPool(factory=lambda: {"id": id(object())}, max_size=5, min_size=1)
+
+        with pool.acquire() as conn1:
+            pass
+
+        with pool.acquire() as conn2:
+            pass
+
+        stats = pool.get_stats()
+        assert stats.checkout_count == 2
+        assert stats.checkin_count == 2
+        pool.close()
+
+    def test_pool_validation_query(self) -> None:
+        from venomqa.performance.pool import ConnectionPool
+
+        class MockConnection:
+            is_alive = True
+
+        def validate(conn):
+            return conn.is_alive
+
+        pool = ConnectionPool(
+            factory=lambda: MockConnection(),
+            max_size=2,
+            validation_query=validate,
+        )
+
+        with pool.acquire() as conn:
+            assert conn.is_alive
+
+        pool.close()
+
+    def test_pool_context_manager(self) -> None:
+        from venomqa.performance.pool import ConnectionPool
+
+        with ConnectionPool(factory=lambda: object(), max_size=2) as pool:
+            with pool.acquire() as conn:
+                assert conn is not None
+
+        stats = pool.get_stats()
+        assert stats.total_connections == 0
+
+    def test_pool_health_check(self) -> None:
+        from venomqa.performance.pool import ConnectionPool
+
+        pool = ConnectionPool(factory=lambda: object(), max_size=5, min_size=2)
+        health = pool.health_check()
+        assert health["healthy"] is True
+        assert health["closed"] is False
+        pool.close()
+
+
+class TestResponseCache:
+    """Tests for the ResponseCache."""
+
+    def test_cache_set_and_get(self) -> None:
+        from venomqa.performance.cache import ResponseCache
+
+        cache = ResponseCache(max_size=100, default_ttl=60.0)
+        cache.set("key1", {"data": "value1"})
+
+        result = cache.get("key1")
+        assert result == {"data": "value1"}
+
+    def test_cache_miss_returns_none(self) -> None:
+        from venomqa.performance.cache import ResponseCache
+
+        cache = ResponseCache()
+        result = cache.get("nonexistent")
+        assert result is None
+
+    def test_cache_lru_eviction(self) -> None:
+        from venomqa.performance.cache import ResponseCache
+
+        cache = ResponseCache(max_size=3, default_ttl=300.0)
+
+        cache.set("key1", "value1")
+        cache.set("key2", "value2")
+        cache.set("key3", "value3")
+        cache.set("key4", "value4")
+
+        assert cache.get("key1") is None
+        assert cache.get("key2") is not None
+        assert cache.get("key3") is not None
+        assert cache.get("key4") is not None
+
+    def test_cache_compute_key(self) -> None:
+        from venomqa.performance.cache import ResponseCache
+
+        cache = ResponseCache()
+
+        key1 = cache.compute_key("GET", "https://api.example.com/users")
+        key2 = cache.compute_key("GET", "https://api.example.com/users")
+        key3 = cache.compute_key("POST", "https://api.example.com/users")
+
+        assert key1 == key2
+        assert key1 != key3
+        assert len(key1) == 64
+
+    def test_cache_headers_normalized(self) -> None:
+        from venomqa.performance.cache import ResponseCache
+
+        cache = ResponseCache()
+
+        key1 = cache.compute_key(
+            "GET", "/api", headers={"Authorization": "Bearer token", "Accept": "application/json"}
+        )
+        key2 = cache.compute_key(
+            "GET",
+            "/api",
+            headers={"Authorization": "Different token", "Accept": "application/json"},
+        )
+        key3 = cache.compute_key("GET", "/api", headers={"accept": "application/json"})
+
+        assert key1 == key2
+        assert key1 == key3
+
+    def test_cache_stats(self) -> None:
+        from venomqa.performance.cache import ResponseCache
+
+        cache = ResponseCache()
+
+        cache.set("key1", "value1")
+        cache.get("key1")
+        cache.get("key1")
+        cache.get("nonexistent")
+
+        stats = cache.get_stats()
+        assert stats.hits == 2
+        assert stats.misses == 1
+        assert stats.sets == 1
+        assert stats.hit_rate == 2 / 3
+
+    def test_cache_get_or_set(self) -> None:
+        from venomqa.performance.cache import ResponseCache
+
+        cache = ResponseCache()
+        call_count = 0
+
+        def factory():
+            nonlocal call_count
+            call_count += 1
+            return {"data": "computed"}
+
+        result1 = cache.get_or_set("key1", factory)
+        result2 = cache.get_or_set("key1", factory)
+
+        assert result1 == result2
+        assert call_count == 1
+
+    def test_cache_cleanup_expired(self) -> None:
+        from venomqa.performance.cache import ResponseCache
+
+        cache = ResponseCache(default_ttl=0.01)
+
+        cache.set("key1", "value1")
+        cache.set("key2", "value2")
+
+        time.sleep(0.05)
+
+        removed = cache.cleanup_expired()
+        assert removed == 2
+
+
+class TestBatchExecutor:
+    """Tests for the BatchExecutor."""
+
+    def test_batch_executor_basic(self, mock_client: MockClient) -> None:
+        from venomqa.performance.batch import BatchExecutor
+        from venomqa.runner import JourneyRunner
+
+        steps = [Step(name=f"step_{i}", action=lambda c, ctx: c.get(f"/api/{i}")) for i in range(3)]
+        journey = Journey(name="test_batch", steps=steps)
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})] * 3)
+
+        executor = BatchExecutor(max_concurrent=2)
+        result = executor.execute([journey], lambda: JourneyRunner(client=mock_client))
+
+        assert result.total == 1
+        assert result.passed == 1
+
+    def test_batch_executor_progress_callback(self, mock_client: MockClient) -> None:
+        from venomqa.performance.batch import BatchExecutor, BatchProgress
+        from venomqa.runner import JourneyRunner
+
+        progress_updates: list[BatchProgress] = []
+
+        def on_progress(p: BatchProgress) -> None:
+            progress_updates.append(p)
+
+        steps = [Step(name="step", action=lambda c, ctx: c.get("/api"))]
+        journey = Journey(name="progress_test", steps=steps)
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})])
+
+        executor = BatchExecutor(max_concurrent=1, progress_callback=on_progress)
+        executor.execute([journey], lambda: JourneyRunner(client=mock_client))
+
+        assert len(progress_updates) >= 1
+
+    def test_batch_aggregate_results(self, mock_client: MockClient) -> None:
+        from venomqa.performance.batch import aggregate_results
+        from venomqa.runner import JourneyRunner
+
+        steps = [Step(name="step", action=lambda c, ctx: c.get("/api"))]
+        journey = Journey(name="test", steps=steps)
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})] * 3)
+
+        runner = JourneyRunner(client=mock_client)
+        results = [runner.run(journey) for _ in range(3)]
+
+        summary = aggregate_results(results)
+        assert summary["total_journeys"] == 3
+        assert summary["passed"] == 3
+
+    def test_batch_result_properties(self) -> None:
+        from datetime import datetime
+        from venomqa.performance.batch import BatchResult
+        from venomqa.core.models import JourneyResult, StepResult
+
+        now = datetime.now()
+        results = [
+            JourneyResult(
+                journey_name="j1",
+                success=True,
+                started_at=now,
+                finished_at=now,
+                step_results=[
+                    StepResult(
+                        step_name="s1",
+                        success=True,
+                        started_at=now,
+                        finished_at=now,
+                        duration_ms=20.0,
+                    ),
+                    StepResult(
+                        step_name="s2",
+                        success=True,
+                        started_at=now,
+                        finished_at=now,
+                        duration_ms=30.0,
+                    ),
+                ],
+                issues=[],
+                duration_ms=100.0,
+            ),
+            JourneyResult(
+                journey_name="j2",
+                success=True,
+                started_at=now,
+                finished_at=now,
+                step_results=[
+                    StepResult(
+                        step_name="s1",
+                        success=True,
+                        started_at=now,
+                        finished_at=now,
+                        duration_ms=50.0,
+                    ),
+                ],
+                issues=[],
+                duration_ms=200.0,
+            ),
+        ]
+
+        batch_result = BatchResult(
+            total=2,
+            passed=2,
+            failed=0,
+            duration_ms=300.0,
+            journey_results=results,
+            started_at=datetime.now(),
+            finished_at=datetime.now(),
+        )
+
+        assert batch_result.avg_journey_duration_ms == 150.0
+        assert batch_result.min_journey_duration_ms == 100.0
+        assert batch_result.max_journey_duration_ms == 200.0
+        assert batch_result.success_rate == 100.0
+
+
+class TestLoadTester:
+    """Tests for the LoadTester."""
+
+    def test_load_test_config_validation(self) -> None:
+        from venomqa.performance.load_tester import LoadTestConfig
+
+        with pytest.raises(ValueError):
+            LoadTestConfig(duration_seconds=0)
+
+        with pytest.raises(ValueError):
+            LoadTestConfig(concurrent_users=0)
+
+        config = LoadTestConfig(duration_seconds=10, concurrent_users=5)
+        assert config.duration_seconds == 10
+        assert config.concurrent_users == 5
+
+    def test_load_test_quick_execution(self, mock_client: MockClient) -> None:
+        from venomqa.performance.load_tester import LoadTester, LoadTestConfig
+        from venomqa.runner import JourneyRunner
+
+        steps = [Step(name="step", action=lambda c, ctx: c.get("/api"))]
+        journey = Journey(name="load_test", steps=steps)
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})] * 50)
+
+        config = LoadTestConfig(
+            duration_seconds=1.0,
+            concurrent_users=2,
+            ramp_up_seconds=0.0,
+        )
+        tester = LoadTester(config)
+        result = tester.run(journey, lambda: JourneyRunner(client=mock_client))
+
+        assert result.duration_seconds >= 1.0
+        assert result.metrics["total_requests"] > 0
+        assert "p50" in result.percentiles
+        assert "p99" in result.percentiles
+
+    def test_load_test_result_summary(self, mock_client: MockClient) -> None:
+        from venomqa.performance.load_tester import LoadTester, LoadTestConfig
+        from venomqa.runner import JourneyRunner
+
+        steps = [Step(name="step", action=lambda c, ctx: c.get("/api"))]
+        journey = Journey(name="summary_test", steps=steps)
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})] * 20)
+
+        config = LoadTestConfig(duration_seconds=0.5, concurrent_users=2)
+        tester = LoadTester(config)
+        result = tester.run(journey, lambda: JourneyRunner(client=mock_client))
+
+        summary = result.get_summary()
+        # Summary format may have variations, check for key content
+        assert "SUMMARY" in summary.upper() or "Summary" in summary
+        assert "Duration" in summary or "duration" in summary.lower()
+
+    def test_benchmark_journey(self, mock_client: MockClient) -> None:
+        from venomqa.performance.load_tester import benchmark_journey
+        from venomqa.runner import JourneyRunner
+
+        steps = [Step(name="step", action=lambda c, ctx: c.get("/api"))]
+        journey = Journey(name="benchmark", steps=steps)
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})] * 50)
+
+        result = benchmark_journey(
+            journey,
+            lambda: JourneyRunner(client=mock_client),
+            iterations=10,
+            warmup_iterations=2,
+        )
+
+        assert result["iterations"] == 10
+        assert "avg_time_ms" in result
+        assert "p50_ms" in result
+        assert "p99_ms" in result
+
+    def test_run_quick_load_test(self, mock_client: MockClient) -> None:
+        from venomqa.performance.load_tester import run_quick_load_test
+        from venomqa.runner import JourneyRunner
+
+        steps = [Step(name="step", action=lambda c, ctx: c.get("/api"))]
+        journey = Journey(name="quick_test", steps=steps)
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})] * 30)
+
+        result = run_quick_load_test(
+            journey,
+            lambda: JourneyRunner(client=mock_client),
+            duration_seconds=0.5,
+            concurrent_users=2,
+        )
+
+        assert result.duration_seconds >= 0.5
+
+
+class TestCachedResponse:
+    """Tests for CachedResponse."""
+
+    def test_cached_response_json(self) -> None:
+        from venomqa.performance.cache import CachedResponse
+
+        response = CachedResponse(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            body={"id": 1, "name": "test"},
+        )
+
+        data = response.json()
+        assert data["id"] == 1
+
+    def test_cached_response_text(self) -> None:
+        from venomqa.performance.cache import CachedResponse
+
+        response = CachedResponse(
+            status_code=200,
+            headers={},
+            body="plain text",
+        )
+
+        assert response.text == "plain text"
+
+    def test_cached_response_age(self) -> None:
+        from venomqa.performance.cache import CachedResponse
+
+        response = CachedResponse(
+            status_code=200,
+            headers={},
+            body={},
+        )
+
+        time.sleep(0.1)
+        assert response.age_seconds >= 0.1
