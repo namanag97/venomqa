@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.client import Client
+from venomqa.http import Client
 
 
 class NotificationActions:
