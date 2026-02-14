@@ -77,15 +77,10 @@
 
 **Current Experience:**
 - Examples exist but patterns are inconsistent
-- Generated code uses `sys.path.insert(0, ...)` hack
+- Generated code uses clean imports (sys.path is handled by `venomqa run`)
 
 **Pain Points:**
-1. ⚠️ **Import confusion (TD-003)**: Generated code has:
-   ```python
-   import sys
-   sys.path.insert(0, str(Path(__file__).parent.parent))
-   ```
-   This looks hacky and confuses beginners. They wonder "is this normal?"
+1. ~~**Import confusion (TD-003)**~~: FIXED - The `_load_journey` function now automatically adds the project root to sys.path, so generated journeys don't need any path manipulation.
 
 2. ⚠️ **Naming confusion (TD-001)**: Documentation says create `journeys/checkout.py` but discovery module only finds `*_journey.py` or `journey_*.py`. User creates `checkout.py`, CLI finds it, but if they use the API directly it might not work.
 
