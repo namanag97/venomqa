@@ -28,6 +28,38 @@ from typing import Any
 import yaml
 
 
+def _default_for_type(schema_type: str, fmt: str | None = None) -> Any:
+    """Return a sensible default value for a JSON schema type.
+
+    Args:
+        schema_type: JSON schema type name.
+        fmt: Optional format specifier.
+
+    Returns:
+        A default value suitable for the type.
+    """
+    format_defaults: dict[str, Any] = {
+        "email": "test@example.com",
+        "date": "2024-01-01",
+        "date-time": "2024-01-01T00:00:00Z",
+        "uri": "https://example.com",
+        "uuid": "00000000-0000-0000-0000-000000000000",
+        "password": "TestPassword123!",
+    }
+    if fmt and fmt in format_defaults:
+        return format_defaults[fmt]
+
+    type_defaults: dict[str, Any] = {
+        "string": "test_string",
+        "integer": 1,
+        "number": 1.0,
+        "boolean": True,
+        "array": [],
+        "object": {},
+    }
+    return type_defaults.get(schema_type, None)
+
+
 class OpenAPIParseError(Exception):
     """Raised when OpenAPI specification parsing fails."""
 
