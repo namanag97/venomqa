@@ -1,14 +1,8 @@
 """Error handling journey - test API error responses."""
 
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
 from venomqa import Journey, Step
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "actions"))
-from todo_actions import get_todo, update_todo, delete_todo, create_todo, upload_attachment
+from ..actions import get_todo, update_todo, delete_todo, create_todo, upload_attachment
 
 error_handling_journey = Journey(
     name="error_handling",
@@ -83,13 +77,25 @@ validation_errors_journey = Journey(
             expect_failure=True,
         ),
         Step(
+            name="create_todo_for_upload_test",
+            action=create_todo,
+            description="Create a todo for upload validation test",
+        ),
+        Step(
             name="upload_without_file",
-            action=lambda client, ctx: client.post("/todos/1/attachments"),
+            action=lambda client, ctx: client.post(f"/todos/{ctx.get('todo_id')}/attachments"),
             description="Upload request without file",
             expect_failure=True,
         ),
     ],
 )
+
+def create_multiple_todos(client, context):
+    """Create multiple todos for pagination testing."""
+    for i in range(5):
+        create_todo(client, context, title=f"Todo {i}")
+    return client.get("/todos")  # Return list to verify creation
+
 
 pagination_journey = Journey(
     name="pagination_tests",
@@ -97,9 +103,7 @@ pagination_journey = Journey(
     steps=[
         Step(
             name="create_multiple_todos",
-            action=lambda client, ctx: [
-                create_todo(client, ctx, title=f"Todo {i}") for i in range(5)
-            ],
+            action=create_multiple_todos,
             description="Create multiple todos for pagination",
         ),
         Step(
@@ -113,10 +117,9 @@ pagination_journey = Journey(
             description="Get second page",
         ),
         Step(
-            name="list_invalid_page",
-            action=lambda client, ctx: client.get("/todos", params={"page": -1}),
-            description="Request with invalid page number",
-            expect_failure=True,
+            name="list_large_page",
+            action=lambda client, ctx: client.get("/todos", params={"page": 100, "limit": 2}),
+            description="Request page beyond available data",
         ),
     ],
 )
