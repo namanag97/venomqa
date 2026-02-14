@@ -813,6 +813,105 @@ class Journey(BaseModel):
         """Check if journey has a specific tag."""
         return tag.strip().lower() in self.tags
 
+    def validate(self) -> list[str]:
+        """Validate journey structure and return list of issues found.
+
+        This method performs comprehensive validation including:
+        - Step names are unique across the journey
+        - Actions are callable or valid string references
+        - Branches have at least one path
+        - Paths have at least one step
+        - No empty journey
+
+        Returns:
+            List of validation issue descriptions. Empty list if valid.
+
+        Example:
+            >>> issues = journey.validate()
+            >>> if issues:
+            ...     for issue in issues:
+            ...         print(f"  - {issue}")
+            ...     raise ValueError("Journey validation failed")
+        """
+        issues: list[str] = []
+
+        # Check journey has steps
+        if not self.steps:
+            issues.append("Journey has no steps defined")
+            return issues  # Can't validate further without steps
+
+        # Collect all step names for uniqueness check
+        step_names: dict[str, list[str]] = {}  # name -> [locations]
+
+        def collect_step_names(steps: list, location: str) -> None:
+            for item in steps:
+                if isinstance(item, Step):
+                    if item.name not in step_names:
+                        step_names[item.name] = []
+                    step_names[item.name].append(location)
+                elif isinstance(item, Branch):
+                    for path in item.paths:
+                        collect_step_names(path.steps, f"{location} > {path.name}")
+
+        collect_step_names(self.steps, "main")
+
+        # Check for duplicate step names
+        for name, locations in step_names.items():
+            if len(locations) > 1:
+                issues.append(
+                    f"Duplicate step name '{name}' found in: {', '.join(locations)}"
+                )
+
+        # Check branches have paths and paths have steps
+        for item in self.steps:
+            if isinstance(item, Branch):
+                if not item.paths:
+                    issues.append(
+                        f"Branch at checkpoint '{item.checkpoint_name}' has no paths"
+                    )
+                for path in item.paths:
+                    if not path.steps:
+                        issues.append(
+                            f"Path '{path.name}' in branch '{item.checkpoint_name}' has no steps"
+                        )
+
+        # Check actions are callable or valid string references
+        def check_actions(steps: list, location: str) -> None:
+            for item in steps:
+                if isinstance(item, Step):
+                    if not callable(item.action) and not isinstance(item.action, str):
+                        issues.append(
+                            f"Step '{item.name}' in {location}: action must be callable or string reference"
+                        )
+                elif isinstance(item, Branch):
+                    for path in item.paths:
+                        check_actions(path.steps, f"{location} > {path.name}")
+
+        check_actions(self.steps, "main")
+
+        return issues
+
+    def validate_or_raise(self) -> None:
+        """Validate journey and raise JourneyValidationError if invalid.
+
+        Raises:
+            JourneyValidationError: If journey has structural issues.
+
+        Example:
+            >>> journey.validate_or_raise()  # Raises if invalid
+            >>> runner.run(journey)  # Safe to run
+        """
+        issues = self.validate()
+        if issues:
+            raise JourneyValidationError(
+                message=f"Journey '{self.name}' has {len(issues)} validation issue(s)",
+                field="journey",
+                context=ErrorContext(
+                    journey_name=self.name,
+                    extra={"issues": issues},
+                ),
+            )
+
     def __call__(self, client: Any, context: Any = None) -> JourneyResult:
         """Execute the journey with a client and optional context.
 
