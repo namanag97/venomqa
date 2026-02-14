@@ -84,6 +84,16 @@ __all__ = [
     "ListCheck",
     "DatabaseCheck",
     "OpenAPICheck",
+    "CustomHTTPCheck",
+    # Configuration
+    "PreflightConfig",
+    "HealthCheckConfig",
+    "AuthCheckConfig",
+    "CRUDCheckConfig",
+    "ListCheckConfig",
+    "CustomCheckConfig",
+    "generate_example_config",
+    "substitute_env_vars",
     # Legacy (environment / config) preflight
     "CheckStatus",
     "CheckResult",
