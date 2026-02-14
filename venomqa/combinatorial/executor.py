@@ -274,11 +274,12 @@ class CombinatorialExecutor:
         """Execute all generated combinations against the live API.
 
         This method:
-        1. Generates combinations using the specified coverage strength.
-        2. Builds a StateGraph from those combinations.
-        3. Optionally explores the graph (executing transitions + invariants).
-        4. Runs each combination's entry actions individually.
-        5. Collects and returns all results.
+        1. (Optional) Runs a preflight smoke test to catch showstoppers.
+        2. Generates combinations using the specified coverage strength.
+        3. Builds a StateGraph from those combinations.
+        4. Optionally explores the graph (executing transitions + invariants).
+        5. Runs each combination's entry actions individually.
+        6. Collects and returns all results.
 
         Args:
             strength: Coverage strength (2 = pairwise, 3 = three-wise, etc.).
@@ -289,12 +290,19 @@ class CombinatorialExecutor:
         Returns:
             ExecutionResult with all findings.
 
+        Raises:
+            APINotReadyError: If preflight is enabled and smoke tests fail.
+
         Example:
             >>> result = executor.execute(strength=2)
             >>> print(f"Passed: {len(result.successes)}")
             >>> print(f"Failed: {len(result.failures)}")
         """
         started_at = datetime.now()
+
+        # Preflight: catch showstoppers before investing in combinatorial tests
+        if self.run_preflight:
+            self._run_preflight_checks()
 
         # Build the graph and get the combinations
         graph, combos = self.builder.build_journey_graph(strength=strength)
