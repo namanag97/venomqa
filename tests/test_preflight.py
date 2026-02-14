@@ -1,22 +1,37 @@
-"""Tests for VenomQA Preflight - Pre-test execution checks."""
+"""Tests for VenomQA Preflight - Pre-test execution checks and smoke tests."""
 
 from __future__ import annotations
 
+import io
 import json
 import socket
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from venomqa.preflight import (
+    APINotReadyError,
+    AutoPreflight,
     CheckResult,
     CheckStatus,
     PreflightChecker,
     PreflightResult,
+    SmokeTest,
+    SmokeTestReport,
+    SmokeTestResult,
     run_preflight_checks,
     run_preflight_checks_with_output,
+)
+from venomqa.preflight.checks import (
+    AuthCheck,
+    CRUDCheck,
+    DatabaseCheck,
+    HealthCheck,
+    ListCheck,
+    OpenAPICheck,
 )
 
 
