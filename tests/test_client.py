@@ -76,7 +76,7 @@ class TestClient:
     def test_connect_creates_httpx_client(self) -> None:
         client = Client(base_url="http://localhost:8080")
 
-        with patch("venomqa.client.httpx.Client") as mock_httpx_client:
+        with patch("venomqa.http.rest.httpx.Client") as mock_httpx_client:
             client.connect()
             mock_httpx_client.assert_called_once()
 
@@ -363,7 +363,7 @@ class TestAsyncClient:
     async def test_async_connect(self) -> None:
         client = AsyncClient(base_url="http://localhost:8080")
 
-        with patch("venomqa.client.httpx.AsyncClient") as mock_async_client:
+        with patch("venomqa.http.rest.httpx.AsyncClient") as mock_async_client:
             await client.connect()
             mock_async_client.assert_called_once()
 
