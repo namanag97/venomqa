@@ -155,3 +155,92 @@
     align-items: center;
   }
 }
+
+/* Landing page hero */
+.md-typeset .hero-section {
+  text-align: center;
+  padding: 2rem 0 3rem 0;
+}
+
+.md-typeset .hero-section h1 {
+  font-size: 3.5rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.md-typeset .hero-tagline {
+  font-size: 1.4rem;
+  color: var(--md-default-fg-color--light);
+  margin-bottom: 2rem;
+}
+
+/* Try it now box */
+.md-typeset .try-it-box {
+  background: var(--md-code-bg-color);
+  border: 2px solid var(--md-primary-fg-color);
+  border-radius: 8px;
+  padding: 1.5rem 2rem;
+  margin: 2rem auto;
+  max-width: 520px;
+  font-family: var(--md-code-font-family);
+}
+
+.md-typeset .try-it-box code {
+  font-size: 1.1rem;
+  color: var(--md-code-fg-color);
+  background: transparent;
+  padding: 0;
+}
+
+.md-typeset .try-it-label {
+  font-size: 0.85rem;
+  color: var(--md-default-fg-color--light);
+  margin-bottom: 0.5rem;
+  font-family: var(--md-text-font-family);
+}
+
+/* Step numbers */
+.md-typeset .step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--md-primary-fg-color);
+  color: white;
+  border-radius: 50%;
+  font-weight: bold;
+  margin-right: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Architecture diagram */
+.md-typeset .architecture-box {
+  background: var(--md-code-bg-color);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: var(--md-code-font-family);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+/* Responsive landing page */
+@media (max-width: 768px) {
+  .md-typeset .hero-section h1 {
+    font-size: 2.5rem;
+  }
+
+  .md-typeset .try-it-box {
+    padding: 1rem;
+    max-width: 100%;
+  }
+
+  .md-typeset .try-it-box code {
+    font-size: 0.85rem;
+    word-break: break-all;
+  }
+}
