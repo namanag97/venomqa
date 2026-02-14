@@ -512,3 +512,151 @@ def validate_profile(profile_config: dict[str, Any], profile_name: str) -> None:
 
     if errors:
         raise ConfigValidationError(errors)
+
+
+def validate_for_production(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Check configuration for production readiness.
+
+    This validates the config against best practices for production
+    deployments. Returns a list of warnings (not errors).
+
+    Args:
+        config: Configuration dictionary to check
+
+    Returns:
+        List of warning dictionaries with field, message, and suggestion
+
+    Example:
+        warnings = validate_for_production(config)
+        for w in warnings:
+            print(f"Warning: {w['message']}")
+            print(f"Suggestion: {w['suggestion']}")
+    """
+    warnings: list[dict[str, Any]] = []
+
+    # Check for localhost in base_url
+    base_url = config.get("base_url", "")
+    if "localhost" in base_url or "127.0.0.1" in base_url:
+        warnings.append({
+            "field": "base_url",
+            "level": "warning",
+            "message": "base_url points to localhost",
+            "suggestion": "Use environment variable: base_url: ${API_BASE_URL}",
+        })
+
+    # Check for hardcoded credentials in db_url
+    db_url = config.get("db_url", "")
+    if db_url and "@" in db_url and "://" in db_url:
+        # Simple check for non-env-var password
+        if not "${" in db_url and ":" in db_url.split("@")[0]:
+            warnings.append({
+                "field": "db_url",
+                "level": "warning",
+                "message": "Database URL may contain hardcoded credentials",
+                "suggestion": "Use environment variable: db_url: ${DATABASE_URL}",
+            })
+
+    # Check timeout is reasonable for production
+    timeout = config.get("timeout", 30)
+    if timeout > 120:
+        warnings.append({
+            "field": "timeout",
+            "level": "warning",
+            "message": f"Timeout of {timeout}s is very high for production",
+            "suggestion": "Consider timeout: 30 or lower for faster failure detection",
+        })
+    elif timeout < 5:
+        warnings.append({
+            "field": "timeout",
+            "level": "warning",
+            "message": f"Timeout of {timeout}s may be too low for production",
+            "suggestion": "Consider timeout: 10-30 for reliability",
+        })
+
+    # Check retry configuration
+    retry = config.get("retry", {})
+    if retry.get("max_attempts", 3) < 2:
+        warnings.append({
+            "field": "retry.max_attempts",
+            "level": "warning",
+            "message": "Only 1 retry attempt configured",
+            "suggestion": "Consider max_attempts: 3 for resilience against transient failures",
+        })
+
+    # Check for JUnit output format (needed for CI)
+    report = config.get("report", {})
+    formats = report.get("formats", [])
+    if "junit" not in formats:
+        warnings.append({
+            "field": "report.formats",
+            "level": "info",
+            "message": "JUnit format not configured",
+            "suggestion": "Add 'junit' to formats for CI/CD integration",
+        })
+
+    # Check parallel_paths for production
+    parallel = config.get("parallel_paths", 1)
+    if parallel > 8:
+        warnings.append({
+            "field": "parallel_paths",
+            "level": "warning",
+            "message": f"High parallelism ({parallel}) may overwhelm target API",
+            "suggestion": "Consider parallel_paths: 4-8 for production stability",
+        })
+
+    # Check fail_fast is set appropriately
+    if not config.get("fail_fast"):
+        warnings.append({
+            "field": "fail_fast",
+            "level": "info",
+            "message": "fail_fast is disabled",
+            "suggestion": "Enable fail_fast: true for faster CI feedback",
+        })
+
+    # Check capture_logs for debugging
+    if not config.get("capture_logs", True):
+        warnings.append({
+            "field": "capture_logs",
+            "level": "info",
+            "message": "Log capture is disabled",
+            "suggestion": "Enable capture_logs: true for better debugging",
+        })
+
+    return warnings
+
+
+def get_config_summary(config: dict[str, Any]) -> dict[str, Any]:
+    """Generate a summary of the configuration for display.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        Summary dictionary with key settings and their status
+    """
+    return {
+        "api": {
+            "base_url": config.get("base_url", "not set"),
+            "timeout": f"{config.get('timeout', 30)}s",
+        },
+        "database": {
+            "configured": bool(config.get("db_url")),
+            "backend": config.get("db_backend", "postgresql"),
+        },
+        "retry": {
+            "max_attempts": config.get("retry", {}).get("max_attempts", 3),
+            "delay": f"{config.get('retry', {}).get('delay', 1.0)}s",
+        },
+        "execution": {
+            "parallel_paths": config.get("parallel_paths", 1),
+            "fail_fast": config.get("fail_fast", False),
+        },
+        "reporting": {
+            "formats": config.get("report", {}).get("formats", ["markdown"]),
+            "output_dir": config.get("report", {}).get("output_dir", "reports"),
+        },
+        "features": {
+            "capture_logs": config.get("capture_logs", True),
+            "verbose": config.get("verbose", False),
+        },
+    }
