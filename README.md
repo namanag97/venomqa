@@ -114,16 +114,30 @@ graph.add_invariant("usage_accurate",
 Chain steps together with automatic context flow:
 
 ```python
+from venomqa import Journey, Step
+
+def health_check(client, context):
+    return client.get("/health")
+
+def create_item(client, context):
+    response = client.post("/items", json={"name": "Test", "price": 9.99})
+    context["item_id"] = response.json()["id"]
+    return response
+
+def get_item(client, context):
+    return client.get(f"/items/{context['item_id']}")
+
 journey = Journey(
-    name="checkout",
+    name="crud_test",
     steps=[
-        Step("create_cart", create_cart),      # stores cart_id
-        Step("add_item", add_item),            # uses cart_id
-        Step("checkout", checkout),            # uses cart_id, stores order_id
-        Step("verify", verify_order),          # uses order_id
+        Step(name="health", action=health_check),
+        Step(name="create", action=create_item),
+        Step(name="verify", action=get_item),
     ]
 )
 ```
+
+Run with: `venomqa run crud_test`
 
 ### Cross-Feature Consistency
 Test that changes in one feature reflect correctly everywhere:
