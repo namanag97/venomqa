@@ -113,7 +113,7 @@ Data Generation:
 """
 
 from venomqa.adapters import get_adapter, list_adapters, register_adapter, register_adapter_class
-from venomqa.client import Client, SecureCredentials
+from venomqa.http import Client, SecureCredentials
 from venomqa.config import QAConfig
 from venomqa.context import (
     ContextBuilder,
