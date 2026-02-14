@@ -325,30 +325,83 @@ def get_profile_schema() -> dict[str, Any]:
 
 
 def get_default_config() -> dict[str, Any]:
-    """Return default configuration values from schema."""
+    """Return default configuration values from schema.
+
+    These defaults are designed to be production-ready while still
+    being developer-friendly out of the box.
+
+    Production considerations built in:
+    - Reasonable timeouts (30s default, not too long for CI)
+    - Retry with exponential backoff
+    - Structured logging capture
+    - Parallel execution disabled by default (safer)
+    - JUnit output for CI integration
+
+    Returns:
+        dict with all default configuration values
+    """
     return {
+        # API Connection
         "base_url": "http://localhost:8000",
+        "timeout": 30,  # 30s is reasonable for most APIs
+
+        # Database (optional but recommended for state branching)
         "db_backend": "postgresql",
         "docker_compose_file": "docker-compose.qa.yml",
-        "timeout": 30,
+
+        # Retry configuration with exponential backoff
+        # These defaults handle transient failures gracefully
         "retry": {
             "max_attempts": 3,
-            "delay": 1.0,
-            "backoff_multiplier": 2,
+            "delay": 1.0,  # Start with 1s delay
+            "backoff_multiplier": 2,  # 1s, 2s, 4s
+            "max_delay": 30.0,  # Cap at 30s between retries
+            "retry_on_status": [429, 500, 502, 503, 504],  # Retryable HTTP codes
         },
+
+        # Logging and debugging
         "capture_logs": True,
-        "log_lines": 50,
-        "parallel_paths": 1,
+        "log_lines": 100,  # Increased for better debugging
+        "verbose": False,
+
+        # Execution behavior
+        "parallel_paths": 1,  # Sequential by default (safer)
+        "fail_fast": False,  # See all failures by default
+
+        # Reporting - include JUnit for CI by default
         "report": {
-            "formats": ["markdown"],
+            "formats": ["markdown", "junit"],  # JUnit for CI
             "output_dir": "reports",
             "filename_prefix": "venomqa-report",
             "include_timestamp": True,
+            "include_request_response": False,  # Privacy by default
         },
-        "verbose": False,
-        "fail_fast": False,
+
+        # Results persistence
         "results_database": "sqlite:///venomqa_results.db",
         "persist_results": False,
+
+        # Circuit breaker defaults (enterprise feature)
+        "circuit_breaker": {
+            "enabled": True,
+            "failure_threshold": 5,  # Open after 5 consecutive failures
+            "reset_timeout": 60,  # Wait 60s before trying again
+            "half_open_requests": 1,  # Test with 1 request
+        },
+
+        # Rate limiting protection
+        "rate_limit": {
+            "enabled": True,
+            "requests_per_second": 10,  # Reasonable default
+            "burst_size": 20,
+        },
+
+        # Connection pooling for performance
+        "connection_pool": {
+            "max_connections": 10,
+            "max_keepalive_connections": 5,
+            "keepalive_expiry": 30,
+        },
     }
 
 
