@@ -2,9 +2,45 @@
 
 Get VenomQA up and running in 5 minutes.
 
+## Try It First (No Setup Required)
+
+Want to see VenomQA in action before setting anything up? Run the demo:
+
+```bash
+pip install venomqa
+venomqa demo
+```
+
+This starts a built-in test server and runs an example journey automatically. No configuration needed.
+
+```
+VenomQA Demo
+==================================================
+
+Starting demo server on http://127.0.0.1:8000...
+Running demo journey...
+
+Demo Journey Results
+┌─────────────────┬────────┬──────────┐
+│ Step            │ Status │ Duration │
+├─────────────────┼────────┼──────────┤
+│ health_check    │ PASS   │ 12ms     │
+│ list_items      │ PASS   │ 8ms      │
+│ create_item     │ PASS   │ 15ms     │
+│ get_item        │ PASS   │ 6ms      │
+│ update_item     │ PASS   │ 9ms      │
+│ delete_item     │ PASS   │ 7ms      │
+│ verify_deleted  │ PASS   │ 5ms      │
+└─────────────────┴────────┴──────────┘
+
+Demo Complete!
+```
+
+---
+
 ## Prerequisites
 
-Before starting, you need:
+To test your own APIs, you need:
 
 1. **Python 3.10+** installed
 2. **An API to test** - If you don't have one, use our test server:
