@@ -157,6 +157,8 @@ class SmokeTest:
         base_url: Root URL of the API (e.g. "http://localhost:8000").
         token: Optional Bearer token for authenticated checks.
         timeout: HTTP timeout in seconds for each check.
+        auth_header: HTTP header name for the auth token (default ``Authorization``).
+        auth_prefix: Prefix before the token value (default ``Bearer``).
 
     Example:
         >>> smoke = SmokeTest("http://localhost:8000", token="eyJ...")
@@ -164,6 +166,10 @@ class SmokeTest:
         >>> if not report.passed:
         ...     report.print_report()
         ...     raise SystemExit(1)
+
+    Config-driven example:
+        >>> smoke = SmokeTest.from_yaml("preflight.yaml")
+        >>> report = smoke.run_all()
     """
 
     def __init__(
@@ -171,12 +177,138 @@ class SmokeTest:
         base_url: str,
         token: str | None = None,
         timeout: float = 10.0,
+        auth_header: str = "Authorization",
+        auth_prefix: str = "Bearer",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
+        self.auth_header = auth_header
+        self.auth_prefix = auth_prefix
         self.results: list[SmokeTestResult] = []
         self._custom_checks: list[BaseCheck] = []
+        self._config: Any | None = None  # set when created via from_config()
+
+    # ----- Factory methods -----
+
+    @classmethod
+    def from_config(cls, config: Any) -> SmokeTest:
+        """Create a ``SmokeTest`` from a ``PreflightConfig`` object.
+
+        Registers all checks defined in the config and configures auth
+        settings.  Call ``run_all()`` to execute them.
+
+        Args:
+            config: A ``PreflightConfig`` instance.
+
+        Returns:
+            A fully configured ``SmokeTest`` instance.
+        """
+        from venomqa.preflight.config import PreflightConfig
+
+        if not isinstance(config, PreflightConfig):
+            raise TypeError(
+                f"Expected PreflightConfig, got {type(config).__name__}"
+            )
+
+        token = config.resolve_token()
+        instance = cls(
+            base_url=config.base_url,
+            token=token,
+            timeout=config.timeout,
+            auth_header=config.auth_header,
+            auth_prefix=config.auth_prefix,
+        )
+        instance._config = config
+
+        # Register health checks
+        for hc in config.health_checks:
+            check = HealthCheck(
+                base_url=config.base_url,
+                token=token,
+                timeout=hc.timeout or config.timeout,
+                path=hc.path,
+                auth_header=config.auth_header,
+                auth_prefix=config.auth_prefix,
+            )
+            # Store expected_status and expected_json for config-aware validation
+            check._expected_status = hc.expected_status
+            check._expected_json = hc.expected_json
+            instance._custom_checks.append(check)
+
+        # Register auth checks
+        for ac in config.auth_checks:
+            check = AuthCheck(
+                base_url=config.base_url,
+                token=token,
+                timeout=config.timeout,
+                path=ac.path,
+                auth_header=config.auth_header,
+                auth_prefix=config.auth_prefix,
+            )
+            instance._custom_checks.append(check)
+
+        # Register CRUD checks
+        for cc in config.crud_checks:
+            check = CRUDCheck(
+                base_url=config.base_url,
+                token=token,
+                timeout=config.timeout,
+                path=cc.path,
+                payload=cc.payload,
+                auth_header=config.auth_header,
+                auth_prefix=config.auth_prefix,
+            )
+            if cc.name:
+                check.name = cc.name
+            instance._custom_checks.append(check)
+
+        # Register list checks
+        for lc in config.list_checks:
+            check = ListCheck(
+                base_url=config.base_url,
+                token=token,
+                timeout=config.timeout,
+                path=lc.path,
+                auth_header=config.auth_header,
+                auth_prefix=config.auth_prefix,
+            )
+            instance._custom_checks.append(check)
+
+        # Register custom checks
+        for xc in config.custom_checks:
+            check = CustomHTTPCheck(
+                base_url=config.base_url,
+                token=token,
+                timeout=config.timeout,
+                auth_header=config.auth_header,
+                auth_prefix=config.auth_prefix,
+                check_name=xc.name,
+                method=xc.method,
+                path=xc.path,
+                payload=xc.payload,
+                extra_headers=xc.headers,
+                expected_status=xc.expected_status,
+                expected_json=xc.expected_json,
+            )
+            instance._custom_checks.append(check)
+
+        return instance
+
+    @classmethod
+    def from_yaml(cls, path: str) -> SmokeTest:
+        """Create a ``SmokeTest`` from a YAML configuration file.
+
+        Args:
+            path: Path to the YAML config file.
+
+        Returns:
+            A fully configured ``SmokeTest`` instance.
+        """
+        from venomqa.preflight.config import PreflightConfig
+
+        config = PreflightConfig.from_yaml(path)
+        return cls.from_config(config)
 
     # ----- Individual checks -----
 
