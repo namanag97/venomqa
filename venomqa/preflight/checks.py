@@ -215,8 +215,10 @@ class HealthCheck(BaseCheck):
         token: str | None = None,
         timeout: float = 10.0,
         path: str = "/health",
+        auth_header: str = "Authorization",
+        auth_prefix: str = "Bearer",
     ) -> None:
-        super().__init__(base_url, token, timeout)
+        super().__init__(base_url, token, timeout, auth_header, auth_prefix)
         self.path = path
 
     def run(self) -> SmokeTestResult:
