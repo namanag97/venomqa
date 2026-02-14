@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from venomqa.clients.graphql import GraphQLError, GraphQLResponse
+from venomqa.http.graphql import GraphQLError, GraphQLResponse
 
 
 # Test data
