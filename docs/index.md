@@ -95,7 +95,7 @@ hide:
 
 <div class="button-group">
 [Get Started](getting-started/quickstart.md){ .md-button .md-button--primary }
-[GitHub](https://github.com/namanagarwal/venomqa){ .md-button }
+[GitHub](https://github.com/namanag97/venomqa){ .md-button }
 </div>
 
 </div>
@@ -451,6 +451,6 @@ Complete documentation for all classes.
 
 **Built by [Naman Agarwal](https://github.com/namanagarwal)**
 
-[GitHub](https://github.com/namanagarwal/venomqa) | [PyPI](https://pypi.org/project/venomqa/) | [Issues](https://github.com/namanagarwal/venomqa/issues)
+[GitHub](https://github.com/namanag97/venomqa) | [PyPI](https://pypi.org/project/venomqa/) | [Issues](https://github.com/namanag97/venomqa/issues)
 
 </div>
