@@ -2497,7 +2497,7 @@ def generate_graphql(
                     http_headers[name.strip()] = value.strip()
 
             # Use GraphQL client to introspect
-            from venomqa.clients.graphql import GraphQLClient, INTROSPECTION_QUERY
+            from venomqa.http.graphql import GraphQLClient, INTROSPECTION_QUERY
 
             client = GraphQLClient(
                 endpoint=endpoint_url,
