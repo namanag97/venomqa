@@ -1164,10 +1164,26 @@ def _create_port_adapter(name: str, adapter_type: str, config: dict[str, Any]) -
 
 
 def _load_journey(name: str, path: str) -> Any:
-    """Load a journey from a Python file."""
+    """Load a journey from a Python file.
+
+    Automatically adds the project root (parent of journeys/) to sys.path
+    so that imports like 'from actions.sample_actions import ...' work
+    without requiring sys.path hacks in the journey files.
+    """
     import importlib.util
+    import sys
 
     try:
+        # Add project root to sys.path for action imports
+        # The project root is the parent directory of the journey file's directory
+        journey_dir = Path(path).parent.resolve()
+        project_root = journey_dir.parent.resolve()
+
+        # Add to sys.path if not already present
+        project_root_str = str(project_root)
+        if project_root_str not in sys.path:
+            sys.path.insert(0, project_root_str)
+
         spec = importlib.util.spec_from_file_location(name, path)
         if spec is None or spec.loader is None:
             return None
