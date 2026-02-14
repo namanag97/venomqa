@@ -390,7 +390,7 @@ class TestResourceCleanup:
         from venomqa.client import Client
         from unittest.mock import patch
 
-        with patch("venomqa.client.httpx.Client") as mock_httpx:
+        with patch("venomqa.http.rest.httpx.Client") as mock_httpx:
             mock_instance = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 200
