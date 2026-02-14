@@ -795,10 +795,16 @@ class PathError(JourneyError):
 
 
 class CircuitOpenError(VenomQAError):
-    """Circuit breaker is open."""
+    """Circuit breaker is open due to repeated failures.
+
+    The circuit breaker pattern prevents cascading failures by stopping
+    requests to a failing service temporarily. After reset_timeout
+    seconds, the circuit will allow test requests again.
+    """
 
     error_code = ErrorCode.CIRCUIT_OPEN
     default_message = "Circuit breaker is open - too many recent failures"
+    docs_path = "resilience/circuit-breaker"
 
     def __init__(
         self,
@@ -809,7 +815,13 @@ class CircuitOpenError(VenomQAError):
     ) -> None:
         self.failures_count = failures_count
         self.reset_timeout = reset_timeout
-        super().__init__(message=message, **kwargs)
+        suggestions = [
+            f"Circuit opened after {failures_count} consecutive failures",
+            f"Wait {reset_timeout}s for circuit to reset, or fix underlying issue",
+            "Check server health before continuing tests",
+            "Reduce failure_threshold if service is flaky",
+        ]
+        super().__init__(message=message, suggestions=suggestions, **kwargs)
 
     def to_dict(self) -> dict[str, Any]:
         result = super().to_dict()
@@ -819,10 +831,15 @@ class CircuitOpenError(VenomQAError):
 
 
 class RetryExhaustedError(VenomQAError):
-    """All retry attempts exhausted."""
+    """All retry attempts have been exhausted.
+
+    The operation failed after multiple retry attempts. The last_error
+    attribute contains the final failure reason.
+    """
 
     error_code = ErrorCode.RETRY_EXHAUSTED
     default_message = "All retry attempts exhausted"
+    docs_path = "resilience/retries"
 
     def __init__(
         self,
@@ -833,7 +850,13 @@ class RetryExhaustedError(VenomQAError):
     ) -> None:
         self.attempts = attempts
         self.last_error = last_error
-        super().__init__(message=message, cause=last_error, **kwargs)
+        suggestions = [
+            f"Operation failed after {attempts} attempts",
+            "Check 'last_error' for the final failure reason",
+            "Increase retry.max_attempts if transient failures expected",
+            "Add longer retry.delay for rate-limited services",
+        ]
+        super().__init__(message=message, cause=last_error, suggestions=suggestions, **kwargs)
 
     def to_dict(self) -> dict[str, Any]:
         result = super().to_dict()
@@ -842,10 +865,15 @@ class RetryExhaustedError(VenomQAError):
 
 
 class RateLimitedError(VenomQAError):
-    """Rate limit exceeded."""
+    """Rate limit exceeded by the target API.
+
+    The API returned HTTP 429 Too Many Requests. Wait for retry_after
+    seconds before retrying.
+    """
 
     error_code = ErrorCode.RATE_LIMITED
     default_message = "Rate limit exceeded"
+    docs_path = "resilience/rate-limiting"
 
     def __init__(
         self,
@@ -854,7 +882,13 @@ class RateLimitedError(VenomQAError):
         **kwargs: Any,
     ) -> None:
         self.retry_after = retry_after
-        super().__init__(message=message, **kwargs)
+        suggestions = [
+            f"Wait {retry_after or 'some'}s before retrying" if retry_after else "Wait before retrying",
+            "Add delays between requests to avoid rate limits",
+            "Consider using parallel_paths: 1 to reduce concurrency",
+            "Configure exponential backoff in retry settings",
+        ]
+        super().__init__(message=message, suggestions=suggestions, **kwargs)
 
     def to_dict(self) -> dict[str, Any]:
         result = super().to_dict()
@@ -863,14 +897,40 @@ class RateLimitedError(VenomQAError):
 
 
 class PluginError(VenomQAError):
-    """Plugin execution error."""
+    """Plugin execution failed.
+
+    An error occurred while executing a VenomQA plugin. This could be:
+    - Plugin initialization failure
+    - Hook execution error
+    - Configuration issue
+    """
 
     error_code = ErrorCode.PLUGIN_ERROR
     default_message = "Plugin execution failed"
+    default_suggestions = [
+        "Check plugin configuration in venomqa.yaml",
+        "Verify plugin dependencies are installed",
+        "Run 'venomqa plugins list' to see available plugins",
+        "Check plugin documentation for requirements",
+    ]
+    docs_path = "plugins"
 
 
 class ReporterError(VenomQAError):
-    """Reporter execution error."""
+    """Reporter execution failed.
+
+    An error occurred while generating a test report. This could be:
+    - Output directory not writable
+    - Template rendering error
+    - Missing dependencies for format
+    """
 
     error_code = ErrorCode.REPORTER_ERROR
     default_message = "Reporter execution failed"
+    default_suggestions = [
+        "Check report.output_dir is writable",
+        "Verify report format is valid: markdown, json, junit, html",
+        "Check disk space availability",
+        "Review reporter error message for specific issue",
+    ]
+    docs_path = "reporters"
