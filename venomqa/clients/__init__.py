@@ -1,39 +1,60 @@
 """VenomQA Protocol Clients Module.
 
+.. deprecated::
+    This module is deprecated. Import from `venomqa.http` instead::
+
+        # Old (still works for backward compatibility):
+        from venomqa.clients import GraphQLClient, gRPCClient
+
+        # New (preferred):
+        from venomqa.http import GraphQLClient, GrpcClient
+
 This module provides specialized clients for various protocols:
 
 - GraphQLClient: GraphQL query and subscription support
 - WebSocketClient: Real-time WebSocket communication
 - gRPCClient: gRPC service method invocation
 
-All clients extend the BaseClient interface with common features:
-- Request/response history tracking
-- Authentication support
-- Retry logic
-- Proper type hints
+Example:
+    >>> from venomqa.http import GraphQLClient, GrpcClient, AsyncWebSocketClient
+    >>>
+    >>> # GraphQL
+    >>> gql = GraphQLClient("https://api.example.com/graphql")
+    >>> gql.connect()
+    >>> response = gql.query("{ users { id name } }")
+    >>>
+    >>> # gRPC
+    >>> grpc = GrpcClient("localhost:50051")
+    >>> grpc.connect()
+    >>> response = grpc.call("MyService", "MyMethod", request)
 """
 
-from venomqa.clients.base import (
+# Re-export from new location for backward compatibility
+from venomqa.http.base import (
     AuthCredentials,
     BaseAsyncClient,
     BaseClient,
+    ClientError,
     ClientRecord,
+    ValidationError,
 )
-from venomqa.clients.graphql import (
+from venomqa.http.graphql import (
     AsyncGraphQLClient,
     GraphQLClient,
     GraphQLError,
     GraphQLResponse,
     GraphQLSchema,
 )
-from venomqa.clients.grpc import (
+from venomqa.http.grpc import (
     AsyncgRPCClient,
+    GrpcClient,
+    GrpcResponse,
     ProtoMethod,
     ProtoService,
     gRPCClient,
     gRPCResponse,
 )
-from venomqa.clients.websocket import (
+from venomqa.http.websocket import (
     AsyncWebSocketClient,
     ConnectionState,
     WebSocketClient,
@@ -44,7 +65,9 @@ __all__ = [
     "BaseClient",
     "BaseAsyncClient",
     "ClientRecord",
+    "ClientError",
     "AuthCredentials",
+    "ValidationError",
     "GraphQLClient",
     "AsyncGraphQLClient",
     "GraphQLError",
@@ -55,8 +78,10 @@ __all__ = [
     "WebSocketMessage",
     "ConnectionState",
     "gRPCClient",
+    "GrpcClient",
     "AsyncgRPCClient",
     "gRPCResponse",
+    "GrpcResponse",
     "ProtoMethod",
     "ProtoService",
 ]
