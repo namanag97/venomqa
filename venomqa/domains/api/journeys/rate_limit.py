@@ -15,7 +15,7 @@ import time
 from typing import Any
 
 from venomqa import Checkpoint, Journey, Step
-from venomqa.client import Client
+from venomqa.http import Client
 
 
 class RateLimitActions:
