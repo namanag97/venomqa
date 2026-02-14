@@ -849,13 +849,14 @@ class TestIntegration:
         assert total_edges > 0
 
     def test_single_dimension(self):
-        """Combinatorial with a single dimension degenerates to single-value testing."""
+        """Combinatorial with a single dimension degenerates to exhaustive."""
         space = DimensionSpace([
             Dimension("mode", ["read", "write", "admin"]),
         ])
         gen = CoveringArrayGenerator(space, seed=42)
-        combos = gen.pairwise()
-        # With 1 dimension, pairwise = all values
+        # strength=2 exceeds 1 dimension, use exhaustive (strength=1)
+        combos = gen.generate(strength=1)
+        # With 1 dimension, strength=1 = all values
         assert len(combos) == 3
 
     def test_binary_dimensions(self):
