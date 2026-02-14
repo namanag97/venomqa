@@ -17,7 +17,7 @@ import time
 from typing import Any
 
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients.websocket import AsyncWebSocketClient, ConnectionState, WebSocketMessage
+from venomqa.http.websocket import AsyncWebSocketClient, ConnectionState, WebSocketMessage
 from venomqa.core.context import ExecutionContext
 
 # =============================================================================
