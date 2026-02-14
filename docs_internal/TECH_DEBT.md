@@ -62,21 +62,20 @@ The API server is not responding. Try:
 
 ## High Priority
 
-### TD-003: Import Path Manipulation in Generated Code
+### TD-003: Import Path Manipulation in Generated Code [FIXED]
 **Location:** `venomqa/cli/commands.py` (SAMPLE_JOURNEY_PY template)
 
-**Problem:**
+**Problem:** (RESOLVED)
+Previously, generated journey files contained:
 ```python
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 ```
 
-**Impact:** Confuses beginners, looks hacky.
+**Solution:** The `_load_journey` function now automatically adds the project root to `sys.path` before loading journey modules. Generated journeys no longer need any path manipulation - they just use clean imports like `from actions.sample_actions import ...`.
 
-**Fix:** Either make package-style imports work or keep journeys self-contained.
-
-**Effort:** 3 hours
+**Status:** FIXED
 
 ---
 
