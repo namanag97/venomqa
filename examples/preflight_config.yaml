@@ -1,0 +1,79 @@
+# VenomQA Preflight Configuration
+# This file configures smoke tests for your API.
+# Documentation: https://venomqa.dev/docs/preflight-configuration
+#
+# Environment variable substitution:
+#   ${VAR}          - required, fails if not set
+#   ${VAR:default}  - uses default if VAR is not set
+#   ${RANDOM}       - random 8-char hex string
+#   ${UUID}         - random UUID4
+#   ${TIMESTAMP}    - current UNIX timestamp
+
+base_url: "${API_URL:http://localhost:8000}"
+timeout: 10.0
+
+# Authentication
+auth:
+  token_env_var: "API_TOKEN"  # Read token from environment
+  # Or hardcode for local dev:
+  # token: "eyJ..."
+  header: "Authorization"
+  prefix: "Bearer"
+
+# Health checks - verify the API is running
+health_checks:
+  - path: /health
+    expected_status: [200]
+    expected_json:
+      status: "healthy"
+
+  - path: /health/ready
+    expected_status: [200]
+
+  - path: /health/live
+    expected_status: [200]
+
+# Auth checks - verify authentication works
+auth_checks:
+  - path: /api/v1/me
+    expected_status: [200]
+
+  - path: /api/v1/workspaces
+    expected_status: [200]
+
+# CRUD checks - verify basic operations work
+crud_checks:
+  - name: "Create workspace"
+    path: /api/v1/workspaces
+    payload:
+      name: "Preflight Test ${RANDOM}"
+      slug: "preflight-${RANDOM}"
+    expected_status: [201, 409]  # 409 = already exists, OK
+    cleanup_path: /api/v1/workspaces/${id}  # Delete after test
+
+  - name: "Create item"
+    path: /api/v1/items
+    payload:
+      name: "Test Item"
+      value: 100
+    expected_status: [201]
+
+# List checks - verify list endpoints return data
+list_checks:
+  - path: /api/v1/workspaces
+    expected_type: array  # or "paginated" for {data: [], next_cursor: ...}
+
+  - path: /api/v1/items
+    expected_type: array
+
+# Custom checks - any additional validation
+custom_checks:
+  - name: "OpenAPI spec available"
+    method: GET
+    path: /openapi.json
+    expected_status: [200]
+
+  - name: "Metrics endpoint"
+    method: GET
+    path: /metrics
+    expected_status: [200]
