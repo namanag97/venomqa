@@ -328,6 +328,120 @@ snapshot = context.snapshot()
 context.restore(snapshot)
 ```
 
+## Context API Reference
+
+The `ExecutionContext` is passed to every action function and provides methods for sharing state between steps, storing results, and managing snapshots for checkpoints.
+
+### Complete Context API
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `set` | `set(key: str, value: Any)` | Store a value in context |
+| `get` | `get(key: str, default=None)` | Get value, returns default if not found |
+| `get_required` | `get_required(key: str)` | Get value, raises `KeyError` if not found |
+| `get_typed` | `get_typed(key: str, type: Type, default=None)` | Get value with type validation |
+| `store_step_result` | `store_step_result(step_name: str, result: Any)` | Store a step's result for later access |
+| `get_step_result` | `get_step_result(step_name: str)` | Get a step's stored result |
+| `get_step_result_required` | `get_step_result_required(step_name: str)` | Get step result, raises `KeyError` if not found |
+| `has_step_result` | `has_step_result(step_name: str)` | Check if a step result exists |
+| `snapshot` | `snapshot()` | Create a snapshot of current state |
+| `restore` | `restore(snapshot: dict)` | Restore context from a snapshot |
+| `clear` | `clear()` | Clear all context data |
+| `merge` | `merge(other: ExecutionContext, overwrite=False)` | Merge another context into this one |
+| `copy` | `copy()` | Create a deep copy of this context |
+| `pop` | `pop(key: str, default=None)` | Remove and return a value |
+| `keys` | `keys()` | Get all keys in context |
+| `step_names` | `step_names()` | Get all step names with stored results |
+| `to_dict` | `to_dict()` | Export context as dictionary |
+| `from_dict` | `from_dict(data: dict)` | Create context from dictionary (class method) |
+
+### Dictionary-Style Access
+
+The context supports Python dictionary operations:
+
+```python
+# Set a value
+context["user_id"] = 123
+
+# Get a value (raises KeyError if missing)
+user_id = context["user_id"]
+
+# Delete a value
+del context["user_id"]
+
+# Check if key exists
+if "user_id" in context:
+    print("User ID is set")
+
+# Get length
+print(f"Context has {len(context)} values")
+```
+
+### Type-Safe Access
+
+Use `get_typed()` for runtime type validation:
+
+```python
+# Get with type checking
+user_id = context.get_typed("user_id", int)  # Raises TypeError if not int
+token = context.get_typed("token", str)
+
+# With default value
+count = context.get_typed("count", int, default=0)
+```
+
+### Step Results
+
+Step results are automatically stored and can be accessed:
+
+```python
+def create_user(client, context):
+    response = client.post("/api/users", json={"name": "Test"})
+    # Explicitly store the result
+    context.store_step_result("create_user", response.json())
+    return response
+
+def get_user(client, context):
+    # Access the stored result
+    create_result = context.get_step_result("create_user")
+    user_id = create_result["id"]
+    return client.get(f"/api/users/{user_id}")
+```
+
+### Snapshots for Checkpoints
+
+Snapshots capture the entire context state for rollback:
+
+```python
+def risky_operation(client, context):
+    # Create snapshot before risky operation
+    snapshot = context.snapshot()
+
+    try:
+        response = client.post("/api/dangerous", json={...})
+        context["result"] = response.json()
+        return response
+    except Exception:
+        # Rollback to previous state
+        context.restore(snapshot)
+        raise
+```
+
+### Accessing State Manager
+
+For database operations with checkpoints:
+
+```python
+def verify_database(client, context):
+    if context.state_manager:
+        # Execute raw SQL query
+        result = context.state_manager.execute(
+            "SELECT COUNT(*) FROM users WHERE active = 1"
+        )
+        context["active_users"] = result[0][0]
+    return client.get("/api/health")
+```
+
 ## Expected Failures
 
 Use `expect_failure=True` when testing that your API correctly rejects invalid requests:
