@@ -103,4 +103,8 @@ __all__ = [
     "TransitionAction",
     "TransitionKey",
     "StateSetup",
+    # Executor
+    "CombinatorialExecutor",
+    "ExecutionResult",
+    "StepResult",
 ]
