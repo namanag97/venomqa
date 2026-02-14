@@ -688,7 +688,10 @@ class TestCombinatorialGraphBuilder:
         assert len(graph.nodes) == 3
 
     def test_build_no_valid_combinations_raises(self):
-        space = DimensionSpace([Dimension("a", [1, 2])])
+        space = DimensionSpace([
+            Dimension("a", [1, 2]),
+            Dimension("b", [3, 4]),
+        ])
         constraints = ConstraintSet([
             Constraint("block_all", predicate=lambda d: False),
         ])
