@@ -407,7 +407,7 @@ def cli(ctx: click.Context, verbose: bool, config: str | None) -> None:
     ctx.ensure_object(dict)
 
     # Don't load config for commands that don't need it
-    if ctx.invoked_subcommand in ("init", "doctor"):
+    if ctx.invoked_subcommand in ("init", "doctor", "smoke-test"):
         ctx.obj["verbose"] = verbose
         setup_logging(verbose)
         return
