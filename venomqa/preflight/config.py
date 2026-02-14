@@ -74,10 +74,9 @@ def substitute_env_vars(value: str) -> str:
         # ${VAR} form (no default)
         env_val = os.environ.get(expr.strip())
         if env_val is None:
-            raise ValueError(
-                f"Environment variable '{expr.strip()}' is not set and no default "
-                f"was provided. Use ${{​{expr.strip()}:default_value}} to specify a default."
-            )
+            # Leave unresolved -- this may be a template placeholder
+            # (e.g. ${id} in cleanup_path) rather than an env var.
+            return match.group(0)
         return env_val
 
     return _ENV_VAR_PATTERN.sub(_replace, value)
