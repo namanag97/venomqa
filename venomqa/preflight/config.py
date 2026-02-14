@@ -48,10 +48,9 @@ def substitute_env_vars(value: str) -> str:
         value: A string potentially containing ``${...}`` placeholders.
 
     Returns:
-        The string with all placeholders resolved.
-
-    Raises:
-        ValueError: If a required env var (no default) is not set.
+        The string with all placeholders resolved. Unresolved ``${VAR}``
+        references (no matching env var, no default) are left as-is to
+        support template placeholders like ``${id}`` in cleanup paths.
     """
     import time as _time
 
