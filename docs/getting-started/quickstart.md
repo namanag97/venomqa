@@ -51,7 +51,7 @@ We provide a simple test server so you can start immediately:
 
 ```bash
 # Clone the repo (if you haven't already)
-git clone https://github.com/namanagarwal/venomqa.git
+git clone https://github.com/namanag97/venomqa.git
 cd venomqa/examples/quickstart
 
 # Install the test server dependencies
