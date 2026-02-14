@@ -3,7 +3,7 @@
 Reusable checkout management actions.
 """
 
-from venomqa.client import Client
+from venomqa.http import Client
 
 
 class CheckoutActions:
