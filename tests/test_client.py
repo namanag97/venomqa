@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock, patch
 import httpx
 import pytest
 
-from venomqa.client import AsyncClient, Client, RequestRecord
+from venomqa.http import AsyncClient, Client, RequestRecord
 
 
 class TestRequestRecord:
