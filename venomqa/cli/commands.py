@@ -385,13 +385,10 @@ SAMPLE_JOURNEY_PY = '''"""Sample journey for your QA tests.
 
 This journey demonstrates basic CRUD operations.
 Modify it for your specific API.
+
+Run with: venomqa run sample_journey
+Or from project root: python -m journeys.sample_journey
 """
-
-import sys
-from pathlib import Path
-
-# Add the parent directory to path for action imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from venomqa import Journey, Step, Checkpoint
 
