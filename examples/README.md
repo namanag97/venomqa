@@ -1,362 +1,231 @@
-# VenomQA Templates & Examples
+# VenomQA Examples
 
-This directory contains reusable templates and complete examples for using VenomQA in your projects.
+Welcome to the VenomQA examples directory! This guide helps you find the right example to start with based on your needs.
 
-## Directory Structure
+## Which Example Should I Use?
 
 ```
-├── ci/                          # CI/CD pipeline templates
-│   ├── github-actions.yml       # GitHub Actions workflow
-│   ├── gitlab-ci.yml            # GitLab CI configuration
-│   ├── jenkins.groovy           # Jenkinsfile (declarative pipeline)
-│   ├── circleci.yml             # CircleCI configuration
-│   └── azure-pipelines.yml      # Azure DevOps pipeline
-│
-├── docker/                      # Docker templates
-│   ├── Dockerfile.example       # Example Dockerfile for test APIs
-│   └── docker-compose.override.yml  # Local development overrides
-│
-├── journeys/                    # Journey templates
-│   ├── auth_flow.py             # Authentication flow patterns
-│   ├── crud_flow.py             # CRUD operation patterns
-│   ├── file_upload_flow.py      # File upload testing
-│   └── payment_flow.py          # Payment/checkout flows
-│
-└── examples/
-    └── full_stack_app/          # Complete example application
-        ├── api/                 # Flask REST API
-        ├── tests/               # pytest unit tests
-        ├── journeys/            # VenomQA journeys
-        ├── actions/             # Reusable actions
-        └── docker-compose.yml   # Docker setup
+New to VenomQA?
+    │
+    ▼
+quickstart/         ← First experience (<2 min)
+    │
+    ▼
+Want to learn patterns?
+    │
+    ▼
+todo_app/           ← Learn actions, journeys, branching (<5 min)
+    │
+    ▼
+Need all features?
+    │
+    ▼
+full_featured_app/  ← All ports, enterprise patterns (<10 min)
+    │
+    ▼
+Integrating with a platform?
+    │
+    ▼
+integrations/       ← Real-world integration examples
 ```
+
+## Examples Overview
+
+| Example | Time | Best For |
+|---------|------|----------|
+| **quickstart/** | 2 min | Your first VenomQA experience |
+| **todo_app/** | 5 min | Learning journeys, checkpoints, branches |
+| **full_featured_app/** | 10 min | All VenomQA features, enterprise patterns |
+| **integrations/medusa/** | 10 min | E-commerce platform integration |
 
 ## Quick Start
 
-### 1. Copy Templates to Your Project
+### Option 1: Quickstart (Fastest)
 
 ```bash
-# Copy CI/CD templates
-cp -r templates/ci/* your-project/.github/workflows/
-
-# Copy journey templates
-cp -r templates/journeys your-project/qa/
-
-# Copy Docker templates
-cp templates/docker/Dockerfile.example your-project/Dockerfile.qa
+cd examples/quickstart
+pip install venomqa
+venomqa run hello_journey
 ```
 
-### 2. Using Journey Templates
-
-```python
-# journeys/my_journey.py
-from templates.journeys.crud_flow import CRUDActions, crud_full_cycle_flow
-
-# Customize for your API
-my_crud_flow = crud_full_cycle_flow.with_overrides(
-    base_url="https://api.myapp.com",
-    resource_path="/api/products"
-)
-```
-
-### 3. Run with CI/CD
+### Option 2: Todo App (Most Educational)
 
 ```bash
-# GitHub Actions - just copy the workflow file
-# GitLab CI - include the template
-include:
-  - local: '/templates/ci/gitlab-ci.yml'
-
-# Jenkins - use the Jenkinsfile in your pipeline
-# CircleCI - reference the orb/config
+cd examples/todo_app
+docker compose up -d
+cd qa
+venomqa run
 ```
 
-## CI/CD Templates
+See the [todo_app README](./todo_app/README.md) for complete instructions.
 
-### GitHub Actions
+## What Each Example Demonstrates
 
-The `github-actions.yml` provides:
-- Linting with Ruff and MyPy
-- Unit test execution with coverage
-- API integration tests
-- E2E tests (on main branch)
-- Performance tests (scheduled/manual)
-- Slack notifications
+### quickstart/
 
-```yaml
-# .github/workflows/venomqa.yml
-# Copy templates/ci/github-actions.yml here
+Your first VenomQA experience in under 2 minutes:
+
+- **Minimal setup** - Just pip install and run
+- **Hello World journey** - See the core concepts
+- **Clean code structure** - Actions and journeys organized
+- **Real API patterns** - Health checks, CRUD operations
+
+Perfect for: Getting started quickly, understanding the basics.
+
+**See**: [quickstart/qa/journeys/hello_journey.py](./quickstart/qa/journeys/hello_journey.py)
+
+### todo_app/
+
+A complete, production-ready example:
+
+- **Flask REST API** with CRUD operations
+- **File upload/download** handling
+- **PostgreSQL** database integration
+- **Journey tests** with checkpoints and branches
+- **Error handling** and validation testing
+- **Docker Compose** for local development
+
+Perfect for: Understanding how to structure a VenomQA project.
+
+**See**: [todo_app/README.md](./todo_app/README.md)
+
+### full_featured_app/
+
+An enterprise example demonstrating ALL VenomQA capabilities:
+
+- **All 10 VenomQA ports** (Client, Database, State, File, Mail, Queue, Cache, Search, WebSocket, Time)
+- **FastAPI** application (more advanced than Flask)
+- **Real-time** communication with WebSocket
+- **Background jobs** with Celery
+- **Email testing** with Mailhog
+- **Caching** with Redis
+- **Search** with Elasticsearch
+- **Rate limiting** and webhooks
+
+Perfect for: Advanced patterns and understanding how different ports work together.
+
+**See**: [full_featured_app/README.md](./full_featured_app/README.md)
+
+### integrations/medusa/
+
+Real-world e-commerce platform integration:
+
+- **Medusa JS** e-commerce backend testing
+- **Customer authentication** flows
+- **Cart management** and checkout
+- **Order processing** with branching paths
+- **Production-like** test scenarios
+
+Perfect for: Seeing how VenomQA integrates with real platforms.
+
+**See**: [integrations/medusa/README.md](./integrations/medusa/README.md)
+
+## Project Structure
+
+```
+examples/
+├── quickstart/              # START HERE - 2 minute intro
+│   ├── app/                 # Simple API server
+│   └── qa/
+│       ├── actions/         # Reusable action functions
+│       └── journeys/        # Test journeys
+│
+├── todo_app/                # NEXT - complete Flask example
+│   ├── app/                 # Flask REST API
+│   ├── docker-compose.yml   # Docker setup
+│   └── qa/
+│       ├── actions/         # CRUD actions
+│       └── journeys/        # Comprehensive journeys
+│
+├── full_featured_app/       # ADVANCED - all features
+│   ├── app/                 # FastAPI application
+│   ├── docker/              # Full stack Compose
+│   └── qa/                  # All port examples
+│
+├── integrations/            # PLATFORM INTEGRATIONS
+│   └── medusa/              # E-commerce platform
+│       ├── qa/              # Integration tests
+│       └── README.md
+│
+├── test-server/             # Mock server for testing
+│   └── test_server.py       # Runnable FastAPI server
+│
+├── seeds/                   # Data seeding examples
+├── plugins/                 # Custom plugin examples
+└── README.md                # This file
 ```
 
-### GitLab CI
+## Running Examples
 
-Features:
-- Multi-stage pipeline (lint → test → e2e → report)
-- Docker-in-Docker for containerized tests
-- GitLab Pages for report hosting
-- Slack webhook notifications
-
-### Jenkins
-
-Includes:
-- Kubernetes pod agent support
-- Parallel test execution
-- JUnit report publishing
-- Email notifications on failure
-
-### CircleCI
-
-Features:
-- Orb-based configuration
-- Docker service containers
-- Parallelism support
-- Slack integration
-
-### Azure Pipelines
-
-Supports:
-- Azure-hosted agents
-- Service containers (PostgreSQL, Redis)
-- Test results publishing
-- Code coverage reports
-
-## Journey Templates
-
-### Authentication Flow (`auth_flow.py`)
-
-```python
-from templates.journeys.auth_flow import (
-    auth_login_flow,
-    auth_registration_flow,
-    auth_full_flow,
-)
-
-# Use predefined flows
-venomqa run --journey auth_login_flow
-
-# Or build custom flows
-from templates.journeys.auth_flow import AuthActions
-
-auth = AuthActions("https://api.example.com")
-response = auth.login("user@example.com", "password")
-```
-
-### CRUD Flow (`crud_flow.py`)
-
-```python
-from templates.journeys.crud_flow import (
-    crud_create_flow,
-    crud_read_flow,
-    crud_update_flow,
-    crud_delete_flow,
-    crud_full_cycle_flow,
-    CRUDActions,
-)
-
-# Test complete CRUD lifecycle
-venomqa run --journey crud_full_cycle_flow
-
-# Use CRUDActions for custom operations
-crud = CRUDActions(
-    base_url="https://api.example.com",
-    resource_path="/api/articles"
-)
-crud.create({"title": "Test", "content": "..."})
-```
-
-### File Upload Flow (`file_upload_flow.py`)
-
-```python
-from templates.journeys.file_upload_flow import (
-    single_file_upload_flow,
-    multiple_file_upload_flow,
-    chunked_upload_flow,
-    FileUploadActions,
-)
-
-# Test file uploads
-venomqa run --journey single_file_upload_flow
-
-# Use FileUploadActions
-uploader = FileUploadActions("https://api.example.com")
-uploader.upload_single("/path/to/file.pdf")
-uploader.upload_chunked("/path/to/large_file.zip", chunk_size=5*1024*1024)
-```
-
-### Payment Flow (`payment_flow.py`)
-
-```python
-from templates.journeys.payment_flow import (
-    shopping_cart_flow,
-    checkout_success_flow,
-    refund_flow,
-    full_purchase_flow,
-    PaymentActions,
-)
-
-# Test payment flows
-venomqa run --journey full_purchase_flow
-
-# Use PaymentActions
-payment = PaymentActions("https://api.example.com")
-payment.create_cart()
-payment.add_to_cart(cart_id, product_id, quantity=2)
-payment.process_checkout(cart_id, payment_method_id, shipping_address)
-```
-
-## Full Stack Example
-
-The `examples/full_stack_app/` directory contains a complete working example:
-
-### Running the Example
+### With Docker (Recommended)
 
 ```bash
-cd examples/full_stack_app
-
-# Option 1: Run API locally
-pip install -r api/requirements.txt
-python -m api.main &
-venomqa run --config venomqa.yaml
-
-# Option 2: Use Docker Compose
-docker-compose up -d
-docker-compose exec venomqa venomqa run
-
-# Option 3: Run tests
-pytest tests/ -v
+cd examples/<example_name>
+docker compose up -d          # Start app
+cd qa
+venomqa run                   # Run tests
 ```
 
-### Example Structure
+### Without Docker
 
-```
-full_stack_app/
-├── api/
-│   ├── main.py              # Flask REST API
-│   └── requirements.txt     # Python dependencies
-├── tests/
-│   └── test_api.py          # pytest unit tests
-├── journeys/
-│   └── __init__.py          # VenomQA journey definitions
-├── actions/
-│   └── __init__.py          # Reusable action functions
-├── docker-compose.yml       # Docker orchestration
-└── venomqa.yaml             # VenomQA configuration
+```bash
+cd examples/<example_name>
+pip install -r requirements.txt
+python -m app.app             # Start app
+cd qa
+venomqa run                   # Run tests
 ```
 
-## Docker Templates
+## Common Tasks
 
-### Dockerfile.example
+### Learning VenomQA
 
-Multi-stage build for test APIs:
-- Builder stage for compilation
-- Runtime stage with minimal dependencies
-- Non-root user for security
-- Health check support
+1. Start with `quickstart/` to see the basics
+2. Move to `todo_app/` for real-world patterns
+3. Study `full_featured_app/` for advanced features
 
-### docker-compose.override.yml
+### Writing Your Own Tests
 
-Local development overrides including:
-- Hot-reload for API
-- Database and cache services
-- Admin UIs (Adminer, Redis Commander)
-- Mock server for external APIs
-- MailHog for email testing
+1. Copy the structure from `todo_app/qa/`
+2. Create `actions/` folder for reusable functions
+3. Create `journeys/` folder for test scenarios
+4. Add `venomqa.yaml` for configuration
 
-## Best Practices
+### Integrating with Your Platform
 
-### 1. Journey Organization
-
-```python
-# journeys/__init__.py
-from .auth import auth_flows
-from .products import product_flows
-from .orders import order_flows
-
-ALL_JOURNEYS = [
-    *auth_flows,
-    *product_flows,
-    *order_flows,
-]
-```
-
-### 2. Action Reusability
-
-```python
-# actions/common.py
-def with_auth(action):
-    def wrapped(client, context):
-        if not context.get("token"):
-            login(client, context)
-        return action(client, context)
-    return wrapped
-
-# Use in journeys
-Step(name="protected_action", action=with_auth(my_action))
-```
-
-### 3. Environment Configuration
-
-```yaml
-# venomqa.yaml
-base_url: "${API_BASE_URL:-http://localhost:8000}"
-timeout: ${TIMEOUT:-30}
-
-environments:
-  dev:
-    base_url: "http://localhost:8000"
-  staging:
-    base_url: "https://staging-api.example.com"
-  prod:
-    base_url: "https://api.example.com"
-    timeout: 60
-```
-
-### 4. CI/CD Integration
-
-```yaml
-# .github/workflows/test.yml
-- name: Run VenomQA
-  run: |
-    venomqa run \
-      --config venomqa.yaml \
-      --env ${{ matrix.environment }} \
-      --tags ${{ matrix.tags }} \
-      --parallel 4 \
-      --output-dir reports
-```
+1. Check `integrations/` for similar platforms
+2. Copy the structure and adapt to your API
+3. Use actions from your closest match as templates
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Connection refused**: Ensure the API is running and accessible
-2. **Auth token expired**: Check token refresh logic in journeys
-3. **Timeout errors**: Increase `timeout` in venomqa.yaml
-4. **Flaky tests**: Add retry configuration for unstable operations
-
-### Debug Mode
+### Services Won't Start
 
 ```bash
-# Enable verbose output
-venomqa run --verbose --debug
-
-# Run single journey
-venomqa run --journey auth_login_flow --debug
-
-# Dry run (validate without executing)
-venomqa run --dry-run
+docker compose logs app
+docker compose down -v
+docker compose up -d
 ```
 
-## Contributing
+### Import Errors
 
-To contribute new templates:
+```bash
+pip install -e ../../..
+python -c "import venomqa; print(venomqa.__version__)"
+```
 
-1. Follow the existing structure
-2. Include docstrings and comments
-3. Add type hints for Python code
-4. Test with the full_stack_app example
-5. Update this README
+### Tests Failing
 
-## License
+```bash
+curl http://localhost:PORT/health  # Check app is running
+venomqa run --verbose              # Get detailed output
+```
 
-MIT License - See LICENSE file for details.
+## Next Steps
+
+After exploring the examples:
+
+1. **Read the docs**: See `/docs/` in the root directory
+2. **Build your journey**: Follow patterns from todo_app
+3. **Set up CI/CD**: Check `/docs/ci-cd.md`
+4. **Join the community**: See CONTRIBUTING.md
