@@ -61,6 +61,8 @@ dependencies = [
     "psycopg[binary]>=3.1.0",
     "faker>=18.0.0",
     "watchdog>=3.0.0",
+    "mkdocstrings>=1.0.3",
+    "mkdocstrings-python>=2.0.2",
 ]
 
 [project.optional-dependencies]
