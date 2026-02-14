@@ -119,7 +119,29 @@ class ErrorCode(Enum):
 
 @dataclass
 class ErrorContext:
-    """Structured context for error logging and debugging."""
+    """Structured context for error logging and debugging.
+
+    ErrorContext captures the full execution state when an error occurs,
+    making it easier to reproduce and debug issues.
+
+    Attributes:
+        journey_name: Name of the journey being executed
+        path_name: Name of the branch path (if in a branch)
+        step_name: Name of the current step
+        request: HTTP request details (method, url, headers, body)
+        response: HTTP response details (status, headers, body)
+        extra: Additional context-specific information
+        timestamp: When the error occurred
+        traceback: Full stack trace (if available)
+
+    Example:
+        context = ErrorContext(
+            journey_name="checkout_flow",
+            step_name="create_order",
+            request={"method": "POST", "url": "/api/orders"},
+            response={"status": 500, "body": {"error": "Internal error"}},
+        )
+    """
 
     journey_name: str | None = None
     path_name: str | None = None
@@ -131,6 +153,7 @@ class ErrorContext:
     traceback: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert context to dictionary for serialization."""
         result = {
             "journey_name": self.journey_name,
             "path_name": self.path_name,
@@ -142,6 +165,17 @@ class ErrorContext:
             "traceback": self.traceback,
         }
         return {k: v for k, v in result.items() if v is not None}
+
+    def format_location(self) -> str:
+        """Format the error location as a readable string."""
+        parts = []
+        if self.journey_name:
+            parts.append(f"journey={self.journey_name}")
+        if self.path_name:
+            parts.append(f"path={self.path_name}")
+        if self.step_name:
+            parts.append(f"step={self.step_name}")
+        return " > ".join(parts) if parts else "unknown location"
 
 
 class VenomQAError(Exception):
