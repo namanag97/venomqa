@@ -717,8 +717,8 @@ venomqa run --verbose --config qa/venomqa.yaml
 ### Getting Help
 
 - **Documentation**: https://venomqa.dev/docs
-- **Issues**: https://github.com/namanagarwal/venomqa/issues
-- **Discussions**: https://github.com/namanagarwal/venomqa/discussions
+- **Issues**: https://github.com/namanag97/venomqa/issues
+- **Discussions**: https://github.com/namanag97/venomqa/discussions
 
 ---
 
