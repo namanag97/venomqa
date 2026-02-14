@@ -475,8 +475,8 @@ A: Try these optimizations:
 A: You have several options:
 
 1. **Check the documentation:** https://venomqa.dev/docs
-2. **Search existing issues:** https://github.com/namanagarwal/venomqa/issues
-3. **Open a new issue:** https://github.com/namanagarwal/venomqa/issues/new
+2. **Search existing issues:** https://github.com/namanag97/venomqa/issues
+3. **Open a new issue:** https://github.com/namanag97/venomqa/issues/new
 4. **Join the community:** (Coming soon)
 
 When reporting issues, include:

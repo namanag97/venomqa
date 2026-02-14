@@ -305,31 +305,76 @@ class VenomQAError(Exception):
 
 
 class ConnectionError(VenomQAError):
-    """Error establishing connection to a service."""
+    """Error establishing connection to a service.
+
+    This error occurs when VenomQA cannot connect to the target API
+    or database. Common causes include:
+    - Service not running
+    - Incorrect URL/port
+    - Network issues
+    - Firewall blocking connections
+    """
 
     error_code = ErrorCode.CONNECTION_FAILED
     default_message = "Failed to establish connection"
+    default_suggestions = [
+        "Verify the service is running (try: curl <base_url>/health)",
+        "Check base_url in venomqa.yaml matches your API address",
+        "Ensure no firewall is blocking the connection",
+        "Run 'venomqa doctor' to diagnose connectivity issues",
+    ]
+    docs_path = "errors/connection"
 
 
 class ConnectionTimeoutError(ConnectionError):
-    """Connection timed out."""
+    """Connection timed out before establishing.
+
+    The connection attempt took longer than the configured timeout.
+    This often indicates network latency or an unresponsive service.
+    """
 
     error_code = ErrorCode.CONNECTION_TIMEOUT
     default_message = "Connection timed out"
+    default_suggestions = [
+        "Increase timeout in venomqa.yaml (current default: 30s)",
+        "Check if the service is overloaded or slow to respond",
+        "Verify network connectivity to the target host",
+        "Consider using 'venomqa smoke-test' to verify API availability",
+    ]
 
 
 class ConnectionRefusedError(ConnectionError):
-    """Connection was refused by the server."""
+    """Connection was actively refused by the server.
+
+    The target host is reachable but no service is listening
+    on the specified port.
+    """
 
     error_code = ErrorCode.CONNECTION_REFUSED
     default_message = "Connection refused by server"
+    default_suggestions = [
+        "Verify the service is running on the expected port",
+        "Check if the port number in base_url is correct",
+        "If using Docker, ensure containers are started: docker compose up -d",
+        "Run 'venomqa docker status' to check container health",
+    ]
 
 
 class ConnectionResetError(ConnectionError):
-    """Connection was reset by the peer."""
+    """Connection was reset by the peer.
+
+    An established connection was unexpectedly closed by the server.
+    This can indicate server crashes, network issues, or timeouts.
+    """
 
     error_code = ErrorCode.CONNECTION_RESET
     default_message = "Connection reset by peer"
+    default_suggestions = [
+        "Check server logs for crashes or errors",
+        "Verify the server can handle the request payload size",
+        "Consider enabling retry with backoff in configuration",
+        "Check for network instability between client and server",
+    ]
 
 
 class TimeoutError(VenomQAError):
