@@ -214,9 +214,13 @@ class CombinatorialExecutor:
     and actual HTTP execution. It takes a configured builder and a client,
     then runs all generated combinations against the live API.
 
+    When ``run_preflight`` is True (the default), a smoke test is run
+    before execution to catch showstopper problems early.
+
     Attributes:
         builder: The CombinatorialGraphBuilder with dimensions and transitions.
         client: The HTTP client for making live requests.
+        run_preflight: Whether to run a preflight smoke test before execution.
 
     Example:
         >>> from venomqa.combinatorial import CombinatorialGraphBuilder, ...
@@ -243,6 +247,7 @@ class CombinatorialExecutor:
         builder: CombinatorialGraphBuilder,
         client: Any,
         db: Any = None,
+        run_preflight: bool = True,
     ) -> None:
         """Initialize the executor.
 
@@ -250,10 +255,14 @@ class CombinatorialExecutor:
             builder: Configured CombinatorialGraphBuilder.
             client: HTTP client (venomqa.Client, httpx.Client, or similar).
             db: Optional database connection for invariant checks.
+            run_preflight: Run a preflight smoke test before execution
+                to catch problems like server down, bad auth, or broken
+                database records. Set to False to skip.
         """
         self.builder = builder
         self.client = client
         self.db = db
+        self.run_preflight = run_preflight
 
     def execute(
         self,
