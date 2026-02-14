@@ -605,8 +605,9 @@ class CombinatorialGraphBuilder:
         gen = CoveringArrayGenerator(
             self.space, self.constraints, seed=self.seed
         )
-        combos = gen.generate(strength=strength)
-        stats = gen.coverage_stats(combos, strength=strength)
+        effective_strength = min(strength, len(self.space.dimensions))
+        combos = gen.generate(strength=effective_strength)
+        stats = gen.coverage_stats(combos, strength=effective_strength)
 
         lines = [
             f"Combinatorial Graph Builder: {self.name}",
