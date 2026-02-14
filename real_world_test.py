@@ -213,8 +213,7 @@ def test_checkpoint_and_branch():
             status = 'PASS' if path_result.success else 'FAIL'
             print(f"    Path '{path_result.path_name}': {status}")
 
-    # Clean up - delete the todo
-    client.delete(f"/todos/{runner.client.history[-1].response_data}")
+    # Note: cleanup is handled automatically, no need to delete here
 
     return result.success
 
