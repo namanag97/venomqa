@@ -1,0 +1,147 @@
+# VenomQA CI/CD Docker Compose
+#
+# This docker-compose file is designed for CI/CD pipelines.
+# It includes all necessary services and the VenomQA runner.
+#
+# Usage:
+#   # Start services
+#   docker compose -f docker/docker-compose.ci.yml up -d api postgres redis
+#
+#   # Wait for services and run tests
+#   docker compose -f docker/docker-compose.ci.yml run --rm venomqa
+#
+#   # Or use the one-liner:
+#   docker compose -f docker/docker-compose.ci.yml up --exit-code-from venomqa
+#
+# Exit codes:
+#   0 - All journeys passed
+#   1 - Some journeys failed
+#   2 - Configuration error
+
+version: "3.8"
+
+services:
+  # ==========================================================================
+  # Test Dependencies
+  # ==========================================================================
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: qa
+      POSTGRES_PASSWORD: ${QA_DB_PASSWORD:-qapass}
+      POSTGRES_DB: venomqa_qa
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_ci_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qa -d venomqa_qa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - venomqa-ci
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - venomqa-ci
+
+  # ==========================================================================
+  # Application Under Test
+  # Replace this with your actual application
+  # ==========================================================================
+
+  api:
+    image: ${API_IMAGE:-your-api:latest}
+    # Uncomment to build from local Dockerfile:
+    # build:
+    #   context: ..
+    #   dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://qa:${QA_DB_PASSWORD:-qapass}@postgres:5432/venomqa_qa
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=ci
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - venomqa-ci
+
+  # ==========================================================================
+  # VenomQA Runner
+  # ==========================================================================
+
+  venomqa:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.runner
+    environment:
+      # VenomQA configuration
+      - VENOMQA_BASE_URL=http://api:8000
+      - VENOMQA_CONFIG=/app/qa/venomqa.yaml
+      - VENOMQA_REPORT_DIR=/app/reports
+      - VENOMQA_TIMEOUT=30
+      - VENOMQA_FAIL_FAST=${FAIL_FAST:-false}
+
+      # Service wait configuration
+      - WAIT_FOR_POSTGRES=postgres:5432
+      - WAIT_FOR_REDIS=redis:6379
+      - WAIT_FOR_HTTP=http://api:8000/health
+      - WAIT_TIMEOUT=120
+
+      # Journey filter (optional)
+      - JOURNEY_FILTER=${JOURNEY_FILTER:-}
+    volumes:
+      # Mount QA files (read-only for safety)
+      - ../qa:/app/qa:ro
+      # Mount reports directory for output
+      - ../reports:/app/reports
+    depends_on:
+      api:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/run-journeys.sh"]
+    networks:
+      - venomqa-ci
+
+  # ==========================================================================
+  # Optional: Report Server
+  # Serves HTML reports after test run
+  # ==========================================================================
+
+  report-server:
+    image: nginx:alpine
+    ports:
+      - "9000:80"
+    volumes:
+      - ../reports:/usr/share/nginx/html:ro
+    profiles:
+      - reports
+    networks:
+      - venomqa-ci
+
+networks:
+  venomqa-ci:
+    driver: bridge
+
+volumes:
+  postgres_ci_data:

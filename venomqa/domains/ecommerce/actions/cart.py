@@ -3,13 +3,12 @@
 Reusable cart management actions.
 """
 
-
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class CartActions:
     def __init__(self, base_url: str):
-        self.client = HTTPClient(base_url=base_url)
+        self.client = Client(base_url=base_url)
 
     def create_cart(self, token: str | None = None):
         headers = {"Authorization": f"Bearer {token}"} if token else {}
@@ -19,9 +18,7 @@ class CartActions:
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.get(f"/api/cart/{cart_id}", headers=headers)
 
-    def add_item(
-        self, cart_id: str, product_id: str, quantity: int = 1, token: str | None = None
-    ):
+    def add_item(self, cart_id: str, product_id: str, quantity: int = 1, token: str | None = None):
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.post(
             f"/api/cart/{cart_id}/items",

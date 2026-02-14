@@ -4,44 +4,119 @@ Demonstrates:
 - API v1 compatibility
 - API v2 compatibility
 - Version transition handling
+
+This module provides journeys for testing API version compatibility
+and migration between API versions.
 """
 
+from __future__ import annotations
+
+from typing import Any
 
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class VersionedAPIActions:
-    def __init__(self, base_url: str, version: str = "v1"):
-        self.client = HTTPClient(base_url=base_url)
+    """Actions for versioned API operations.
+
+    Provides methods for interacting with different API versions,
+    supporting version-specific features and behaviors.
+
+    Args:
+        base_url: Base URL for the API service.
+        version: API version to use (e.g., 'v1', 'v2').
+    """
+
+    def __init__(self, base_url: str, version: str = "v1") -> None:
+        self.client = Client(base_url=base_url)
         self.version = version
         self.base_path = f"/api/{version}"
 
-    def get_items(self, token: str | None = None):
+    def get_items(self, token: str | None = None) -> Any:
+        """Get all items from the versioned API.
+
+        Args:
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing items list.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.get(f"{self.base_path}/items", headers=headers)
 
-    def get_item(self, item_id: str, token: str | None = None):
+    def get_item(self, item_id: str, token: str | None = None) -> Any:
+        """Get a single item by ID from the versioned API.
+
+        Args:
+            item_id: Unique identifier of the item.
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing item data.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.get(f"{self.base_path}/items/{item_id}", headers=headers)
 
-    def create_item(self, data: dict, token: str | None = None):
+    def create_item(self, data: dict[str, Any], token: str | None = None) -> Any:
+        """Create a new item via the versioned API.
+
+        Args:
+            data: Item data to create.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from create request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.post(f"{self.base_path}/items", json=data, headers=headers)
 
-    def update_item(self, item_id: str, data: dict, token: str | None = None):
+    def update_item(self, item_id: str, data: dict[str, Any], token: str | None = None) -> Any:
+        """Update an existing item via the versioned API.
+
+        Args:
+            item_id: Unique identifier of the item to update.
+            data: Updated item data.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from update request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.patch(f"{self.base_path}/items/{item_id}", json=data, headers=headers)
 
-    def delete_item(self, item_id: str, token: str | None = None):
+    def delete_item(self, item_id: str, token: str | None = None) -> Any:
+        """Delete an item via the versioned API.
+
+        Args:
+            item_id: Unique identifier of the item to delete.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from delete request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.delete(f"{self.base_path}/items/{item_id}", headers=headers)
 
-    def get_api_info(self):
+    def get_api_info(self) -> Any:
+        """Get API version information.
+
+        Returns:
+            Response object containing API version details.
+        """
         return self.client.get(f"{self.base_path}/info")
 
 
-def login(client, context):
+def login(client: Client, context: dict) -> Any:
+    """Authenticate and store token in context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from login request.
+    """
     response = client.post(
         "/api/auth/login",
         json={
@@ -54,7 +129,16 @@ def login(client, context):
     return response
 
 
-def get_v1_api_info(client, context):
+def get_v1_api_info(client: Client, context: dict) -> Any:
+    """Get API v1 version information.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object containing v1 API info.
+    """
     actions = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v1"
     )
@@ -66,7 +150,16 @@ def get_v1_api_info(client, context):
     return response
 
 
-def get_v2_api_info(client, context):
+def get_v2_api_info(client: Client, context: dict) -> Any:
+    """Get API v2 version information.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object containing v2 API info.
+    """
     actions = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v2"
     )
@@ -78,7 +171,16 @@ def get_v2_api_info(client, context):
     return response
 
 
-def create_v1_item(client, context):
+def create_v1_item(client: Client, context: dict) -> Any:
+    """Create an item using API v1.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from create request.
+    """
     actions = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v1"
     )
@@ -93,7 +195,16 @@ def create_v1_item(client, context):
     return response
 
 
-def create_v2_item(client, context):
+def create_v2_item(client: Client, context: dict) -> Any:
+    """Create an item using API v2 with enhanced features.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from create request.
+    """
     actions = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v2"
     )
@@ -109,7 +220,16 @@ def create_v2_item(client, context):
     return response
 
 
-def get_v1_item(client, context):
+def get_v1_item(client: Client, context: dict) -> Any:
+    """Retrieve an item using API v1.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing v1_item_id.
+
+    Returns:
+        Response object containing item data.
+    """
     actions = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v1"
     )
@@ -120,7 +240,16 @@ def get_v1_item(client, context):
     return response
 
 
-def get_v2_item(client, context):
+def get_v2_item(client: Client, context: dict) -> Any:
+    """Retrieve an item using API v2.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing v2_item_id.
+
+    Returns:
+        Response object containing item data with v2 features.
+    """
     actions = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v2"
     )
@@ -132,7 +261,16 @@ def get_v2_item(client, context):
     return response
 
 
-def migrate_v1_to_v2(client, context):
+def migrate_v1_to_v2(client: Client, context: dict) -> Any:
+    """Access a v1 item through v2 API to test migration.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing v1_item_id.
+
+    Returns:
+        Response object containing migrated item data.
+    """
     actions_v2 = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v2"
     )
@@ -143,14 +281,32 @@ def migrate_v1_to_v2(client, context):
     return response
 
 
-def delete_v1_item(client, context):
+def delete_v1_item(client: Client, context: dict) -> Any:
+    """Delete an item using API v1.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing v1_item_id.
+
+    Returns:
+        Response object from delete request.
+    """
     actions = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v1"
     )
     return actions.delete_item(item_id=context["v1_item_id"], token=context.get("token"))
 
 
-def delete_v2_item(client, context):
+def delete_v2_item(client: Client, context: dict) -> Any:
+    """Delete an item using API v2.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing v2_item_id.
+
+    Returns:
+        Response object from delete request.
+    """
     actions = VersionedAPIActions(
         base_url=context.get("base_url", "http://localhost:8000"), version="v2"
     )

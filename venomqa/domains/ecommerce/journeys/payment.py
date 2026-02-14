@@ -6,19 +6,16 @@ Demonstrates:
 - Payment failure handling
 """
 
-
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class PaymentActions:
     def __init__(self, base_url: str, payment_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.payment_client = HTTPClient(base_url=payment_url or "http://localhost:8001")
+        self.client = Client(base_url=base_url)
+        self.payment_client = Client(base_url=payment_url or "http://localhost:8001")
 
-    def create_payment_intent(
-        self, amount: float, currency: str = "USD", token: str | None = None
-    ):
+    def create_payment_intent(self, amount: float, currency: str = "USD", token: str | None = None):
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.payment_client.post(
             "/api/payments/intent",
@@ -221,7 +218,7 @@ def void_payment(client, context):
 
 
 payment_processing_flow = Journey(
-    name="payment_processing",
+    name="ecommerce_payment_processing",
     description="Complete payment processing with capture",
     steps=[
         Step(name="login", action=login_shopper),
@@ -237,7 +234,7 @@ payment_processing_flow = Journey(
 )
 
 refund_flow = Journey(
-    name="payment_refund",
+    name="ecommerce_refund",
     description="Full and partial refund flows",
     steps=[
         Step(name="login", action=login_shopper),
@@ -245,7 +242,7 @@ refund_flow = Journey(
         Step(
             name="create_intent",
             action=create_payment_intent,
-            context_overrides={"payment_amount": 100.00},
+            args={"payment_amount": 100.00},
         ),
         Step(name="confirm", action=confirm_with_card),
         Step(name="capture", action=capture_payment),
@@ -266,7 +263,7 @@ refund_flow = Journey(
                         Step(
                             name="refund_partial",
                             action=partial_refund,
-                            context_overrides={"refund_amount": 30.00},
+                            args={"refund_amount": 30.00},
                         ),
                         Step(name="verify_partial_refund", action=verify_refund),
                     ],
@@ -277,7 +274,7 @@ refund_flow = Journey(
 )
 
 payment_failure_flow = Journey(
-    name="payment_failure",
+    name="ecommerce_payment_failure",
     description="Handle payment failures gracefully",
     steps=[
         Step(name="login", action=login_shopper),

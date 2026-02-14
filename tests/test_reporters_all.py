@@ -203,7 +203,6 @@ class TestMarkdownReporter:
                             PathResult(path_name="path1", success=True),
                             PathResult(path_name="path2", success=True),
                         ],
-                        all_passed=True,
                     ),
                 ],
                 issues=[],
@@ -479,7 +478,6 @@ class TestJUnitReporter:
                         path_results=[
                             PathResult(path_name="path1", success=True),
                         ],
-                        all_passed=True,
                     ),
                 ],
                 issues=[],
@@ -546,6 +544,7 @@ class TestJUnitReporter:
         system_out = root.find(".//system-out")
 
         assert system_out is not None
+        assert system_out.text is not None
         assert "Duration" in system_out.text
 
 
@@ -585,7 +584,6 @@ class TestReporterComparison:
                             PathResult(path_name="path1", success=True),
                             PathResult(path_name="path2", success=False, error="Path failed"),
                         ],
-                        all_passed=False,
                     ),
                 ],
                 issues=[

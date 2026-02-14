@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
+
+from venomqa import Journey
 
 
 class TestAuthDomainsImports:
@@ -15,7 +17,7 @@ class TestAuthDomainsImports:
 
         assert auth is not None
 
-    def test_auth_has_expected_functions(self) -> None:
+    def test_auth_has_expected_journeys(self) -> None:
         from venomqa.domains.auth import (
             registration_flow,
             email_verification_flow,
@@ -28,117 +30,97 @@ class TestAuthDomainsImports:
             password_strength_flow,
         )
 
-        assert callable(registration_flow)
-        assert callable(email_verification_flow)
-        assert callable(registration_with_profile_flow)
-        assert callable(oauth_google_flow)
-        assert callable(oauth_github_flow)
-        assert callable(oauth_linking_flow)
-        assert callable(password_reset_flow)
-        assert callable(password_change_flow)
-        assert callable(password_strength_flow)
+        assert isinstance(registration_flow, Journey)
+        assert isinstance(email_verification_flow, Journey)
+        assert isinstance(registration_with_profile_flow, Journey)
+        assert isinstance(oauth_google_flow, Journey)
+        assert isinstance(oauth_github_flow, Journey)
+        assert isinstance(oauth_linking_flow, Journey)
+        assert isinstance(password_reset_flow, Journey)
+        assert isinstance(password_change_flow, Journey)
+        assert isinstance(password_strength_flow, Journey)
 
 
 class TestRegistrationFlows:
     """Tests for registration-related journey flows."""
 
-    @patch("venomqa.domains.auth.journeys.registration.registration_flow")
-    def test_registration_flow(self, mock_flow: MagicMock) -> None:
+    def test_registration_flow_structure(self) -> None:
         from venomqa.domains.auth import registration_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert "registration" in registration_flow.name.lower()
+        assert "registration" in registration_flow.description.lower()
 
-        registration_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.auth.journeys.registration.email_verification_flow")
-    def test_email_verification_flow(self, mock_flow: MagicMock) -> None:
+    def test_email_verification_flow_structure(self) -> None:
         from venomqa.domains.auth import email_verification_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert (
+            "email" in email_verification_flow.name.lower()
+            or "verification" in email_verification_flow.name.lower()
+        )
 
-        email_verification_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.auth.journeys.registration.registration_with_profile_flow")
-    def test_registration_with_profile_flow(self, mock_flow: MagicMock) -> None:
+    def test_registration_with_profile_flow_structure(self) -> None:
         from venomqa.domains.auth import registration_with_profile_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
-
-        registration_with_profile_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
+        assert (
+            "registration" in registration_with_profile_flow.name.lower()
+            or "profile" in registration_with_profile_flow.name.lower()
+        )
 
 
 class TestOAuthFlows:
     """Tests for OAuth-related journey flows."""
 
-    @patch("venomqa.domains.auth.journeys.oauth.oauth_google_flow")
-    def test_oauth_google_flow(self, mock_flow: MagicMock) -> None:
+    def test_oauth_google_flow_structure(self) -> None:
         from venomqa.domains.auth import oauth_google_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert (
+            "google" in oauth_google_flow.name.lower() or "oauth" in oauth_google_flow.name.lower()
+        )
+        assert len(oauth_google_flow.steps) > 0
 
-        oauth_google_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.auth.journeys.oauth.oauth_github_flow")
-    def test_oauth_github_flow(self, mock_flow: MagicMock) -> None:
+    def test_oauth_github_flow_structure(self) -> None:
         from venomqa.domains.auth import oauth_github_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert (
+            "github" in oauth_github_flow.name.lower() or "oauth" in oauth_github_flow.name.lower()
+        )
+        assert len(oauth_github_flow.steps) > 0
 
-        oauth_github_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.auth.journeys.oauth.oauth_linking_flow")
-    def test_oauth_linking_flow(self, mock_flow: MagicMock) -> None:
+    def test_oauth_linking_flow_structure(self) -> None:
         from venomqa.domains.auth import oauth_linking_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
-
-        oauth_linking_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
+        assert (
+            "linking" in oauth_linking_flow.name.lower()
+            or "oauth" in oauth_linking_flow.name.lower()
+        )
 
 
 class TestPasswordFlows:
     """Tests for password-related journey flows."""
 
-    @patch("venomqa.domains.auth.journeys.password.password_reset_flow")
-    def test_password_reset_flow(self, mock_flow: MagicMock) -> None:
+    def test_password_reset_flow_structure(self) -> None:
         from venomqa.domains.auth import password_reset_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert (
+            "password" in password_reset_flow.name.lower()
+            or "reset" in password_reset_flow.name.lower()
+        )
 
-        password_reset_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.auth.journeys.password.password_change_flow")
-    def test_password_change_flow(self, mock_flow: MagicMock) -> None:
+    def test_password_change_flow_structure(self) -> None:
         from venomqa.domains.auth import password_change_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert (
+            "password" in password_change_flow.name.lower()
+            or "change" in password_change_flow.name.lower()
+        )
 
-        password_change_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.auth.journeys.password.password_strength_flow")
-    def test_password_strength_flow(self, mock_flow: MagicMock) -> None:
+    def test_password_strength_flow_structure(self) -> None:
         from venomqa.domains.auth import password_strength_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
-
-        password_strength_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
+        assert (
+            "password" in password_strength_flow.name.lower()
+            or "strength" in password_strength_flow.name.lower()
+        )
 
 
 class TestAuthJourneyPatterns:

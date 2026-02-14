@@ -329,7 +329,9 @@ class GlobalErrorHandler:
                 )
                 if result.success:
                     return result.value
-                raise result.error from e
+                if result.error is not None:
+                    raise result.error from e
+                raise e
 
         return wrapper
 
@@ -357,7 +359,8 @@ def handle_errors(
                 if result.success:
                     return result.value
                 if reraise:
-                    raise result.error from e
+                    exc = result.error if result.error is not None else e
+                    raise exc from e
                 return None
 
         return wrapper

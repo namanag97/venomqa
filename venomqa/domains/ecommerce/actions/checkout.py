@@ -3,14 +3,13 @@
 Reusable checkout management actions.
 """
 
-
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class CheckoutActions:
     def __init__(self, base_url: str, checkout_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.checkout_client = HTTPClient(base_url=checkout_url or base_url)
+        self.client = Client(base_url=base_url)
+        self.checkout_client = Client(base_url=checkout_url or base_url)
 
     def start_checkout(self, cart_id: str, token: str | None = None):
         headers = {"Authorization": f"Bearer {token}"} if token else {}

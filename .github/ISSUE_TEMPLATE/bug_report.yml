@@ -1,0 +1,148 @@
+name: Bug Report
+description: Report a bug to help us improve VenomQA
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this bug! Please fill out the sections below to help us resolve the issue.
+
+  - type: input
+    id: venomqa-version
+    attributes:
+      label: VenomQA Version
+      description: What version of VenomQA are you running?
+      placeholder: "0.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python Version
+      description: What version of Python are you using?
+      placeholder: "3.11.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other (please specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: |
+        Please provide a minimal, reproducible example. This includes:
+        - Journey code
+        - Configuration (venomqa.yaml)
+        - Any relevant setup steps
+      placeholder: |
+        1. Create a journey file with...
+        2. Run `venomqa run my_journey`
+        3. See error
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: The journey should complete successfully...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: The journey failed with an error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs / Stack Trace
+      description: |
+        Please paste any relevant error messages or stack traces.
+        Run with `--verbose` for more details.
+      placeholder: |
+        Traceback (most recent call last):
+          File "...", line X, in ...
+            ...
+        Error: ...
+      render: shell
+
+  - type: textarea
+    id: minimal-repro
+    attributes:
+      label: Minimal Reproducible Example
+      description: |
+        If possible, provide a complete minimal example that demonstrates the bug.
+        This should be self-contained and runnable.
+      placeholder: |
+        # journey.py
+        from venomqa import Journey, Step, Client
+
+        def my_action(client, context):
+            return client.get("/api/health")
+
+        journey = Journey(
+            name="minimal_bug",
+            steps=[Step(name="test", action=my_action)],
+        )
+
+        # venomqa.yaml
+        base_url: "http://localhost:8000"
+      render: python
+
+  - type: dropdown
+    id: database-backend
+    attributes:
+      label: Database Backend
+      description: Which database backend are you using?
+      options:
+        - PostgreSQL
+        - None (in-memory)
+        - Other
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context about the problem here:
+        - Are you using Docker?
+        - Any custom adapters?
+        - Other relevant environment details?
+      placeholder: I'm running this in a Docker container with PostgreSQL 15...
+
+  - type: checkboxes
+    id: pre-submission
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched the existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have read the documentation at docs/FAQ.md
+          required: false
+        - label: I can reproduce this issue consistently
+          required: false

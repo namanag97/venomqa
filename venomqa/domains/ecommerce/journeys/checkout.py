@@ -6,15 +6,14 @@ Demonstrates:
 - Multi-port testing (api:8000, payments:8001)
 """
 
-
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class CheckoutActions:
     def __init__(self, base_url: str, payment_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.payment_client = HTTPClient(base_url=payment_url or base_url)
+        self.client = Client(base_url=base_url)
+        self.payment_client = Client(base_url=payment_url or base_url)
 
     def create_cart(self, token: str | None = None):
         headers = {"Authorization": f"Bearer {token}"} if token else {}

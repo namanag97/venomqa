@@ -1,0 +1,110 @@
+# VenomQA Configuration for Medusa E-commerce
+# Medusa JS Store API Integration
+
+target:
+  # Medusa default development server
+  base_url: http://localhost:9000
+  # Store API prefix (v2 API)
+  api_prefix: /store
+  # Admin API prefix (for setup)
+  admin_prefix: /admin
+  timeout: 30.0
+  retry_count: 3
+  retry_delay: 1.0
+
+database:
+  # PostgreSQL connection for Medusa
+  type: postgresql
+  host: localhost
+  port: 5432
+  name: medusa-db
+  user: medusa
+  password: ${MEDUSA_DB_PASSWORD:-medusa}
+  # Enable checkpointing
+  checkpointing: true
+  # Use transactions for test isolation
+  transaction_isolation: true
+
+auth:
+  # Medusa uses JWT bearer tokens
+  type: jwt
+  # Customer token header
+  header: Authorization
+  scheme: Bearer
+  # Token refresh endpoint
+  refresh_endpoint: /auth/token/refresh
+  # Session cookie name (alternative auth method)
+  session_cookie: connect.sid
+
+state:
+  # State backend for checkpoints
+  backend: postgres
+  connection_string: postgresql://medusa:${MEDUSA_DB_PASSWORD:-medusa}@localhost:5432/medusa-db
+  # Checkpoint table prefix
+  checkpoint_prefix: venomqa_checkpoint_
+
+regions:
+  # Default test region
+  default: us
+  available:
+    - us
+    - eu
+
+currencies:
+  default: usd
+  available:
+    - usd
+    - eur
+
+journeys:
+  # Default journey settings
+  fail_fast: false
+  parallel_paths: 1
+  capture_logs: true
+  log_lines: 100
+  # Timeout for individual steps
+  step_timeout: 10.0
+  # Timeout for entire journey
+  journey_timeout: 300.0
+
+reporters:
+  - type: console
+    verbosity: detailed
+  - type: json
+    output: ./reports/medusa-test-results.json
+  - type: html
+    output: ./reports/medusa-test-report.html
+  - type: junit
+    output: ./reports/junit.xml
+
+environments:
+  development:
+    target:
+      base_url: http://localhost:9000
+    database:
+      host: localhost
+
+  staging:
+    target:
+      base_url: https://staging-api.example.com
+    database:
+      host: staging-db.example.com
+
+  production:
+    target:
+      base_url: https://api.example.com
+    database:
+      host: prod-db.example.com
+      # Read-only mode in production
+      checkpointing: false
+
+# Medusa-specific settings
+medusa:
+  # Publishable API key (required for store API)
+  publishable_api_key: ${MEDUSA_PUBLISHABLE_KEY}
+  # Sales channel ID for testing
+  sales_channel_id: ${MEDUSA_SALES_CHANNEL_ID}
+  # Test region ID
+  region_id: ${MEDUSA_REGION_ID}
+  # Stock location ID
+  stock_location_id: ${MEDUSA_STOCK_LOCATION_ID}

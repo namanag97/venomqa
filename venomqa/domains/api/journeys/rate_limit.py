@@ -4,31 +4,81 @@ Demonstrates:
 - Burst rate limit enforcement
 - Sustained rate limit enforcement
 - Rate limit header validation
+
+This module provides journeys for testing API rate limiting behavior
+including burst limits, sustained limits, and proper header handling.
 """
 
+from __future__ import annotations
+
 import time
+from typing import Any
 
 from venomqa import Checkpoint, Journey, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class RateLimitActions:
-    def __init__(self, base_url: str):
-        self.client = HTTPClient(base_url=base_url)
+    """Actions for rate limit testing operations.
 
-    def make_request(self, endpoint: str, token: str | None = None):
+    Provides methods for making requests to test rate limiting
+    behavior and checking rate limit status.
+
+    Args:
+        base_url: Base URL for the API service.
+    """
+
+    def __init__(self, base_url: str) -> None:
+        self.client = Client(base_url=base_url)
+
+    def make_request(self, endpoint: str, token: str | None = None) -> Any:
+        """Make a GET request to an endpoint.
+
+        Args:
+            endpoint: API endpoint path.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from the request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.get(endpoint, headers=headers)
 
-    def make_authenticated_request(self, endpoint: str, token: str):
+    def make_authenticated_request(self, endpoint: str, token: str) -> Any:
+        """Make an authenticated GET request.
+
+        Args:
+            endpoint: API endpoint path.
+            token: Required authentication token.
+
+        Returns:
+            Response object from the request.
+        """
         return self.client.get(endpoint, headers={"Authorization": f"Bearer {token}"})
 
-    def get_rate_limit_status(self, token: str | None = None):
+    def get_rate_limit_status(self, token: str | None = None) -> Any:
+        """Get current rate limit status.
+
+        Args:
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing rate limit status.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.get("/api/rate-limit/status", headers=headers)
 
 
-def login(client, context):
+def login(client: Client, context: dict) -> Any:
+    """Authenticate and store token in context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from login request.
+    """
     response = client.post(
         "/api/auth/login",
         json={
@@ -41,14 +91,32 @@ def login(client, context):
     return response
 
 
-def make_single_request(client, context):
+def make_single_request(client: Client, context: dict) -> Any:
+    """Make a single request to test endpoint.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from the request.
+    """
     actions = RateLimitActions(base_url=context.get("base_url", "http://localhost:8000"))
     response = actions.make_request(endpoint="/api/test", token=context.get("token"))
     context["last_response"] = response
     return response
 
 
-def make_burst_requests(client, context):
+def make_burst_requests(client: Client, context: dict) -> dict[str, Any]:
+    """Make multiple rapid requests to trigger burst rate limiting.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Dictionary with burst test results.
+    """
     actions = RateLimitActions(base_url=context.get("base_url", "http://localhost:8000"))
     burst_count = context.get("burst_count", 10)
     responses = []
@@ -67,7 +135,16 @@ def make_burst_requests(client, context):
     return {"total_requests": burst_count, "rate_limited": len(rate_limited)}
 
 
-def make_sustained_requests(client, context):
+def make_sustained_requests(client: Client, context: dict) -> dict[str, Any]:
+    """Make sustained requests over time to test sustained rate limiting.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Dictionary with sustained test results.
+    """
     actions = RateLimitActions(base_url=context.get("base_url", "http://localhost:8000"))
     total_requests = context.get("sustained_count", 20)
     interval = context.get("request_interval", 0.1)
@@ -88,7 +165,16 @@ def make_sustained_requests(client, context):
     return {"total_requests": total_requests, "rate_limited": len(rate_limited)}
 
 
-def check_rate_limit_headers(client, context):
+def check_rate_limit_headers(client: Client, context: dict) -> Any:
+    """Verify rate limit headers are present in response.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from the request.
+    """
     actions = RateLimitActions(base_url=context.get("base_url", "http://localhost:8000"))
     response = actions.make_request(endpoint="/api/test", token=context.get("token"))
     headers = dict(response.headers) if hasattr(response, "headers") else {}
@@ -105,14 +191,32 @@ def check_rate_limit_headers(client, context):
     return response
 
 
-def verify_rate_limit_exceeded(client, context):
+def verify_rate_limit_exceeded(client: Client, context: dict) -> dict[str, int]:
+    """Verify that rate limit was exceeded during burst test.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing burst_responses.
+
+    Returns:
+        Dictionary with rate limited count.
+    """
     responses = context.get("burst_responses", [])
     rate_limited = [r for r in responses if r["status_code"] == 429]
     assert len(rate_limited) > 0, "Should have rate limited responses"
     return {"rate_limited_count": len(rate_limited)}
 
 
-def get_rate_limit_status(client, context):
+def get_rate_limit_status(client: Client, context: dict) -> Any:
+    """Get current rate limit status from API.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object containing rate limit status.
+    """
     actions = RateLimitActions(base_url=context.get("base_url", "http://localhost:8000"))
     response = actions.get_rate_limit_status(token=context.get("token"))
     if response.status_code == 200:
@@ -122,21 +226,19 @@ def get_rate_limit_status(client, context):
 
 
 rate_limit_burst_flow = Journey(
-    name="rate_limit_burst",
+    name="api_rate_limit_burst",
     description="Test burst rate limit enforcement",
     steps=[
         Step(name="login", action=login),
         Checkpoint(name="authenticated"),
-        Step(
-            name="burst_requests", action=make_burst_requests, context_overrides={"burst_count": 20}
-        ),
+        Step(name="burst_requests", action=make_burst_requests, args={"burst_count": 20}),
         Checkpoint(name="burst_complete"),
         Step(name="verify_rate_limited", action=verify_rate_limit_exceeded),
     ],
 )
 
 rate_limit_sustained_flow = Journey(
-    name="rate_limit_sustained",
+    name="api_rate_limit_sustained",
     description="Test sustained rate limit enforcement",
     steps=[
         Step(name="login", action=login),
@@ -144,7 +246,7 @@ rate_limit_sustained_flow = Journey(
         Step(
             name="sustained_requests",
             action=make_sustained_requests,
-            context_overrides={"sustained_count": 30, "request_interval": 0.05},
+            args={"sustained_count": 30, "request_interval": 0.05},
         ),
         Checkpoint(name="sustained_complete"),
         Step(name="check_status", action=get_rate_limit_status),
@@ -152,7 +254,7 @@ rate_limit_sustained_flow = Journey(
 )
 
 rate_limit_headers_flow = Journey(
-    name="rate_limit_headers",
+    name="api_rate_limit_headers",
     description="Verify rate limit headers are present and correct",
     steps=[
         Step(name="login", action=login),

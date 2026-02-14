@@ -434,27 +434,27 @@ class TestSanitizeName:
     """Tests for checkpoint name sanitization."""
 
     def test_sanitize_simple_name(self) -> None:
-        result = PostgreSQLStateManager._sanitize_name("simple_name")
+        result = BaseStateManager._sanitize_checkpoint_name("simple_name")
         assert result == "chk_simple_name"
 
     def test_sanitize_name_with_special_chars(self) -> None:
-        result = PostgreSQLStateManager._sanitize_name("test-name; DROP TABLE")
+        result = BaseStateManager._sanitize_checkpoint_name("test-name; DROP TABLE")
         assert "chk_" in result
         assert "-" not in result
         assert ";" not in result
         assert " " not in result
 
     def test_sanitize_name_starting_with_digit(self) -> None:
-        result = PostgreSQLStateManager._sanitize_name("123_checkpoint")
+        result = BaseStateManager._sanitize_checkpoint_name("123_checkpoint")
         assert result.startswith("chk_sp_")
 
     def test_sanitize_truncates_long_name(self) -> None:
         long_name = "a" * 100
-        result = PostgreSQLStateManager._sanitize_name(long_name)
+        result = BaseStateManager._sanitize_checkpoint_name(long_name)
         assert len(result) <= 63
 
     def test_sanitize_preserves_underscores(self) -> None:
-        result = PostgreSQLStateManager._sanitize_name("test_checkpoint_name")
+        result = BaseStateManager._sanitize_checkpoint_name("test_checkpoint_name")
         assert "test_checkpoint_name" in result
 
 
@@ -471,9 +471,14 @@ class TestStateManagerIntegration:
 
         manager.checkpoint("initial")
         manager.checkpoint("after_create")
+
+        assert len(manager._checkpoints) == 2
+        assert "chk_initial" in manager._checkpoints
+        assert "chk_after_create" in manager._checkpoints
+
         manager.rollback("initial")
 
-        assert manager._checkpoints == ["chk_initial", "chk_after_create"]
+        assert manager._checkpoints == ["chk_initial"]
 
     def test_full_lifecycle(self) -> None:
         manager = PostgreSQLStateManager(

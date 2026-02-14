@@ -3,14 +3,13 @@
 Reusable search actions.
 """
 
-
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class SearchActions:
     def __init__(self, base_url: str, search_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.search_client = HTTPClient(base_url=search_url or base_url)
+        self.client = Client(base_url=base_url)
+        self.search_client = Client(base_url=search_url or base_url)
 
     def search(self, query: str, page: int = 1, per_page: int = 20, token: str | None = None):
         headers = {"Authorization": f"Bearer {token}"} if token else {}

@@ -123,6 +123,13 @@ from venomqa.context import (
     create_context,
 )
 from venomqa.core.context import ExecutionContext
+from venomqa.core.graph import (
+    Edge,
+    ExplorationResult,
+    Invariant,
+    StateGraph,
+    StateNode,
+)
 from venomqa.core.models import (
     Branch,
     Checkpoint,
@@ -448,6 +455,11 @@ __all__ = [
     "PortConfig",
     "PortsConfiguration",
     "create_context",
+    "StateGraph",
+    "StateNode",
+    "Edge",
+    "Invariant",
+    "ExplorationResult",
     "JourneyRunner",
     "Client",
     "SecureCredentials",

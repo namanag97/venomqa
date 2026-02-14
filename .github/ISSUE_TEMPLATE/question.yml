@@ -1,0 +1,76 @@
+name: Question / Support
+description: Ask a question or get help with VenomQA
+title: "[Question]: "
+labels: ["question"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about VenomQA? We're here to help!
+        
+        Before asking, please:
+        - Check the [Documentation](https://github.com/namanagarwal/venomqa/tree/main/docs)
+        - Review the [FAQ](https://github.com/namanagarwal/venomqa/blob/main/docs/FAQ.md)
+        - Search existing [Issues](https://github.com/namanagarwal/venomqa/issues)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: |
+        How do I...?
+        
+        I'm trying to understand...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: |
+        Provide any relevant context that might help us answer your question:
+        - What are you trying to achieve?
+        - What have you already tried?
+        - Any relevant code or configuration?
+      placeholder: |
+        I'm working on a project that tests...
+        
+        My current setup:
+        - VenomQA version: 0.2.0
+        - Python version: 3.11
+        - Database: PostgreSQL 15
+
+  - type: textarea
+    id: code-sample
+    attributes:
+      label: Code Sample
+      description: If applicable, share relevant code
+      placeholder: |
+        ```python
+        from venomqa import Journey, Step
+        
+        # My journey code
+        journey = Journey(...)
+        ```
+      render: python
+
+  - type: dropdown
+    id: question-area
+    attributes:
+      label: Question Area
+      description: What area is your question about?
+      options:
+        - Getting Started
+        - Journey DSL
+        - State Management / Checkpointing
+        - Ports & Adapters
+        - CLI Usage
+        - Configuration
+        - Reporting
+        - Integration / Deployment
+        - Other
+    validations:
+      required: true

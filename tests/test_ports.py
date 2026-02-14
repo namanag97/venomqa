@@ -299,7 +299,7 @@ class TestJobInfoDataclass:
         )
         assert job.id == "job-123"
         assert job.status == JobStatus.PENDING
-        assert job.retry_count == 0
+        assert job.retries == 0
 
     def test_job_status_enum_values(self) -> None:
         assert JobStatus.PENDING.value == "pending"
@@ -316,7 +316,7 @@ class TestJobResultDataclass:
             job_id="job-123",
             success=True,
             result={"processed": 100},
-            duration_ms=150.5,
+            duration=150.5,
         )
         assert result.success is True
         assert result.result == {"processed": 100}
@@ -337,11 +337,12 @@ class TestEmailDataclass:
 
     def test_email_creation(self) -> None:
         email = Email(
-            to=["user@example.com"],
+            sender="test@example.com",
+            recipients=["user@example.com"],
             subject="Test Subject",
             body="Test body content",
         )
-        assert email.to == ["user@example.com"]
+        assert email.recipients == ["user@example.com"]
         assert email.subject == "Test Subject"
         assert email.cc == []
         assert email.attachments == []
@@ -353,7 +354,8 @@ class TestEmailDataclass:
             content_type="application/pdf",
         )
         email = Email(
-            to=["user@example.com"],
+            sender="test@example.com",
+            recipients=["user@example.com"],
             subject="Report",
             body="See attached",
             attachments=[attachment],
@@ -547,8 +549,6 @@ class TestMockEndpointDataclass:
         endpoint = MockEndpoint(
             path="/api/users",
             method="GET",
-            response_status=200,
-            response_body={"users": []},
         )
         assert endpoint.path == "/api/users"
         assert endpoint.method == "GET"
@@ -570,7 +570,6 @@ class TestRecordedRequestDataclass:
         req = RecordedRequest(
             id="rec-123",
             method="POST",
-            url="https://api.example.com/users",
             path="/users",
         )
         assert req.method == "POST"

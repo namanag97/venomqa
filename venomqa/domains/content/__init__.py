@@ -25,3 +25,6 @@ __all__ = [
     "filtered_search_flow",
     "search_suggestions_flow",
 ]
+
+single_file_upload_flow = single_upload_flow
+bulk_file_upload_flow = bulk_upload_flow

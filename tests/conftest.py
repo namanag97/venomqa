@@ -8,6 +8,62 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+
+# =============================================================================
+# Pytest Configuration for Stress Test Scenarios
+# =============================================================================
+
+
+def pytest_addoption(parser):
+    """Add custom command line options for stress tests."""
+    parser.addoption(
+        "--base-url",
+        action="store",
+        default="http://localhost:8000",
+        help="Base URL for integration tests",
+    )
+    parser.addoption(
+        "--run-slow",
+        action="store_true",
+        default=False,
+        help="Run slow stress tests",
+    )
+    parser.addoption(
+        "--run-integration",
+        action="store_true",
+        default=False,
+        help="Run integration tests requiring a live server",
+    )
+
+
+def pytest_configure(config):
+    """Configure custom markers for stress tests."""
+    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+    config.addinivalue_line("markers", "stress: marks tests as stress tests")
+    config.addinivalue_line("markers", "branching: marks tests related to branching")
+    config.addinivalue_line("markers", "concurrency: marks tests related to concurrency")
+    config.addinivalue_line("markers", "performance: marks tests related to performance")
+    config.addinivalue_line("markers", "resilience: marks tests related to resilience/recovery")
+    config.addinivalue_line("markers", "realtime: marks tests related to real-time features")
+    config.addinivalue_line("markers", "files: marks tests related to file operations")
+    config.addinivalue_line("markers", "time: marks tests related to time manipulation")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip slow and integration tests unless explicitly requested."""
+    if not config.getoption("--run-slow"):
+        skip_slow = pytest.mark.skip(reason="need --run-slow option to run")
+        for item in items:
+            if "slow" in item.keywords:
+                item.add_marker(skip_slow)
+
+    if not config.getoption("--run-integration"):
+        skip_integration = pytest.mark.skip(reason="need --run-integration option to run")
+        for item in items:
+            if "integration" in item.keywords:
+                item.add_marker(skip_integration)
+
 from venomqa.client import Client, RequestRecord
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (

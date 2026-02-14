@@ -770,3 +770,370 @@ def db_truncate(
         sql = f"TRUNCATE TABLE {table}"
 
     return db_execute(client, context, sql, alias=alias)
+
+
+def db_count(
+    client: Client,
+    context: Context,
+    table: str,
+    where: dict[str, Any] | None = None,
+    alias: str = "default",
+) -> int:
+    """Count rows in a table.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        table: Table name to count rows from.
+        where: Optional WHERE clause conditions.
+        alias: Database connection alias.
+
+    Returns:
+        int: Number of rows.
+
+    Raises:
+        DatabaseError: If query fails.
+
+    Example:
+        >>> total = db_count(client, context, "users")
+        >>> active = db_count(client, context, "users", where={"status": "active"})
+    """
+    connection = _get_connection(client, context, alias)
+    style = _get_placeholder_style(connection)
+
+    sql = f"SELECT COUNT(*) AS count FROM {table}"
+    params: list[Any] = []
+
+    if where:
+        where_clauses = []
+        placeholder_idx = 1 if style == "postgres" else 0
+
+        for col, val in where.items():
+            if style == "postgres":
+                where_clauses.append(f"{col} = ${placeholder_idx}")
+                placeholder_idx += 1
+            elif style == "qmark":
+                where_clauses.append(f"{col} = ?")
+            else:
+                where_clauses.append(f"{col} = %s")
+            params.append(val)
+
+        sql += f" WHERE {' AND '.join(where_clauses)}"
+
+    results = db_query(client, context, sql, params if params else None, alias)
+    return results[0]["count"] if results else 0
+
+
+def db_exists(
+    client: Client,
+    context: Context,
+    table: str,
+    where: dict[str, Any],
+    alias: str = "default",
+) -> bool:
+    """Check if a record exists in a table.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        table: Table name to check.
+        where: WHERE clause conditions.
+        alias: Database connection alias.
+
+    Returns:
+        bool: True if at least one matching record exists.
+
+    Raises:
+        DatabaseError: If query fails.
+
+    Example:
+        >>> if db_exists(client, context, "users", where={"email": "john@example.com"}):
+        ...     print("User exists")
+    """
+    return db_count(client, context, table, where, alias) > 0
+
+
+def db_get(
+    client: Client,
+    context: Context,
+    table: str,
+    where: dict[str, Any],
+    columns: list[str] | None = None,
+    alias: str = "default",
+) -> dict[str, Any] | None:
+    """Get a single record from a table by conditions.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        table: Table name to query.
+        where: WHERE clause conditions.
+        columns: List of columns to select. If None, selects all.
+        alias: Database connection alias.
+
+    Returns:
+        dict | None: Single row as dictionary, or None if not found.
+
+    Raises:
+        DatabaseError: If query fails.
+
+    Example:
+        >>> user = db_get(client, context, "users", where={"id": 1})
+        >>> if user:
+        ...     print(user["name"])
+    """
+    connection = _get_connection(client, context, alias)
+    style = _get_placeholder_style(connection)
+
+    cols = ", ".join(columns) if columns else "*"
+    sql = f"SELECT {cols} FROM {table}"
+
+    where_clauses = []
+    params: list[Any] = []
+    placeholder_idx = 1 if style == "postgres" else 0
+
+    for col, val in where.items():
+        if style == "postgres":
+            where_clauses.append(f"{col} = ${placeholder_idx}")
+            placeholder_idx += 1
+        elif style == "qmark":
+            where_clauses.append(f"{col} = ?")
+        else:
+            where_clauses.append(f"{col} = %s")
+        params.append(val)
+
+    sql += f" WHERE {' AND '.join(where_clauses)} LIMIT 1"
+
+    results = db_query(client, context, sql, params, alias)
+    return results[0] if results else None
+
+
+def db_get_or_create(
+    client: Client,
+    context: Context,
+    table: str,
+    defaults: dict[str, Any],
+    where: dict[str, Any],
+    alias: str = "default",
+) -> tuple[dict[str, Any], bool]:
+    """Get a record or create it if it doesn't exist.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        table: Table name.
+        defaults: Default values to use when creating.
+        where: Conditions to search for existing record.
+        alias: Database connection alias.
+
+    Returns:
+        tuple: (record_dict, created) where created is True if record was created.
+
+    Raises:
+        DatabaseError: If operation fails.
+
+    Example:
+        >>> user, created = db_get_or_create(
+        ...     client, context,
+        ...     table="users",
+        ...     defaults={"name": "John", "role": "user"},
+        ...     where={"email": "john@example.com"}
+        ... )
+        >>> if created:
+        ...     print("New user created")
+    """
+    record = db_get(client, context, table, where, alias=alias)
+
+    if record:
+        return record, False
+
+    data = {**where, **defaults}
+    db_insert(client, context, table, data, alias=alias, return_id=False)
+
+    new_record = db_get(client, context, table, where, alias=alias)
+    return new_record, True
+
+
+def db_get_column_names(
+    client: Client,
+    context: Context,
+    table: str,
+    alias: str = "default",
+) -> list[str]:
+    """Get column names for a table.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        table: Table name.
+        alias: Database connection alias.
+
+    Returns:
+        list: List of column names.
+
+    Raises:
+        DatabaseError: If query fails.
+
+    Example:
+        >>> columns = db_get_column_names(client, context, "users")
+        >>> print(columns)  # ['id', 'name', 'email', 'created_at']
+    """
+    connection = _get_connection(client, context, alias)
+    style = _get_placeholder_style(connection)
+
+    if style == "postgres":
+        sql = """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = %s
+            ORDER BY ordinal_position
+        """
+    elif style == "qmark":
+        sql = f"PRAGMA table_info({table})"
+        results = db_query(client, context, sql, alias=alias)
+        return [r["name"] for r in results]
+    else:
+        sql = """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = %s
+            ORDER BY ordinal_position
+        """
+
+    results = db_query(client, context, sql, [table], alias)
+    return [r["column_name"] for r in results]
+
+
+def db_bulk_delete(
+    client: Client,
+    context: Context,
+    table: str,
+    ids: list[int],
+    id_column: str = "id",
+    alias: str = "default",
+) -> int:
+    """Delete multiple records by ID.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        table: Table name.
+        ids: List of IDs to delete.
+        id_column: Name of the ID column.
+        alias: Database connection alias.
+
+    Returns:
+        int: Number of rows deleted.
+
+    Raises:
+        DatabaseError: If delete fails.
+
+    Example:
+        >>> deleted = db_bulk_delete(client, context, "logs", ids=[1, 2, 3, 4, 5])
+    """
+    if not ids:
+        return 0
+
+    connection = _get_connection(client, context, alias)
+    style = _get_placeholder_style(connection)
+
+    placeholders = []
+    params: list[Any] = []
+
+    for i, id_val in enumerate(ids):
+        if style == "postgres":
+            placeholders.append(f"${i + 1}")
+        elif style == "qmark":
+            placeholders.append("?")
+        else:
+            placeholders.append("%s")
+        params.append(id_val)
+
+    sql = f"DELETE FROM {table} WHERE {id_column} IN ({', '.join(placeholders)})"
+    return db_execute(client, context, sql, params, alias)
+
+
+def db_copy_row(
+    client: Client,
+    context: Context,
+    table: str,
+    where: dict[str, Any],
+    overrides: dict[str, Any] | None = None,
+    alias: str = "default",
+) -> int | None:
+    """Copy a row from a table with optional overrides.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        table: Table name.
+        where: Conditions to find the row to copy.
+        overrides: Column values to override in the copy.
+        alias: Database connection alias.
+
+    Returns:
+        int | None: ID of the new row.
+
+    Raises:
+        DatabaseError: If operation fails.
+
+    Example:
+        >>> new_id = db_copy_row(
+        ...     client, context,
+        ...     table="products",
+        ...     where={"id": 1},
+        ...     overrides={"name": "Copy of Product 1", "sku": "SKU-COPY-001"}
+        ... )
+    """
+    row = db_get(client, context, table, where, alias=alias)
+
+    if not row:
+        raise DatabaseError(f"No row found to copy with conditions: {where}")
+
+    data = dict(row)
+    if "id" in data:
+        del data["id"]
+
+    if overrides:
+        data.update(overrides)
+
+    return db_insert(client, context, table, data, alias=alias)
+
+
+def db_execute_script(
+    client: Client,
+    context: Context,
+    script: str,
+    alias: str = "default",
+    separator: str = ";",
+) -> list[int]:
+    """Execute multiple SQL statements from a script.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        script: SQL script with multiple statements.
+        alias: Database connection alias.
+        separator: Statement separator.
+
+    Returns:
+        list: Row counts for each statement.
+
+    Raises:
+        DatabaseError: If any statement fails.
+
+    Example:
+        >>> results = db_execute_script(client, context, '''
+        ...     INSERT INTO users (name) VALUES ('John');
+        ...     INSERT INTO users (name) VALUES ('Jane');
+        ...     UPDATE stats SET user_count = user_count + 2;
+        ... ''')
+    """
+    statements = [s.strip() for s in script.split(separator) if s.strip()]
+    row_counts = []
+
+    for stmt in statements:
+        count = db_execute(client, context, stmt, alias=alias)
+        row_counts.append(count)
+
+    return row_counts

@@ -1,0 +1,155 @@
+# VenomQA Seed File - E-commerce Checkout Journey
+# Seeds data specifically for checkout flow testing
+
+_metadata:
+  description: "Seed data for checkout journey testing"
+  journey: checkout
+  tags:
+    - checkout
+    - payment
+    - orders
+
+# Buyer user with verified payment methods
+users:
+  - id: checkout_buyer
+    email: checkout_buyer@test.com
+    password: checkout123!
+    role: buyer
+    name: Checkout Test Buyer
+    is_verified: true
+    has_payment_method: true
+    default_shipping_address:
+      street: "456 Commerce Ave"
+      city: "Shopville"
+      state: "ST"
+      zip: "54321"
+      country: "US"
+
+  - id: checkout_seller
+    email: checkout_seller@test.com
+    password: seller123!
+    role: seller
+    name: Checkout Test Seller
+    is_verified: true
+    store_name: "Test Store"
+
+# Products with various pricing and stock levels
+products:
+  - id: cheap_item
+    seller_id: ${users.checkout_seller.id}
+    title: Budget Item
+    price: 9.99
+    stock: 1000
+    is_active: true
+
+  - id: medium_item
+    seller_id: ${users.checkout_seller.id}
+    title: Standard Item
+    price: 49.99
+    stock: 100
+    is_active: true
+
+  - id: expensive_item
+    seller_id: ${users.checkout_seller.id}
+    title: Premium Item
+    price: 299.99
+    stock: 10
+    is_active: true
+
+  - id: low_stock_item
+    seller_id: ${users.checkout_seller.id}
+    title: Limited Stock Item
+    price: 79.99
+    stock: 2
+    is_active: true
+
+  - id: out_of_stock_item
+    seller_id: ${users.checkout_seller.id}
+    title: Out of Stock Item
+    price: 39.99
+    stock: 0
+    is_active: true
+
+# Pre-populated cart for checkout testing
+carts:
+  - id: checkout_cart
+    user_id: ${users.checkout_buyer.id}
+    status: active
+
+cart_items:
+  - id: checkout_cart_item_1
+    cart_id: ${carts.checkout_cart.id}
+    product_id: ${products.medium_item.id}
+    quantity: 2
+
+  - id: checkout_cart_item_2
+    cart_id: ${carts.checkout_cart.id}
+    product_id: ${products.cheap_item.id}
+    quantity: 1
+
+# Discount codes for testing
+discount_codes:
+  - id: percent_discount
+    code: "SAVE10"
+    type: percentage
+    value: 10
+    min_order_amount: 50.00
+    is_active: true
+    usage_limit: 100
+    used_count: 0
+
+  - id: fixed_discount
+    code: "FLAT20"
+    type: fixed
+    value: 20.00
+    min_order_amount: 100.00
+    is_active: true
+    usage_limit: 50
+    used_count: 0
+
+  - id: expired_discount
+    code: "EXPIRED"
+    type: percentage
+    value: 50
+    is_active: false
+    expires_at: "2024-01-01T00:00:00Z"
+
+# Shipping options
+shipping_methods:
+  - id: standard_shipping
+    name: Standard Shipping
+    price: 5.99
+    estimated_days: 5
+    is_active: true
+
+  - id: express_shipping
+    name: Express Shipping
+    price: 14.99
+    estimated_days: 2
+    is_active: true
+
+  - id: overnight_shipping
+    name: Overnight Shipping
+    price: 29.99
+    estimated_days: 1
+    is_active: true
+
+# Payment methods for the buyer
+payment_methods:
+  - id: test_card
+    user_id: ${users.checkout_buyer.id}
+    type: credit_card
+    last_four: "4242"
+    brand: visa
+    is_default: true
+    expires_month: 12
+    expires_year: 2025
+
+  - id: test_card_2
+    user_id: ${users.checkout_buyer.id}
+    type: credit_card
+    last_four: "5555"
+    brand: mastercard
+    is_default: false
+    expires_month: 6
+    expires_year: 2026

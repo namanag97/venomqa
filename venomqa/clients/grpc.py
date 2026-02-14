@@ -1,29 +1,136 @@
-"""gRPC client for VenomQA with service method invocation support."""
+"""gRPC client for VenomQA with service method invocation support.
+
+This module provides gRPC clients for testing gRPC services, including
+support for unary, server streaming, client streaming, and bidirectional
+streaming RPCs.
+
+Classes:
+    GrpcResponse: Data class for gRPC responses.
+    ProtoMethod: Represents a gRPC method definition.
+    ProtoService: Represents a gRPC service definition.
+    GrpcClient: Synchronous gRPC client.
+    AsyncgRPCClient: Asynchronous gRPC client.
+
+Example:
+    >>> from venomqa.clients.grpc import GrpcClient
+    >>> client = GrpcClient("localhost:50051")
+    >>> client.connect()
+    >>> # Load proto module and register service
+    >>> response = client.call("MyService", "MyMethod", request)
+    >>> print(response.data)
+"""
 
 from __future__ import annotations
 
 import importlib.util
 import logging
 import time
-from collections.abc import Generator, Iterator
+from collections.abc import AsyncGenerator, Generator, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from venomqa.clients.base import BaseAsyncClient, BaseClient
+from venomqa.clients.base import (
+    BaseAsyncClient,
+    BaseClient,
+    ValidationError,
+)
 from venomqa.errors import ConnectionError, RequestFailedError, RequestTimeoutError
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
-
     import grpc
 
 logger = logging.getLogger(__name__)
 
 
+def _extract_grpc_error(e: Exception) -> tuple[int, str]:
+    """Extract gRPC status code and details from an exception.
+
+    Args:
+        e: The exception to extract error info from.
+
+    Returns:
+        Tuple of (status_code, status_details).
+    """
+    err_str = str(e)
+    status_code = getattr(e, "code", lambda: -1)()
+    if callable(status_code):
+        status_code = -1
+    else:
+        try:
+            status_code = int(status_code)
+        except (TypeError, ValueError):
+            status_code = -1
+    status_details = getattr(e, "details", lambda: err_str)()
+    if callable(status_details):
+        status_details = err_str
+    return status_code, status_details
+
+
+def _validate_grpc_service_method(service: str, method: str, stubs: dict[str, Any]) -> Any:
+    """Validate service and method names and return the method function.
+
+    Args:
+        service: Service name to validate.
+        method: Method name to validate.
+        stubs: Dictionary of registered stubs.
+
+    Returns:
+        The method function from the stub.
+
+    Raises:
+        ValidationError: If service or method is invalid.
+    """
+    if not service:
+        raise ValidationError(
+            "Service name cannot be empty",
+            field_name="service",
+            value=service,
+        )
+    if not method:
+        raise ValidationError(
+            "Method name cannot be empty",
+            field_name="method",
+            value=method,
+        )
+
+    if service not in stubs:
+        raise ValidationError(
+            f"Service '{service}' not registered. Available: {list(stubs.keys())}",
+            field_name="service",
+            value=service,
+        )
+
+    stub = stubs[service]
+    method_fn = getattr(stub, method, None)
+
+    if method_fn is None:
+        raise ValidationError(
+            f"Method '{method}' not found on service '{service}'. "
+            f"Available: {list(stubs[service].__class__.__dict__.keys())}",
+            field_name="method",
+            value=method,
+        )
+
+    return method_fn
+
+
 @dataclass
 class GrpcResponse:
-    """Represents a gRPC response."""
+    """Represents a gRPC response with status and metadata.
+
+    Attributes:
+        data: The response message/object from the gRPC call.
+        status_code: gRPC status code (0 = OK).
+        status_details: Human-readable status details.
+        duration_ms: Response time in milliseconds.
+        metadata: Response metadata (trailers).
+
+    Example:
+        >>> response = GrpcResponse(data=result, status_code=0, duration_ms=45.2)
+        >>> if response.successful:
+        ...     print(response.data)
+    """
 
     data: Any
     status_code: int = 0
@@ -33,10 +140,19 @@ class GrpcResponse:
 
     @property
     def successful(self) -> bool:
+        """Check if the response indicates success.
+
+        Returns:
+            True if status_code is 0 (OK).
+        """
         return self.status_code == 0
 
     def raise_for_status(self) -> None:
-        """Raise exception if response has error status."""
+        """Raise exception if response has error status.
+
+        Raises:
+            RequestFailedError: If status_code is not 0.
+        """
         if self.status_code != 0:
             raise RequestFailedError(
                 message=f"gRPC error {self.status_code}: {self.status_details}",
@@ -49,7 +165,17 @@ gRPCResponse = GrpcResponse  # noqa: N816
 
 @dataclass
 class ProtoMethod:
-    """Represents a gRPC method."""
+    """Represents a gRPC method definition.
+
+    Attributes:
+        name: Method name.
+        service_name: Parent service name.
+        package: Protocol package name.
+        input_type: Input message type name.
+        output_type: Output message type name.
+        client_streaming: Whether method accepts client stream.
+        server_streaming: Whether method returns server stream.
+    """
 
     name: str
     service_name: str
@@ -59,18 +185,98 @@ class ProtoMethod:
     client_streaming: bool = False
     server_streaming: bool = False
 
+    @property
+    def full_name(self) -> str:
+        """Get fully qualified method name.
+
+        Returns:
+            package.Service/Method format.
+        """
+        if self.package:
+            return f"{self.package}.{self.service_name}/{self.name}"
+        return f"{self.service_name}/{self.name}"
+
 
 @dataclass
 class ProtoService:
-    """Represents a gRPC service."""
+    """Represents a gRPC service definition.
+
+    Attributes:
+        name: Service name.
+        package: Protocol package name.
+        methods: Dictionary of method name to ProtoMethod.
+    """
 
     name: str
     package: str
     methods: dict[str, ProtoMethod] = field(default_factory=dict)
 
+    @property
+    def full_name(self) -> str:
+        """Get fully qualified service name.
+
+        Returns:
+            package.Service format.
+        """
+        if self.package:
+            return f"{self.package}.{self.name}"
+        return self.name
+
+
+def _validate_grpc_endpoint(endpoint: str) -> str:
+    """Validate gRPC endpoint format.
+
+    Args:
+        endpoint: The gRPC endpoint (host:port or URL).
+
+    Returns:
+        Validated endpoint string.
+
+    Raises:
+        ValidationError: If endpoint is invalid.
+    """
+    if not endpoint:
+        raise ValidationError(
+            "gRPC endpoint cannot be empty",
+            field_name="endpoint",
+            value=endpoint,
+        )
+
+    endpoint = endpoint.strip()
+
+    if endpoint.startswith(("http://", "https://")):
+        raise ValidationError(
+            "gRPC endpoint should not include http/https scheme. Use host:port format.",
+            field_name="endpoint",
+            value=endpoint,
+        )
+
+    return endpoint
+
 
 class GrpcClient(BaseClient[GrpcResponse]):
-    """gRPC client with service method invocation support."""
+    """Synchronous gRPC client with service method invocation support.
+
+    Supports all gRPC communication patterns:
+    - Unary RPC
+    - Server streaming RPC
+    - Client streaming RPC
+    - Bidirectional streaming RPC
+
+    Example:
+        >>> from venomqa.clients.grpc import GrpcClient
+        >>> client = GrpcClient("localhost:50051", use_tls=True)
+        >>> client.connect()
+        >>> proto = client.load_proto("generated/service_pb2.py")
+        >>> client.register_service("MyService", proto.MyServiceStub)
+        >>> response = client.call("MyService", "GetData", request)
+        >>> print(response.data)
+
+    Attributes:
+        proto_dir: Directory containing proto files.
+        default_metadata: Default gRPC metadata for all calls.
+        use_tls: Whether to use TLS encryption.
+    """
 
     def __init__(
         self,
@@ -85,7 +291,26 @@ class GrpcClient(BaseClient[GrpcResponse]):
         private_key: bytes | str | Path | None = None,
         certificate_chain: bytes | str | Path | None = None,
     ) -> None:
-        super().__init__(endpoint, timeout, {}, retry_count, retry_delay)
+        """Initialize the gRPC client.
+
+        Args:
+            endpoint: Server endpoint in host:port format.
+            proto_dir: Directory containing compiled proto files (optional).
+            timeout: Default RPC timeout in seconds (default: 30.0).
+            default_metadata: Default metadata for all RPCs (optional).
+            retry_count: Maximum retry attempts (default: 3).
+            retry_delay: Base retry delay in seconds (default: 1.0).
+            use_tls: Enable TLS encryption (default: False).
+            root_certificates: Root CA certificates (optional).
+            private_key: Client private key for mTLS (optional).
+            certificate_chain: Client certificate chain for mTLS (optional).
+
+        Raises:
+            ValidationError: If parameters are invalid.
+        """
+        validated_endpoint = _validate_grpc_endpoint(endpoint)
+        super().__init__(validated_endpoint, timeout, {}, retry_count, retry_delay)
+
         self.proto_dir = Path(proto_dir) if proto_dir else None
         self.default_metadata = default_metadata or []
         self.use_tls = use_tls
@@ -98,7 +323,14 @@ class GrpcClient(BaseClient[GrpcResponse]):
         self._loaded_modules: dict[str, Any] = {}
 
     def _load_cert(self, cert: bytes | str | Path | None) -> bytes | None:
-        """Load certificate from bytes, file path, or return as-is."""
+        """Load certificate from bytes, file path, or return as-is.
+
+        Args:
+            cert: Certificate data or path.
+
+        Returns:
+            Certificate bytes, or None if not provided.
+        """
         if cert is None:
             return None
         if isinstance(cert, bytes):
@@ -107,10 +339,17 @@ class GrpcClient(BaseClient[GrpcResponse]):
             path = Path(cert)
             if path.exists():
                 return path.read_bytes()
+            logger.warning(f"Certificate file not found: {path}")
         return None
 
     def connect(self) -> None:
-        """Establish gRPC channel connection."""
+        """Establish gRPC channel connection.
+
+        Creates either secure or insecure channel based on use_tls setting.
+
+        Raises:
+            ConnectionError: If connection fails.
+        """
         import grpc
 
         if self._channel is not None:
@@ -127,10 +366,16 @@ class GrpcClient(BaseClient[GrpcResponse]):
             logger.info(f"gRPC client connected to {self.endpoint}")
 
         except Exception as e:
-            raise ConnectionError(message=f"Failed to connect to gRPC server: {e}") from e
+            raise ConnectionError(
+                message=f"Failed to connect to gRPC server at {self.endpoint}: {e}"
+            ) from e
 
     def _create_credentials(self) -> grpc.ChannelCredentials:
-        """Create TLS credentials."""
+        """Create TLS channel credentials.
+
+        Returns:
+            gRPC channel credentials for secure connection.
+        """
         import grpc
 
         return grpc.ssl_channel_credentials(
@@ -140,15 +385,24 @@ class GrpcClient(BaseClient[GrpcResponse]):
         )
 
     def disconnect(self) -> None:
-        """Close gRPC channel connection."""
+        """Close gRPC channel connection.
+
+        Clears all registered services and stubs.
+        """
         if self._channel:
             self._channel.close()
             self._channel = None
         self._stubs.clear()
+        self._services.clear()
         self._connected = False
         logger.info("gRPC client disconnected")
 
     def is_connected(self) -> bool:
+        """Check if client is connected.
+
+        Returns:
+            True if channel is established.
+        """
         return self._connected and self._channel is not None
 
     def load_proto(
@@ -156,12 +410,27 @@ class GrpcClient(BaseClient[GrpcResponse]):
         proto_file: str | Path,
         module_name: str | None = None,
     ) -> Any:
-        """Load a compiled proto module.
+        """Load a compiled proto module dynamically.
 
         Args:
             proto_file: Path to the compiled _pb2.py file.
-            module_name: Name for the module. Defaults to proto file stem.
+            module_name: Name for the module (default: proto file stem).
+
+        Returns:
+            The loaded proto module.
+
+        Raises:
+            FileNotFoundError: If proto file doesn't exist.
+            ImportError: If module cannot be loaded.
+            ValidationError: If proto_file is empty.
         """
+        if not proto_file:
+            raise ValidationError(
+                "Proto file path cannot be empty",
+                field_name="proto_file",
+                value=proto_file,
+            )
+
         proto_path = Path(proto_file)
         if not proto_path.exists():
             raise FileNotFoundError(f"Proto file not found: {proto_path}")
@@ -186,9 +455,32 @@ class GrpcClient(BaseClient[GrpcResponse]):
         stub_class: Any,
         package: str = "",
     ) -> ProtoService:
-        """Register a gRPC service with its stub class."""
+        """Register a gRPC service with its stub class.
+
+        Args:
+            service_name: Name to identify the service.
+            stub_class: The generated stub class from proto compilation.
+            package: Protocol package name (optional).
+
+        Returns:
+            ProtoService instance for the registered service.
+
+        Raises:
+            ValidationError: If service_name is empty.
+            ConnectionError: If not connected.
+        """
+        if not service_name:
+            raise ValidationError(
+                "Service name cannot be empty",
+                field_name="service_name",
+                value=service_name,
+            )
+
         if not self._connected:
             self.connect()
+
+        if self._channel is None:
+            raise ConnectionError(message="gRPC channel not established")
 
         stub = stub_class(self._channel)
         self._stubs[service_name] = stub
@@ -212,7 +504,11 @@ class GrpcClient(BaseClient[GrpcResponse]):
         return service
 
     def get_metadata(self) -> list[tuple[str, str]]:
-        """Get metadata including auth tokens."""
+        """Get metadata including auth tokens.
+
+        Returns:
+            List of metadata tuples for gRPC call.
+        """
         metadata = list(self.default_metadata)
         auth_header = self.get_auth_header()
         if auth_header:
@@ -229,23 +525,30 @@ class GrpcClient(BaseClient[GrpcResponse]):
         timeout: float | None = None,
         metadata: list[tuple[str, str]] | None = None,
     ) -> gRPCResponse:
-        """Call a unary gRPC method."""
+        """Call a unary gRPC method.
+
+        Args:
+            service: Registered service name.
+            method: Method name on the service.
+            request: Request message object.
+            timeout: RPC timeout in seconds (optional).
+            metadata: Additional metadata for this call (optional).
+
+        Returns:
+            gRPCResponse with result or error.
+
+        Raises:
+            ValidationError: If service/method not found.
+            RequestTimeoutError: If call times out.
+        """
         self._ensure_connected()
-
-        if service not in self._stubs:
-            raise ValueError(f"Service '{service}' not registered")
-
-        stub = self._stubs[service]
-        method_fn = getattr(stub, method, None)
-
-        if method_fn is None:
-            raise ValueError(f"Method '{method}' not found on service '{service}'")
+        method_fn = _validate_grpc_service_method(service, method, self._stubs)
 
         call_metadata = self.get_metadata()
         if metadata:
             call_metadata.extend(metadata)
 
-        timeout_val = timeout or self.timeout
+        timeout_val = timeout if timeout is not None else self.timeout
         start_time = time.perf_counter()
 
         try:
@@ -264,8 +567,8 @@ class GrpcClient(BaseClient[GrpcResponse]):
 
             self._record_request(
                 operation=f"{service}/{method}",
-                request_data=str(request),
-                response_data=str(response),
+                request_data=str(request)[:500] if request else None,
+                response_data=str(response)[:500] if response else None,
                 duration_ms=duration_ms,
             )
 
@@ -273,21 +576,21 @@ class GrpcClient(BaseClient[GrpcResponse]):
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            err_str = str(e)
-            status_code = getattr(e, "code", lambda: -1)()
-            status_details = getattr(e, "details", lambda: err_str)()
+            status_code, status_details = _extract_grpc_error(e)
 
             self._record_request(
                 operation=f"{service}/{method}",
-                request_data=str(request),
+                request_data=str(request)[:500] if request else None,
                 response_data=None,
                 duration_ms=duration_ms,
                 error=status_details,
                 metadata={"status_code": status_code},
             )
 
-            if "timeout" in err_str.lower():
-                raise RequestTimeoutError(message=f"gRPC call timed out: {e}") from e
+            if "timeout" in status_details.lower() or status_code == 4:
+                raise RequestTimeoutError(
+                    message=f"gRPC call to {service}/{method} timed out after {timeout_val}s"
+                ) from e
 
             return gRPCResponse(
                 data=None,
@@ -310,23 +613,48 @@ class GrpcClient(BaseClient[GrpcResponse]):
         - Server streaming: requests is None
         - Client streaming: requests is an iterator
         - Bidirectional streaming: requests is an iterator
+
+        Args:
+            service: Registered service name.
+            method: Method name on the service.
+            requests: Iterator of request messages (optional).
+            timeout: RPC timeout in seconds (optional).
+            metadata: Additional metadata for this call (optional).
+
+        Yields:
+            gRPCResponse for each response in the stream.
         """
         self._ensure_connected()
 
+        if not service:
+            raise ValidationError(
+                "Service name cannot be empty",
+                field_name="service",
+                value=service,
+            )
+
         if service not in self._stubs:
-            raise ValueError(f"Service '{service}' not registered")
+            raise ValidationError(
+                f"Service '{service}' not registered",
+                field_name="service",
+                value=service,
+            )
 
         stub = self._stubs[service]
         method_fn = getattr(stub, method, None)
 
         if method_fn is None:
-            raise ValueError(f"Method '{method}' not found on service '{service}'")
+            raise ValidationError(
+                f"Method '{method}' not found on service '{service}'",
+                field_name="method",
+                value=method,
+            )
 
         call_metadata = self.get_metadata()
         if metadata:
             call_metadata.extend(metadata)
 
-        timeout_val = timeout or self.timeout
+        timeout_val = timeout if timeout is not None else self.timeout
         start_time = time.perf_counter()
 
         try:
@@ -354,7 +682,7 @@ class GrpcClient(BaseClient[GrpcResponse]):
                 self._record_request(
                     operation=f"{service}/{method}/stream",
                     request_data="<streaming>",
-                    response_data=str(response)[:500],
+                    response_data=str(response)[:500] if response else None,
                     duration_ms=duration_ms,
                 )
 
@@ -365,7 +693,11 @@ class GrpcClient(BaseClient[GrpcResponse]):
             duration_ms = (time.perf_counter() - start_time) * 1000
             err_str = str(e)
             status_code = getattr(e, "code", lambda: -1)()
+            if callable(status_code):
+                status_code = -1
             status_details = getattr(e, "details", lambda: err_str)()
+            if callable(status_details):
+                status_details = err_str
 
             self._record_request(
                 operation=f"{service}/{method}/stream",
@@ -384,15 +716,33 @@ class GrpcClient(BaseClient[GrpcResponse]):
             )
 
     def get_service(self, service_name: str) -> ProtoService | None:
-        """Get a registered service by name."""
+        """Get a registered service by name.
+
+        Args:
+            service_name: Name of the service.
+
+        Returns:
+            ProtoService or None if not found.
+        """
         return self._services.get(service_name)
 
     def list_services(self) -> list[str]:
-        """List all registered service names."""
+        """List all registered service names.
+
+        Returns:
+            List of service name strings.
+        """
         return list(self._services.keys())
 
     def list_methods(self, service_name: str) -> list[str]:
-        """List all methods for a service."""
+        """List all methods for a service.
+
+        Args:
+            service_name: Name of the service.
+
+        Returns:
+            List of method name strings.
+        """
         service = self._services.get(service_name)
         if service:
             return list(service.methods.keys())
@@ -403,7 +753,24 @@ gRPCClient = GrpcClient  # noqa: N816
 
 
 class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
-    """Async gRPC client with service method invocation support."""
+    """Asynchronous gRPC client with service method invocation support.
+
+    Provides the same functionality as GrpcClient but with async/await
+    support for non-blocking operations.
+
+    Example:
+        >>> from venomqa.clients.grpc import AsyncgRPCClient
+        >>> client = AsyncgRPCClient("localhost:50051")
+        >>> await client.connect()
+        >>> proto = client.load_proto("generated/service_pb2.py")
+        >>> client.register_service("MyService", proto.MyServiceStub)
+        >>> response = await client.call("MyService", "GetData", request)
+
+    Attributes:
+        proto_dir: Directory containing proto files.
+        default_metadata: Default gRPC metadata for all calls.
+        use_tls: Whether to use TLS encryption.
+    """
 
     def __init__(
         self,
@@ -418,7 +785,26 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
         private_key: bytes | str | Path | None = None,
         certificate_chain: bytes | str | Path | None = None,
     ) -> None:
-        super().__init__(endpoint, timeout, {}, retry_count, retry_delay)
+        """Initialize the async gRPC client.
+
+        Args:
+            endpoint: Server endpoint in host:port format.
+            proto_dir: Directory containing compiled proto files (optional).
+            timeout: Default RPC timeout in seconds (default: 30.0).
+            default_metadata: Default metadata for all RPCs (optional).
+            retry_count: Maximum retry attempts (default: 3).
+            retry_delay: Base retry delay in seconds (default: 1.0).
+            use_tls: Enable TLS encryption (default: False).
+            root_certificates: Root CA certificates (optional).
+            private_key: Client private key for mTLS (optional).
+            certificate_chain: Client certificate chain for mTLS (optional).
+
+        Raises:
+            ValidationError: If parameters are invalid.
+        """
+        validated_endpoint = _validate_grpc_endpoint(endpoint)
+        super().__init__(validated_endpoint, timeout, {}, retry_count, retry_delay)
+
         self.proto_dir = Path(proto_dir) if proto_dir else None
         self.default_metadata = default_metadata or []
         self.use_tls = use_tls
@@ -440,10 +826,15 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
             path = Path(cert)
             if path.exists():
                 return path.read_bytes()
+            logger.warning(f"Certificate file not found: {path}")
         return None
 
     async def connect(self) -> None:
-        """Establish async gRPC channel connection."""
+        """Establish async gRPC channel connection.
+
+        Raises:
+            ConnectionError: If connection fails.
+        """
         import grpc
 
         if self._channel is not None:
@@ -460,10 +851,12 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
             logger.info(f"Async gRPC client connected to {self.endpoint}")
 
         except Exception as e:
-            raise ConnectionError(message=f"Failed to connect to gRPC server: {e}") from e
+            raise ConnectionError(
+                message=f"Failed to connect to gRPC server at {self.endpoint}: {e}"
+            ) from e
 
     def _create_credentials(self) -> grpc.ChannelCredentials:
-        """Create TLS credentials."""
+        """Create TLS channel credentials."""
         import grpc
 
         return grpc.ssl_channel_credentials(
@@ -478,10 +871,16 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
             await self._channel.close()
             self._channel = None
         self._stubs.clear()
+        self._services.clear()
         self._connected = False
         logger.info("Async gRPC client disconnected")
 
     async def is_connected(self) -> bool:
+        """Check if async client is connected.
+
+        Returns:
+            True if channel is established.
+        """
         return self._connected and self._channel is not None
 
     def load_proto(
@@ -489,7 +888,26 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
         proto_file: str | Path,
         module_name: str | None = None,
     ) -> Any:
-        """Load a compiled proto module."""
+        """Load a compiled proto module dynamically.
+
+        Args:
+            proto_file: Path to the compiled _pb2.py file.
+            module_name: Name for the module (default: proto file stem).
+
+        Returns:
+            The loaded proto module.
+
+        Raises:
+            FileNotFoundError: If proto file doesn't exist.
+            ImportError: If module cannot be loaded.
+        """
+        if not proto_file:
+            raise ValidationError(
+                "Proto file path cannot be empty",
+                field_name="proto_file",
+                value=proto_file,
+            )
+
         proto_path = Path(proto_file)
         if not proto_path.exists():
             raise FileNotFoundError(f"Proto file not found: {proto_path}")
@@ -514,9 +932,29 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
         stub_class: Any,
         package: str = "",
     ) -> ProtoService:
-        """Register a gRPC service with its stub class."""
+        """Register a gRPC service with its stub class.
+
+        Args:
+            service_name: Name to identify the service.
+            stub_class: The generated stub class from proto compilation.
+            package: Protocol package name (optional).
+
+        Returns:
+            ProtoService instance for the registered service.
+
+        Raises:
+            ValidationError: If service_name is empty.
+            ConnectionError: If not connected.
+        """
+        if not service_name:
+            raise ValidationError(
+                "Service name cannot be empty",
+                field_name="service_name",
+                value=service_name,
+            )
+
         if not self._connected or self._channel is None:
-            raise ConnectionError(message="Client not connected")
+            raise ConnectionError(message="Client not connected. Call connect() first.")
 
         stub = stub_class(self._channel)
         self._stubs[service_name] = stub
@@ -540,9 +978,24 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
         return service
 
     def get_metadata(self) -> list[tuple[str, str]]:
-        """Get metadata including auth tokens."""
+        """Get metadata including auth tokens.
+
+        Note: For async clients, this uses the base credentials directly.
+        For async token refresh, use get_metadata_async instead.
+        """
         metadata = list(self.default_metadata)
-        auth_header = self.get_auth_header()
+        if self._credentials:
+            token = self._credentials.authorization_header
+            metadata.append(("authorization", token))
+        return metadata
+
+    async def get_metadata_async(self) -> list[tuple[str, str]]:
+        """Get metadata including auth tokens (async version).
+
+        Uses async token refresh if configured.
+        """
+        metadata = list(self.default_metadata)
+        auth_header = await self.get_auth_header()
         if auth_header:
             token = auth_header.get("Authorization", "")
             if token.startswith("Bearer "):
@@ -557,24 +1010,56 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
         timeout: float | None = None,
         metadata: list[tuple[str, str]] | None = None,
     ) -> gRPCResponse:
-        """Call a unary gRPC method asynchronously."""
+        """Call a unary gRPC method asynchronously.
+
+        Args:
+            service: Registered service name.
+            method: Method name on the service.
+            request: Request message object.
+            timeout: RPC timeout in seconds (optional).
+            metadata: Additional metadata for this call (optional).
+
+        Returns:
+            gRPCResponse with result or error.
+        """
         if not self._connected:
             await self.connect()
 
+        if not service:
+            raise ValidationError(
+                "Service name cannot be empty",
+                field_name="service",
+                value=service,
+            )
+        if not method:
+            raise ValidationError(
+                "Method name cannot be empty",
+                field_name="method",
+                value=method,
+            )
+
         if service not in self._stubs:
-            raise ValueError(f"Service '{service}' not registered")
+            raise ValidationError(
+                f"Service '{service}' not registered. Available: {list(self._stubs.keys())}",
+                field_name="service",
+                value=service,
+            )
 
         stub = self._stubs[service]
         method_fn = getattr(stub, method, None)
 
         if method_fn is None:
-            raise ValueError(f"Method '{method}' not found on service '{service}'")
+            raise ValidationError(
+                f"Method '{method}' not found on service '{service}'",
+                field_name="method",
+                value=method,
+            )
 
         call_metadata = self.get_metadata()
         if metadata:
             call_metadata.extend(metadata)
 
-        timeout_val = timeout or self.timeout
+        timeout_val = timeout if timeout is not None else self.timeout
         start_time = time.perf_counter()
 
         try:
@@ -593,8 +1078,8 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
 
             self._record_request(
                 operation=f"{service}/{method}",
-                request_data=str(request),
-                response_data=str(response),
+                request_data=str(request)[:500] if request else None,
+                response_data=str(response)[:500] if response else None,
                 duration_ms=duration_ms,
             )
 
@@ -604,19 +1089,25 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
             duration_ms = (time.perf_counter() - start_time) * 1000
             err_str = str(e)
             status_code = getattr(e, "code", lambda: -1)()
+            if callable(status_code):
+                status_code = -1
             status_details = getattr(e, "details", lambda: err_str)()
+            if callable(status_details):
+                status_details = err_str
 
             self._record_request(
                 operation=f"{service}/{method}",
-                request_data=str(request),
+                request_data=str(request)[:500] if request else None,
                 response_data=None,
                 duration_ms=duration_ms,
                 error=status_details,
                 metadata={"status_code": status_code},
             )
 
-            if "timeout" in err_str.lower():
-                raise RequestTimeoutError(message=f"gRPC call timed out: {e}") from e
+            if "timeout" in err_str.lower() or status_code == 4:
+                raise RequestTimeoutError(
+                    message=f"gRPC call to {service}/{method} timed out after {timeout_val}s"
+                ) from e
 
             return gRPCResponse(
                 data=None,
@@ -633,24 +1124,50 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
         timeout: float | None = None,
         metadata: list[tuple[str, str]] | None = None,
     ) -> AsyncGenerator[gRPCResponse, None]:
-        """Call a streaming gRPC method asynchronously."""
+        """Call a streaming gRPC method asynchronously.
+
+        Args:
+            service: Registered service name.
+            method: Method name on the service.
+            requests: Iterator/async iterator of request messages (optional).
+            timeout: RPC timeout in seconds (optional).
+            metadata: Additional metadata for this call (optional).
+
+        Yields:
+            gRPCResponse for each response in the stream.
+        """
         if not self._connected:
             await self.connect()
 
+        if not service:
+            raise ValidationError(
+                "Service name cannot be empty",
+                field_name="service",
+                value=service,
+            )
+
         if service not in self._stubs:
-            raise ValueError(f"Service '{service}' not registered")
+            raise ValidationError(
+                f"Service '{service}' not registered",
+                field_name="service",
+                value=service,
+            )
 
         stub = self._stubs[service]
         method_fn = getattr(stub, method, None)
 
         if method_fn is None:
-            raise ValueError(f"Method '{method}' not found on service '{service}'")
+            raise ValidationError(
+                f"Method '{method}' not found on service '{service}'",
+                field_name="method",
+                value=method,
+            )
 
         call_metadata = self.get_metadata()
         if metadata:
             call_metadata.extend(metadata)
 
-        timeout_val = timeout or self.timeout
+        timeout_val = timeout if timeout is not None else self.timeout
         start_time = time.perf_counter()
 
         try:
@@ -678,7 +1195,7 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
                 self._record_request(
                     operation=f"{service}/{method}/stream",
                     request_data="<streaming>",
-                    response_data=str(response)[:500],
+                    response_data=str(response)[:500] if response else None,
                     duration_ms=duration_ms,
                 )
 
@@ -689,7 +1206,11 @@ class AsyncgRPCClient(BaseAsyncClient[gRPCResponse]):
             duration_ms = (time.perf_counter() - start_time) * 1000
             err_str = str(e)
             status_code = getattr(e, "code", lambda: -1)()
+            if callable(status_code):
+                status_code = -1
             status_details = getattr(e, "details", lambda: err_str)()
+            if callable(status_details):
+                status_details = err_str
 
             self._record_request(
                 operation=f"{service}/{method}/stream",

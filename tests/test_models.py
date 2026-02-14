@@ -78,9 +78,9 @@ class TestCheckpoint:
         checkpoint = Checkpoint(name="after_setup")
         assert checkpoint.name == "after_setup"
 
-    def test_checkpoint_is_dataclass(self) -> None:
+    def test_checkpoint_is_pydantic_model(self) -> None:
         checkpoint = Checkpoint(name="test")
-        assert hasattr(checkpoint, "__dataclass_fields__")
+        assert hasattr(Checkpoint, "model_fields")
 
 
 class TestPath:
@@ -374,7 +374,9 @@ class TestJourneyResult:
         now = datetime.now()
         step_results = [
             StepResult(step_name="s1", success=True, started_at=now, finished_at=now),
-            StepResult(step_name="s2", success=False, started_at=now, finished_at=now),
+            StepResult(
+                step_name="s2", success=False, started_at=now, finished_at=now, error="Failed"
+            ),
             StepResult(step_name="s3", success=True, started_at=now, finished_at=now),
         ]
         result = JourneyResult(

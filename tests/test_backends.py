@@ -462,7 +462,7 @@ class TestStateManagerIntegration:
         manager.checkpoint("after_create")
         manager.rollback("initial")
 
-        assert manager._checkpoints == ["chk_initial", "chk_after_create"]
+        assert manager._checkpoints == ["chk_initial"]
 
     def test_full_lifecycle(self) -> None:
         manager = PostgreSQLStateManager(

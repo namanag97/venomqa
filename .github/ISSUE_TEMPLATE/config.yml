@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/namanagarwal/venomqa/tree/main/docs
+    about: Check the documentation for guides and API reference
+  - name: FAQ
+    url: https://github.com/namanagarwal/venomqa/blob/main/docs/FAQ.md
+    about: Frequently asked questions about VenomQA
+  - name: Discussions
+    url: https://github.com/namanagarwal/venomqa/discussions
+    about: Join the community discussion for questions, ideas, and announcements
+  - name: Security Vulnerability
+    url: https://github.com/namanagarwal/venomqa/security/policy
+    about: Please report security vulnerabilities through our security policy

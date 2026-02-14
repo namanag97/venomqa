@@ -8,7 +8,12 @@ def create_todo(client, context, title=None, description=None, completed=None):
         data["description"] = description
     if completed is not None:
         data["completed"] = completed
-    return client.post("/todos", json=data)
+    response = client.post("/todos", json=data)
+    # Store the todo_id in context for future steps
+    if response.status_code in [200, 201]:
+        todo_id = response.json().get("id")
+        context["todo_id"] = todo_id
+    return response
 
 
 def get_todo(client, context, todo_id=None):
@@ -45,7 +50,16 @@ def delete_todo(client, context, todo_id=None):
 def upload_attachment(client, context, todo_id=None, filename="test.txt", content=b"test content"):
     todo_id = todo_id or context.get("todo_id")
     files = {"file": (filename, content, "text/plain")}
-    return client.post(f"/todos/{todo_id}/attachments", files=files)
+    response = client.post(f"/todos/{todo_id}/attachments", files=files)
+    # Store attachment_id in context
+    if response.status_code in [200, 201]:
+        attachment_id = response.json().get("id")
+        context["attachment_id"] = attachment_id
+        # Also store in a list for multiple uploads
+        if "attachment_ids" not in context:
+            context["attachment_ids"] = []
+        context["attachment_ids"].append(attachment_id)
+    return response
 
 
 def download_attachment(client, context, todo_id=None, file_id=None):

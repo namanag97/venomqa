@@ -6,15 +6,14 @@ Demonstrates:
 - Multi-provider authentication
 """
 
-
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class OAuthActions:
     def __init__(self, base_url: str, auth_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.auth_client = HTTPClient(base_url=auth_url or base_url)
+        self.client = Client(base_url=base_url)
+        self.auth_client = Client(base_url=auth_url or base_url)
 
     def initiate_oauth(self, provider: str, redirect_uri: str):
         return self.auth_client.get(
@@ -170,7 +169,7 @@ def unlink_google(client, context):
 
 
 oauth_google_flow = Journey(
-    name="oauth_google",
+    name="auth_oauth_google",
     description="Google OAuth login flow",
     steps=[
         Step(name="initiate_google", action=initiate_google_oauth),
@@ -182,7 +181,7 @@ oauth_google_flow = Journey(
 )
 
 oauth_github_flow = Journey(
-    name="oauth_github",
+    name="auth_oauth_github",
     description="GitHub OAuth login flow",
     steps=[
         Step(name="initiate_github", action=initiate_github_oauth),
@@ -194,7 +193,7 @@ oauth_github_flow = Journey(
 )
 
 oauth_linking_flow = Journey(
-    name="oauth_linking",
+    name="auth_oauth_linking",
     description="Link multiple OAuth providers to account",
     steps=[
         Step(name="google_login", action=login_with_google),

@@ -1,29 +1,77 @@
-"""JUnit XML reporter for CI/CD integration."""
+"""JUnit XML reporter for CI/CD integration.
+
+Generates JUnit XML reports compatible with CI systems like Jenkins,
+GitHub Actions, GitLab CI, CircleCI, and others. Reports follow the
+standard JUnit XML schema for test results.
+
+Example:
+    >>> from venomqa.reporters import JUnitReporter
+    >>> reporter = JUnitReporter()
+    >>> xml_output = reporter.generate(journey_results)
+    >>> print(xml_output)  # JUnit XML format
+"""
 
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from typing import Any
 
-from venomqa.core.models import JourneyResult
+from venomqa.core.models import (
+    JourneyResult,
+    PathResult,
+    StepResult,
+)
 from venomqa.reporters.base import BaseReporter
 
 
 class JUnitReporter(BaseReporter):
-    """Generate JUnit XML reports for CI integration."""
+    """Generate JUnit XML reports for CI integration.
+
+    Produces JUnit XML documents with:
+    - Testsuites container with aggregate statistics
+    - Individual testsuites per journey
+    - Testcases for each step and branch path
+    - Failure elements with error details
+    - Properties for journey metadata
+
+    Attributes:
+        output_path: Optional default path for saving reports.
+
+    Example:
+        >>> reporter = JUnitReporter(output_path="reports/junit.xml")
+        >>> reporter.save(results)
+        PosixPath('reports/junit.xml')
+    """
 
     @property
     def file_extension(self) -> str:
+        """Return the XML file extension."""
         return ".xml"
 
     def generate(self, results: list[JourneyResult]) -> str:
-        """Generate JUnit XML from journey results."""
+        """Generate a JUnit XML report from journey results.
+
+        Args:
+            results: List of JourneyResult objects from test execution.
+
+        Returns:
+            JUnit XML-formatted report string with XML declaration.
+        """
         root = self._build_xml(results)
         self._indent_xml(root)
         return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
     def _build_xml(self, results: list[JourneyResult]) -> ET.Element:
-        """Build JUnit XML structure."""
+        """Build the complete JUnit XML structure.
+
+        Creates a testsuites element containing individual testsuite
+        elements for each journey.
+
+        Args:
+            results: List of JourneyResult objects.
+
+        Returns:
+            Root Element containing the complete JUnit XML structure.
+        """
         test_suites = ET.Element("testsuites")
 
         total_tests = sum(r.total_steps + r.total_paths for r in results)
@@ -44,7 +92,17 @@ class JUnitReporter(BaseReporter):
         return test_suites
 
     def _build_test_suite(self, result: JourneyResult) -> ET.Element:
-        """Build a test suite for a journey."""
+        """Build a testsuite element for a single journey.
+
+        Creates a testsuite containing testcases for each step
+        and branch path, with properties for metadata.
+
+        Args:
+            result: JourneyResult object to convert to testsuite.
+
+        Returns:
+            Element representing the testsuite.
+        """
         test_suite = ET.Element("testsuite")
 
         total_tests = result.total_steps + result.total_paths
@@ -78,8 +136,19 @@ class JUnitReporter(BaseReporter):
 
         return test_suite
 
-    def _build_step_test_case(self, journey_name: str, step: Any) -> ET.Element:
-        """Build a test case for a step."""
+    def _build_step_test_case(self, journey_name: str, step: StepResult) -> ET.Element:
+        """Build a testcase element for a step result.
+
+        Creates a testcase with timing information and failure
+        details if the step failed.
+
+        Args:
+            journey_name: Name of the parent journey.
+            step: StepResult object to convert to testcase.
+
+        Returns:
+            Element representing the testcase.
+        """
         test_case = ET.Element("testcase")
 
         test_case.set("classname", f"{journey_name}.steps")
@@ -96,8 +165,22 @@ class JUnitReporter(BaseReporter):
 
         return test_case
 
-    def _build_path_test_case(self, journey_name: str, checkpoint: str, path: Any) -> ET.Element:
-        """Build a test case for a branch path."""
+    def _build_path_test_case(
+        self, journey_name: str, checkpoint: str, path: PathResult
+    ) -> ET.Element:
+        """Build a testcase element for a branch path result.
+
+        Creates a testcase representing a branch path execution,
+        with failure details if the path failed.
+
+        Args:
+            journey_name: Name of the parent journey.
+            checkpoint: Name of the checkpoint for this branch.
+            path: PathResult object to convert to testcase.
+
+        Returns:
+            Element representing the testcase.
+        """
         test_case = ET.Element("testcase")
 
         test_case.set("classname", f"{journey_name}.branches.{checkpoint}")
@@ -111,8 +194,15 @@ class JUnitReporter(BaseReporter):
 
         return test_case
 
-    def _format_step_failure(self, step: Any) -> str:
-        """Format step failure details."""
+    def _format_step_failure(self, step: StepResult) -> str:
+        """Format step failure details for the failure element text.
+
+        Args:
+            step: Failed StepResult object.
+
+        Returns:
+            Formatted string with error details and request/response if available.
+        """
         lines = [f"Step: {step.step_name}", f"Error: {step.error or 'Unknown error'}"]
 
         if step.request:
@@ -122,8 +212,15 @@ class JUnitReporter(BaseReporter):
 
         return "\n".join(lines)
 
-    def _format_path_failure(self, path: Any) -> str:
-        """Format path failure details."""
+    def _format_path_failure(self, path: PathResult) -> str:
+        """Format path failure details for the failure element text.
+
+        Args:
+            path: Failed PathResult object.
+
+        Returns:
+            Formatted string with error details and failed steps.
+        """
         lines = [f"Path: {path.path_name}", f"Error: {path.error or 'Unknown error'}"]
 
         failed_steps = [s for s in path.step_results if not s.success]
@@ -134,8 +231,15 @@ class JUnitReporter(BaseReporter):
 
         return "\n".join(lines)
 
-    def _format_step_output(self, step: Any) -> str:
-        """Format step output for system-out."""
+    def _format_step_output(self, step: StepResult) -> str:
+        """Format step output for the system-out element.
+
+        Args:
+            step: StepResult object.
+
+        Returns:
+            Formatted string with duration and request/response details.
+        """
         parts = [f"Duration: {step.duration_ms}ms"]
         if step.request:
             parts.append(f"Request: {step.request}")
@@ -144,15 +248,33 @@ class JUnitReporter(BaseReporter):
         return " | ".join(parts)
 
     def _add_property(self, parent: ET.Element, name: str, value: str) -> None:
-        """Add a property element."""
+        """Add a property element to a properties container.
+
+        Args:
+            parent: Parent properties element.
+            name: Property name.
+            value: Property value.
+        """
         prop = ET.SubElement(parent, "property")
         prop.set("name", name)
         prop.set("value", value)
 
     def _indent_xml(self, elem: ET.Element, level: int = 0) -> None:
-        """Pretty-print XML with indentation."""
+        """Add indentation to XML for pretty-printing.
+
+        Recursively adds newlines and indentation to make the XML
+        human-readable.
+
+        Note:
+            Uses len(elem) instead of truthiness check to avoid
+            DeprecationWarning about element truth value testing.
+
+        Args:
+            elem: Element to indent.
+            level: Current indentation level (for recursion).
+        """
         indent = "\n" + "  " * level
-        if elem:
+        if len(elem) > 0:
             if not elem.text or not elem.text.strip():
                 elem.text = indent + "  "
             if not elem.tail or not elem.tail.strip():

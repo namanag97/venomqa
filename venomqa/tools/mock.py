@@ -808,3 +808,347 @@ def reset_mock_requests(
             raise MockError(f"Failed to reset WireMock request log: {e}") from e
     else:
         raise MockError(f"Unsupported mock service: {mock_service}")
+
+
+class MockResponseBuilder:
+    """Builder pattern for creating mock responses.
+
+    Provides a fluent interface for configuring mock responses.
+
+    Example:
+        >>> mock = (
+        ...     MockResponseBuilder()
+        ...     .with_path("/api/users")
+        ...     .with_method("GET")
+        ...     .with_status(200)
+        ...     .with_json_body({"users": [{"id": 1, "name": "John"}]})
+        ...     .with_delay(100)
+        ...     .build()
+        ... )
+        >>> setup_mock(client, context, mock["path"], mock["response"], mock["method"])
+    """
+
+    def __init__(self) -> None:
+        self._path: str = "/"
+        self._method: str = "GET"
+        self._status: int = 200
+        self._body: Any = {}
+        self._headers: dict[str, str] = {"Content-Type": "application/json"}
+        self._delay_ms: int = 0
+        self._priority: int = 0
+
+    def with_path(self, path: str) -> MockResponseBuilder:
+        """Set the path for the mock."""
+        self._path = path
+        return self
+
+    def with_method(self, method: str) -> MockResponseBuilder:
+        """Set the HTTP method for the mock."""
+        self._method = method.upper()
+        return self
+
+    def with_status(self, status: int) -> MockResponseBuilder:
+        """Set the response status code."""
+        self._status = status
+        return self
+
+    def with_body(self, body: Any) -> MockResponseBuilder:
+        """Set the response body (any JSON-serializable value)."""
+        self._body = body
+        return self
+
+    def with_json_body(self, data: dict[str, Any]) -> MockResponseBuilder:
+        """Set the response body as JSON."""
+        self._body = data
+        self._headers["Content-Type"] = "application/json"
+        return self
+
+    def with_text_body(self, text: str) -> MockResponseBuilder:
+        """Set the response body as plain text."""
+        self._body = text
+        self._headers["Content-Type"] = "text/plain"
+        return self
+
+    def with_headers(self, headers: dict[str, str]) -> MockResponseBuilder:
+        """Add response headers."""
+        self._headers.update(headers)
+        return self
+
+    def with_delay(self, delay_ms: int) -> MockResponseBuilder:
+        """Set response delay in milliseconds."""
+        self._delay_ms = delay_ms
+        return self
+
+    def with_priority(self, priority: int) -> MockResponseBuilder:
+        """Set mock priority (higher = more important)."""
+        self._priority = priority
+        return self
+
+    def build(self) -> dict[str, Any]:
+        """Build the mock configuration.
+
+        Returns:
+            dict: Configuration with path, method, and response.
+        """
+        return {
+            "path": self._path,
+            "method": self._method,
+            "response": {
+                "status": self._status,
+                "body": self._body,
+                "headers": self._headers,
+            },
+            "delay_ms": self._delay_ms,
+            "priority": self._priority,
+        }
+
+    def setup(
+        self,
+        client: Client,
+        context: Context,
+        mock_service: str = "mockserver",
+    ) -> dict[str, Any]:
+        """Build and setup the mock in one step.
+
+        Args:
+            client: VenomQA client instance.
+            context: Test context.
+            mock_service: Mock service to use.
+
+        Returns:
+            dict: Mock configuration that was created.
+        """
+        config = self.build()
+        return setup_mock(
+            client=client,
+            context=context,
+            path=config["path"],
+            response=config["response"],
+            method=config["method"],
+            mock_service=mock_service,
+            priority=config["priority"],
+            delay_ms=config["delay_ms"],
+        )
+
+
+def mock_success_response(
+    path: str,
+    data: Any,
+    method: str = "GET",
+) -> dict[str, Any]:
+    """Create a standard success mock response.
+
+    Args:
+        path: API path to mock.
+        data: Response data.
+        method: HTTP method.
+
+    Returns:
+        dict: Mock configuration.
+
+    Example:
+        >>> config = mock_success_response("/api/users", {"users": []})
+        >>> setup_mock(client, context, config["path"], config["response"])
+    """
+    return {
+        "path": path,
+        "method": method,
+        "response": {
+            "status": 200,
+            "body": {"success": True, "data": data},
+            "headers": {"Content-Type": "application/json"},
+        },
+    }
+
+
+def mock_error_response(
+    path: str,
+    error_message: str,
+    status: int = 400,
+    error_code: str | None = None,
+    method: str = "GET",
+) -> dict[str, Any]:
+    """Create a standard error mock response.
+
+    Args:
+        path: API path to mock.
+        error_message: Error message.
+        status: HTTP status code (default: 400).
+        error_code: Optional error code.
+        method: HTTP method.
+
+    Returns:
+        dict: Mock configuration.
+
+    Example:
+        >>> config = mock_error_response("/api/users", "User not found", status=404)
+        >>> setup_mock(client, context, config["path"], config["response"])
+    """
+    body: dict[str, Any] = {
+        "success": False,
+        "error": {"message": error_message},
+    }
+    if error_code:
+        body["error"]["code"] = error_code
+
+    return {
+        "path": path,
+        "method": method,
+        "response": {
+            "status": status,
+            "body": body,
+            "headers": {"Content-Type": "application/json"},
+        },
+    }
+
+
+def mock_paginated_response(
+    path: str,
+    items: list[Any],
+    page: int = 1,
+    per_page: int = 10,
+    total: int | None = None,
+    method: str = "GET",
+) -> dict[str, Any]:
+    """Create a paginated mock response.
+
+    Args:
+        path: API path to mock.
+        items: List of items for current page.
+        page: Current page number.
+        per_page: Items per page.
+        total: Total items (default: len(items)).
+        method: HTTP method.
+
+    Returns:
+        dict: Mock configuration.
+
+    Example:
+        >>> config = mock_paginated_response(
+        ...     "/api/users",
+        ...     items=[{"id": 1}, {"id": 2}],
+        ...     page=1,
+        ...     per_page=10,
+        ...     total=25
+        ... )
+        >>> setup_mock(client, context, config["path"], config["response"])
+    """
+    total = total if total is not None else len(items)
+    total_pages = (total + per_page - 1) // per_page
+
+    return {
+        "path": path,
+        "method": method,
+        "response": {
+            "status": 200,
+            "body": {
+                "success": True,
+                "data": {
+                    "items": items,
+                    "pagination": {
+                        "page": page,
+                        "per_page": per_page,
+                        "total": total,
+                        "total_pages": total_pages,
+                        "has_next": page < total_pages,
+                        "has_prev": page > 1,
+                    },
+                },
+            },
+            "headers": {"Content-Type": "application/json"},
+        },
+    }
+
+
+def mock_auth_required_response(
+    path: str,
+    method: str = "GET",
+) -> dict[str, Any]:
+    """Create an authentication required (401) mock response.
+
+    Args:
+        path: API path to mock.
+        method: HTTP method.
+
+    Returns:
+        dict: Mock configuration.
+
+    Example:
+        >>> config = mock_auth_required_response("/api/protected")
+        >>> setup_mock(client, context, config["path"], config["response"])
+    """
+    return mock_error_response(
+        path=path,
+        error_message="Authentication required",
+        status=401,
+        error_code="AUTH_REQUIRED",
+        method=method,
+    )
+
+
+def mock_rate_limited_response(
+    path: str,
+    retry_after: int = 60,
+    method: str = "GET",
+) -> dict[str, Any]:
+    """Create a rate limited (429) mock response.
+
+    Args:
+        path: API path to mock.
+        retry_after: Seconds until rate limit resets.
+        method: HTTP method.
+
+    Returns:
+        dict: Mock configuration.
+
+    Example:
+        >>> config = mock_rate_limited_response("/api/data", retry_after=30)
+        >>> setup_mock(client, context, config["path"], config["response"])
+    """
+    return {
+        "path": path,
+        "method": method,
+        "response": {
+            "status": 429,
+            "body": {
+                "success": False,
+                "error": {
+                    "message": "Rate limit exceeded",
+                    "code": "RATE_LIMITED",
+                    "retry_after": retry_after,
+                },
+            },
+            "headers": {
+                "Content-Type": "application/json",
+                "Retry-After": str(retry_after),
+            },
+        },
+    }
+
+
+def mock_server_error_response(
+    path: str,
+    message: str = "Internal server error",
+    method: str = "GET",
+) -> dict[str, Any]:
+    """Create a server error (500) mock response.
+
+    Args:
+        path: API path to mock.
+        message: Error message.
+        method: HTTP method.
+
+    Returns:
+        dict: Mock configuration.
+
+    Example:
+        >>> config = mock_server_error_response("/api/flaky")
+        >>> setup_mock(client, context, config["path"], config["response"])
+    """
+    return mock_error_response(
+        path=path,
+        error_message=message,
+        status=500,
+        error_code="INTERNAL_ERROR",
+        method=method,
+    )

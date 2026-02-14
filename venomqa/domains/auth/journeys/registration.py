@@ -6,15 +6,14 @@ Demonstrates:
 - Profile setup branching
 """
 
-
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class RegistrationActions:
     def __init__(self, base_url: str, auth_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.auth_client = HTTPClient(base_url=auth_url or base_url)
+        self.client = Client(base_url=base_url)
+        self.auth_client = Client(base_url=auth_url or base_url)
 
     def register(self, email: str, password: str, name: str, **extra_fields):
         return self.auth_client.post(
@@ -145,7 +144,7 @@ def setup_business_profile(client, context):
 
 
 registration_flow = Journey(
-    name="user_registration",
+    name="auth_registration",
     description="Standard user registration flow",
     steps=[
         Step(name="register", action=register_user),
@@ -157,7 +156,7 @@ registration_flow = Journey(
 )
 
 email_verification_flow = Journey(
-    name="email_verification",
+    name="auth_email_verification",
     description="Registration with email verification",
     steps=[
         Step(name="register", action=register_user),
@@ -170,7 +169,7 @@ email_verification_flow = Journey(
 )
 
 registration_with_profile_flow = Journey(
-    name="registration_with_profile",
+    name="auth_registration_with_profile",
     description="Registration with profile type branching",
     steps=[
         Step(name="register", action=register_user),

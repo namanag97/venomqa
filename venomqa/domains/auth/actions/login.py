@@ -3,12 +3,12 @@
 Reusable login and session management actions.
 """
 
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class LoginActions:
     def __init__(self, base_url: str):
-        self.client = HTTPClient(base_url=base_url)
+        self.client = Client(base_url=base_url)
 
     def login(self, email: str, password: str):
         return self.client.post("/api/auth/login", json={"email": email, "password": password})

@@ -2,6 +2,8 @@
 
 This page provides practical, real-world examples of using VenomQA.
 
+> **Looking for basics?** See the [Getting Started Guide](getting-started.md) for introductory examples.
+
 ## Table of Contents
 
 - [E-Commerce Checkout Flow](#e-commerce-checkout-flow)
@@ -12,6 +14,15 @@ This page provides practical, real-world examples of using VenomQA.
 - [File Upload and Processing](#file-upload-and-processing)
 - [WebSocket and Real-Time Features](#websocket-and-real-time-features)
 - [Third-Party API Mocking](#third-party-api-mocking)
+
+## Related Documentation
+
+| Topic | Document |
+|-------|----------|
+| Journey DSL | [journeys.md](journeys.md) |
+| Adapters | [adapters.md](adapters.md) |
+| Ports | [ports.md](ports.md) |
+| Advanced Patterns | [advanced.md](advanced.md) |
 
 ---
 

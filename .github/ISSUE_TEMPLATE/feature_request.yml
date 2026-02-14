@@ -1,0 +1,120 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for VenomQA
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please describe your idea in detail to help us understand and prioritize it.
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement
+      description: |
+        Is your feature request related to a problem? Please describe.
+        Example: I'm always frustrated when...
+      placeholder: |
+        I'm trying to test X, but currently VenomQA doesn't support Y.
+        This makes it difficult to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see implemented
+      placeholder: |
+        I would like VenomQA to support...
+        
+        Example usage:
+        ```python
+        from venomqa import Journey, Step
+        
+        journey = Journey(
+            name="example",
+            steps=[...],
+            new_feature=True,  # This would enable...
+        )
+        ```
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: |
+        I've tried using X, but it doesn't work because...
+        Another option would be to...
+
+  - type: dropdown
+    id: feature-area
+    attributes:
+      label: Feature Area
+      description: Which area of VenomQA does this feature relate to?
+      options:
+        - Journey DSL
+        - State Management / Checkpointing
+        - Ports & Adapters
+        - CLI
+        - Reporting
+        - Parallel Execution
+        - Configuration
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Nice to have
+        - Important
+        - Critical / Blocking
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases
+      description: |
+        Describe specific use cases where this feature would be helpful.
+        This helps us understand the impact and design the feature properly.
+      placeholder: |
+        1. Testing multi-tenant applications where...
+        2. Validating webhook callbacks by...
+        3. Simulating concurrent users with...
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context, mockups, or references:
+        - Links to similar features in other tools
+        - Relevant documentation
+        - Implementation ideas
+      placeholder: |
+        Similar tools like X handle this by...
+        
+        Reference: https://...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to submit a PR for this feature
+          required: false
+        - label: I have searched existing issues and discussions for similar requests
+          required: true

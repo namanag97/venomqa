@@ -1,0 +1,22 @@
+[distutils]
+index-servers =
+    pypi
+    testpypi
+
+[pypi]
+username = __token__
+password = <your-pypi-token-here>
+
+[testpypi]
+username = __token__
+password = <your-testpypi-token-here>
+
+# Instructions:
+# 1. Copy this file to ~/.pypirc
+# 2. Replace <your-pypi-token-here> with your actual PyPI API token
+# 3. Replace <your-testpypi-token-here> with your TestPyPI API token
+# 4. Run: chmod 600 ~/.pypirc (to secure the file)
+#
+# To get tokens:
+# - PyPI: https://pypi.org/manage/account/token/
+# - TestPyPI: https://test.pypi.org/manage/account/token/

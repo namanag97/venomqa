@@ -1,0 +1,39 @@
+# CODEOWNERS - Define code owners for VenomQA
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @namanagarwal
+
+# Core framework
+/venomqa/core/ @namanagarwal
+/venomqa/state/ @namanagarwal
+/venomqa/runner/ @namanagarwal
+
+# CLI
+/venomqa/cli/ @namanagarwal
+
+# Ports and Adapters
+/venomqa/ports/ @namanagarwal
+/venomqa/adapters/ @namanagarwal
+
+# Reporters
+/venomqa/reporters/ @namanagarwal
+
+# Configuration
+/venomqa/config/ @namanagarwal
+
+# Documentation
+/docs/ @namanagarwal
+/README.md @namanagarwal
+/CONTRIBUTING.md @namanagarwal
+
+# Tests
+/tests/ @namanagarwal
+
+# CI/CD
+/.github/workflows/ @namanagarwal
+/.github/ISSUE_TEMPLATE/ @namanagarwal
+
+# Build configuration
+/pyproject.toml @namanagarwal
+/docker-compose*.yml @namanagarwal

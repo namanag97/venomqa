@@ -5,13 +5,13 @@ Reusable WebSocket connection and messaging actions.
 
 import asyncio
 
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 from venomqa.clients.websocket import AsyncWebSocketClient
 
 
 class WebSocketActions:
     def __init__(self, base_url: str, ws_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
+        self.client = Client(base_url=base_url)
         self.ws_url = ws_url or base_url.replace("http", "ws").replace("https", "wss")
 
     def get_ws_client(self, path: str, token: str | None = None):

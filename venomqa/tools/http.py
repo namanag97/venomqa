@@ -788,3 +788,353 @@ def websocket_close(
             loop.run_until_complete(connection.close_async())
     except RuntimeError:
         asyncio.run(connection.close_async())
+
+
+def request(
+    client: Client,
+    context: Context,
+    method: str,
+    path: str,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    json: Any = None,
+    data: dict[str, Any] | bytes | None = None,
+    timeout: float = 30.0,
+    **kwargs: Any,
+) -> httpx.Response:
+    """Perform an HTTP request with any method.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        method: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, etc.).
+        path: API endpoint path or full URL.
+        params: Query parameters.
+        headers: Additional headers for this request.
+        json: JSON body for the request.
+        data: Form data or raw body for the request.
+        timeout: Request timeout in seconds.
+        **kwargs: Additional arguments passed to httpx.
+
+    Returns:
+        httpx.Response: The HTTP response.
+
+    Raises:
+        HTTPError: If the request fails.
+
+    Example:
+        >>> response = request(client, context, "GET", "/api/users")
+        >>> response = request(client, context, "CUSTOM_METHOD", "/api/action")
+    """
+    base_url = _get_base_url(client, context)
+    url = _build_url(base_url, path)
+    request_headers = _get_headers(client, context)
+    if headers:
+        request_headers.update(headers)
+
+    http_client = getattr(client, "http_client", None) or httpx.Client(timeout=timeout)
+
+    try:
+        response = http_client.request(
+            method=method.upper(),
+            url=url,
+            params=params,
+            headers=request_headers,
+            json=json,
+            data=data,
+            **kwargs,
+        )
+        context.last_response = response
+        return response
+    except httpx.HTTPError as e:
+        raise HTTPError(f"{method.upper()} request failed: {url}") from e
+
+
+def upload_file(
+    client: Client,
+    context: Context,
+    path: str,
+    file_path: str | None = None,
+    file_content: bytes | None = None,
+    file_name: str | None = None,
+    field_name: str = "file",
+    additional_data: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: float = 60.0,
+    method: str = "POST",
+) -> httpx.Response:
+    """Upload a file via multipart/form-data.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        path: API endpoint path or full URL.
+        file_path: Path to file to upload (mutually exclusive with file_content).
+        file_content: File content as bytes (mutually exclusive with file_path).
+        file_name: Name of the file (required if using file_content).
+        field_name: Form field name for the file (default: 'file').
+        additional_data: Additional form fields to include.
+        headers: Additional headers for this request.
+        timeout: Request timeout in seconds.
+        method: HTTP method (default: POST).
+
+    Returns:
+        httpx.Response: The HTTP response.
+
+    Raises:
+        HTTPError: If the request fails.
+        ValueError: If neither file_path nor file_content is provided.
+
+    Example:
+        >>> # Upload from file path
+        >>> response = upload_file(
+        ...     client, context,
+        ...     path="/api/upload",
+        ...     file_path="/path/to/document.pdf"
+        ... )
+        >>>
+        >>> # Upload from bytes
+        >>> response = upload_file(
+        ...     client, context,
+        ...     path="/api/upload",
+        ...     file_content=b"file content here",
+        ...     file_name="data.txt"
+        ... )
+    """
+    if file_path is None and file_content is None:
+        raise ValueError("Either file_path or file_content must be provided")
+
+    if file_path is not None:
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+        if file_name is None:
+            file_name = file_path.split("/")[-1].split("\\")[-1]
+
+    if file_content is None or file_name is None:
+        raise ValueError("file_name is required when using file_content")
+
+    base_url = _get_base_url(client, context)
+    url = _build_url(base_url, path)
+    request_headers = _get_headers(client, context)
+    if headers:
+        request_headers.update(headers)
+
+    if "Content-Type" in request_headers:
+        del request_headers["Content-Type"]
+
+    files = {field_name: (file_name, file_content)}
+    data = additional_data or {}
+
+    http_client = getattr(client, "http_client", None) or httpx.Client(timeout=timeout)
+
+    try:
+        response = http_client.request(
+            method=method,
+            url=url,
+            files=files,
+            data=data,
+            headers=request_headers,
+        )
+        context.last_response = response
+        return response
+    except httpx.HTTPError as e:
+        raise HTTPError(f"File upload failed: {url}") from e
+
+
+def download_file(
+    client: Client,
+    context: Context,
+    path: str,
+    output_path: str,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: float = 60.0,
+    chunk_size: int = 8192,
+) -> dict[str, Any]:
+    """Download a file from an endpoint.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        path: API endpoint path or full URL.
+        output_path: Path where the file should be saved.
+        params: Query parameters.
+        headers: Additional headers for this request.
+        timeout: Request timeout in seconds.
+        chunk_size: Size of chunks to read/write.
+
+    Returns:
+        dict: Download information with 'size', 'path', and 'content_type' keys.
+
+    Raises:
+        HTTPError: If the request fails.
+
+    Example:
+        >>> result = download_file(
+        ...     client, context,
+        ...     path="/api/reports/123/download",
+        ...     output_path="/tmp/report.pdf"
+        ... )
+        >>> print(f"Downloaded {result['size']} bytes")
+    """
+    base_url = _get_base_url(client, context)
+    url = _build_url(base_url, path)
+    request_headers = _get_headers(client, context)
+    if headers:
+        request_headers.update(headers)
+
+    http_client = getattr(client, "http_client", None) or httpx.Client(timeout=timeout)
+
+    try:
+        with http_client.stream("GET", url, params=params, headers=request_headers) as response:
+            response.raise_for_status()
+            context.last_response = response
+
+            content_type = response.headers.get("Content-Type", "application/octet-stream")
+            total_size = 0
+
+            with open(output_path, "wb") as f:
+                for chunk in response.iter_bytes(chunk_size=chunk_size):
+                    f.write(chunk)
+                    total_size += len(chunk)
+
+            return {
+                "size": total_size,
+                "path": output_path,
+                "content_type": content_type,
+            }
+    except httpx.HTTPError as e:
+        raise HTTPError(f"File download failed: {url}") from e
+
+
+def follow_redirects(
+    client: Client,
+    context: Context,
+    path: str,
+    max_redirects: int = 10,
+    **kwargs: Any,
+) -> list[httpx.Response]:
+    """Follow redirect chain and return all responses.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        path: API endpoint path or full URL.
+        max_redirects: Maximum number of redirects to follow.
+        **kwargs: Additional arguments passed to GET request.
+
+    Returns:
+        list: List of responses in redirect chain.
+
+    Raises:
+        HTTPError: If the request fails.
+
+    Example:
+        >>> responses = follow_redirects(client, context, "/old-url")
+        >>> for i, resp in enumerate(responses):
+        ...     print(f"Step {i}: {resp.status_code} -> {resp.headers.get('Location', 'final')}")
+    """
+    base_url = _get_base_url(client, context)
+    url = _build_url(base_url, path)
+    request_headers = _get_headers(client, context)
+
+    http_client = getattr(client, "http_client", None) or httpx.Client(
+        timeout=kwargs.pop("timeout", 30.0),
+        follow_redirects=False,
+    )
+
+    responses: list[httpx.Response] = []
+    current_url = url
+    redirect_count = 0
+
+    while redirect_count <= max_redirects:
+        try:
+            response = http_client.get(current_url, headers=request_headers, **kwargs)
+            responses.append(response)
+
+            if 300 <= response.status_code < 400:
+                location = response.headers.get("Location")
+                if not location:
+                    break
+
+                if location.startswith("/"):
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(current_url)
+                    current_url = f"{parsed.scheme}://{parsed.netloc}{location}"
+                elif not location.startswith("http"):
+                    from urllib.parse import urljoin
+
+                    current_url = urljoin(current_url, location)
+                else:
+                    current_url = location
+
+                redirect_count += 1
+            else:
+                break
+        except httpx.HTTPError as e:
+            raise HTTPError(f"Request failed during redirect chain: {current_url}") from e
+
+    if responses:
+        context.last_response = responses[-1]
+
+    return responses
+
+
+def get_response_size(response: httpx.Response) -> int:
+    """Get the size of a response in bytes.
+
+    Args:
+        response: HTTP response.
+
+    Returns:
+        int: Size in bytes.
+
+    Example:
+        >>> response = get(client, context, "/api/data")
+        >>> size = get_response_size(response)
+        >>> print(f"Response size: {size} bytes")
+    """
+    content_length = response.headers.get("Content-Length")
+    if content_length:
+        return int(content_length)
+    return len(response.content)
+
+
+def is_json_response(response: httpx.Response) -> bool:
+    """Check if response is JSON.
+
+    Args:
+        response: HTTP response.
+
+    Returns:
+        bool: True if response appears to be JSON.
+
+    Example:
+        >>> response = get(client, context, "/api/users")
+        >>> if is_json_response(response):
+        ...     data = response.json()
+    """
+    content_type = response.headers.get("Content-Type", "")
+    return "json" in content_type.lower()
+
+
+def get_json_or_none(response: httpx.Response) -> Any:
+    """Safely get JSON from response, returning None on failure.
+
+    Args:
+        response: HTTP response.
+
+    Returns:
+        Any: Parsed JSON or None if parsing fails.
+
+    Example:
+        >>> response = get(client, context, "/api/data")
+        >>> data = get_json_or_none(response)
+        >>> if data:
+        ...     print(data.get("status"))
+    """
+    try:
+        return response.json()
+    except (json.JSONDecodeError, Exception):
+        return None

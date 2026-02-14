@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
+import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -29,9 +31,16 @@ from venomqa.errors import (
     JourneyError,
     JourneyTimeoutError,
     VenomQAError,
+    create_debug_context,
+    format_error,
 )
+from venomqa.errors.debug import DebugLogger, StepThroughController
 from venomqa.errors import (
     PathError as PathError,
+)
+from venomqa.errors.retry import (
+    JourneyTimeoutError as EnhancedJourneyTimeoutError,
+    StepTimeoutError,
 )
 
 if TYPE_CHECKING:
@@ -39,6 +48,7 @@ if TYPE_CHECKING:
     from venomqa.performance import ResponseCache
     from venomqa.performance.pool import ConnectionPool
     from venomqa.state import StateManager
+    from venomqa.storage import ResultsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +70,13 @@ class JourneyRunner:
         cache_ttl: float = 300.0,
         cacheable_methods: set[str] | None = None,
         ports: dict[str, Any] | None = None,
+        output: Any | None = None,
+        results_repository: ResultsRepository | None = None,
+        persist_results: bool = False,
+        results_tags: list[str] | None = None,
+        results_metadata: dict[str, Any] | None = None,
+        debug_logger: DebugLogger | None = None,
+        step_controller: StepThroughController | None = None,
     ) -> None:
         self.client = client
         self.state_manager = state_manager
@@ -78,6 +95,20 @@ class JourneyRunner:
         self._cache_hits = 0
         self._cache_misses = 0
         self.ports = ports or {}
+        self.output = output
+        self._step_counter = 0
+
+        # Results persistence
+        self.results_repository = results_repository
+        self.persist_results = persist_results or results_repository is not None
+        self.results_tags = results_tags or []
+        self.results_metadata = results_metadata or {}
+
+        # Debug and step-through support
+        self.debug_logger = debug_logger
+        self.step_controller = step_controller
+        self._current_journey_name = ""
+        self._current_path_name = "main"
 
     def run(self, journey: Journey) -> JourneyResult:
         """Execute a complete journey with all branches."""
@@ -91,6 +122,7 @@ class JourneyRunner:
 
         self.client.clear_history()
         context = ExecutionContext()
+        context.state_manager = self.state_manager
 
         step_results: list[StepResult] = []
         branch_results: list[BranchResult] = []
@@ -168,7 +200,7 @@ class JourneyRunner:
             br.all_passed for br in branch_results
         )
 
-        return JourneyResult(
+        result = JourneyResult(
             journey_name=journey.name,
             success=all_passed,
             started_at=started_at,
@@ -179,11 +211,18 @@ class JourneyRunner:
             duration_ms=duration_ms,
         )
 
+        # Persist results if configured
+        self._persist_result(result, journey)
+
+        return result
+
     def _handle_checkpoint(self, checkpoint: Checkpoint) -> None:
         """Create a database checkpoint."""
         if self.state_manager:
             self.state_manager.checkpoint(checkpoint.name)
             logger.debug(f"Created checkpoint: {checkpoint.name}")
+        if self.output:
+            self.output.checkpoint(checkpoint.name)
 
     def _handle_branch(
         self,
@@ -193,6 +232,9 @@ class JourneyRunner:
     ) -> BranchResult:
         """Execute all paths in a branch, rolling back after each."""
         logger.info(f"Exploring branch with {len(branch.paths)} paths")
+
+        if self.output:
+            self.output.branch_start(branch.checkpoint_name, len(branch.paths))
 
         path_results: list[PathResult] = []
         context_snapshot = context.snapshot()
@@ -213,12 +255,9 @@ class JourneyRunner:
                 cause=e,
             ) from e
 
-        all_passed = all(r.success for r in path_results)
-
         return BranchResult(
             checkpoint_name=branch.checkpoint_name,
             path_results=path_results,
-            all_passed=all_passed,
         )
 
     def _run_paths_sequential(
@@ -233,6 +272,7 @@ class JourneyRunner:
         for path in branch.paths:
             context = ExecutionContext()
             context.restore(context_snapshot)
+            context.state_manager = self.state_manager
 
             path_result = self._run_path(path, journey_name, context)
             results.append(path_result)
@@ -240,6 +280,8 @@ class JourneyRunner:
             if self.state_manager:
                 self.state_manager.rollback(branch.checkpoint_name)
                 logger.debug(f"Rolled back to checkpoint: {branch.checkpoint_name}")
+                if self.output:
+                    self.output.rollback(branch.checkpoint_name)
 
         return results
 
@@ -250,6 +292,12 @@ class JourneyRunner:
         context_snapshot: dict[str, Any],
     ) -> list[PathResult]:
         """Run paths in parallel using thread pool."""
+        if self.state_manager:
+            logger.warning(
+                "Parallel path execution with state_manager may not properly isolate database state. "
+                "Consider using parallel_paths=1 for reliable checkpoint/rollback behavior."
+            )
+
         results: list[PathResult] = []
 
         with ThreadPoolExecutor(max_workers=self.parallel_paths) as executor:
@@ -258,6 +306,7 @@ class JourneyRunner:
             for path in branch.paths:
                 context = ExecutionContext()
                 context.restore(context_snapshot)
+                context.state_manager = self.state_manager
 
                 future = executor.submit(self._run_path, path, journey_name, context)
                 futures[future] = path.name
@@ -287,6 +336,9 @@ class JourneyRunner:
     ) -> PathResult:
         """Execute all steps in a path."""
         logger.info(f"Running path: {path.name}")
+
+        if self.output:
+            self.output.path_start(path.name)
 
         step_results: list[StepResult] = []
         path_error: str | None = None
@@ -318,6 +370,9 @@ class JourneyRunner:
 
         all_passed = all(r.success for r in step_results)
 
+        if self.output:
+            self.output.path_result(path.name, all_passed and path_error is None, len(step_results))
+
         return PathResult(
             path_name=path.name,
             success=all_passed and path_error is None,
@@ -331,15 +386,40 @@ class JourneyRunner:
         journey_name: str,
         path_name: str,
         context: ExecutionContext,
+        journey_timeout: float | None = None,
     ) -> StepResult:
-        """Execute a single step and capture results."""
+        """Execute a single step and capture results.
+
+        Args:
+            step: Step to execute.
+            journey_name: Name of the journey.
+            path_name: Name of the path.
+            context: Execution context.
+            journey_timeout: Optional journey-level timeout (for default step timeout).
+
+        Returns:
+            StepResult with execution outcome.
+        """
         logger.debug(f"Running step: {step.name}")
 
+        # Log step start for debug mode
+        if self.debug_logger:
+            self.debug_logger.log_step_start(step.name, journey_name, path_name)
+
+        self._step_counter += 1
+        if self.output:
+            self.output.step_start(step.name, self._step_counter, step.description)
+
         started_at = datetime.now()
+        start_time = time.time()
         error: str | None = None
+        exception_raised: Exception | None = None
         response: dict[str, Any] | None = None
         request: dict[str, Any] | None = None
         success = False
+
+        # Determine effective timeout: step timeout > journey timeout > default
+        effective_timeout = step.timeout or journey_timeout
 
         try:
             action = (
@@ -351,15 +431,52 @@ class JourneyRunner:
                 }
                 step_args = getattr(step, "args", {})
                 merged_args = {**step_ports, **step_args}
-                result = action(self.client, context, **merged_args)
+
+                # Log request details for debug mode
+                if self.debug_logger and self.client.history:
+                    # Log will be captured after request via history
+                    pass
+
+                # Execute with timeout if configured
+                if effective_timeout is not None:
+                    result = self._execute_with_step_timeout(
+                        action=action,
+                        client=self.client,
+                        context=context,
+                        merged_args=merged_args,
+                        timeout=effective_timeout,
+                        step_name=step.name,
+                        description=step.description,
+                    )
+                else:
+                    result = action(self.client, context, **merged_args)
+
+                # Log HTTP request/response if debug mode and we have history
+                if self.debug_logger and self.client.history:
+                    last = self.client.last_request()
+                    if last:
+                        req_id = self.debug_logger.log_request(
+                            last.method,
+                            last.url,
+                            dict(last.headers) if hasattr(last, "headers") else None,
+                            last.request_body,
+                        )
+                        self.debug_logger.log_response(
+                            req_id,
+                            last.response_status,
+                            last.duration_ms,
+                            None,
+                            last.response_body,
+                        )
             else:
                 raise ValueError(f"Step action is not callable: {step.action}")
 
             if hasattr(result, "status_code"):
+                headers = dict(getattr(result, "headers", {}))
                 response = {
                     "status_code": result.status_code,
                     "body": self._safe_json(result),
-                    "headers": dict(result.headers),
+                    "headers": headers,
                 }
 
                 if self.client.history:
@@ -369,6 +486,7 @@ class JourneyRunner:
                             "method": last.method,
                             "url": last.url,
                             "body": last.request_body,
+                            "headers": dict(last.headers) if hasattr(last, "headers") else {},
                         }
 
             context.store_step_result(step.name, result)
@@ -377,9 +495,11 @@ class JourneyRunner:
             is_http_error = hasattr(result, "is_error") and result.is_error
 
             if expected_failure:
+                # When expecting failure, success = actual failure occurred
                 success = is_http_error
                 if not success:
                     error = "Expected failure but step succeeded"
+                    success = False  # Mark as failed when we expected failure but got success
             else:
                 success = not is_http_error
                 if not success and hasattr(result, "status_code"):
@@ -387,6 +507,7 @@ class JourneyRunner:
 
         except VenomQAError as e:
             error = f"[{e.error_code.value}] {e.message}"
+            exception_raised = e
             success = step.expect_failure
 
             if self.client.history:
@@ -396,6 +517,7 @@ class JourneyRunner:
                         "method": last.method,
                         "url": last.url,
                         "body": last.request_body,
+                        "headers": dict(last.headers) if hasattr(last, "headers") else {},
                     }
                     if last.error:
                         error = last.error
@@ -404,6 +526,7 @@ class JourneyRunner:
 
         except Exception as e:
             error = str(e)
+            exception_raised = e
             success = step.expect_failure
 
             if self.client.history:
@@ -413,12 +536,18 @@ class JourneyRunner:
                         "method": last.method,
                         "url": last.url,
                         "body": last.request_body,
+                        "headers": dict(last.headers) if hasattr(last, "headers") else {},
                     }
                     if last.error:
                         error = last.error
 
         finished_at = datetime.now()
         duration_ms = (finished_at - started_at).total_seconds() * 1000
+
+        # Log step end for debug mode
+        if self.debug_logger:
+            self.debug_logger.log_step_end(step.name, success, duration_ms, error)
+            self.debug_logger.log_timing(f"step:{step.name}", duration_ms)
 
         if not success:
             logs = self._capture_logs() if self.capture_logs else []
@@ -431,6 +560,47 @@ class JourneyRunner:
                 response=response,
                 logs=logs,
             )
+            if self.output:
+                self.output.step_fail(step.name, error or "Unknown error", duration_ms)
+
+            # Print enhanced error information
+            if exception_raised:
+                error_output = format_error(
+                    step_name=step.name,
+                    journey_name=journey_name,
+                    error=exception_raised,
+                    request=request,
+                    response=response,
+                    verbose=self.debug_logger is not None,
+                )
+                print(error_output)
+        else:
+            if self.output:
+                self.output.step_pass(step.name, duration_ms)
+
+        # Step-through mode: pause after step and allow inspection
+        if self.step_controller and self.step_controller.enabled:
+            # Build context data for display
+            ctx_data = {}
+            if hasattr(context, "_data"):
+                ctx_data = dict(context._data)
+            if hasattr(context, "_step_results"):
+                ctx_data["_step_results"] = list(context._step_results.keys())
+
+            # Get the result for inspection
+            last_result = context.get_step_result(step.name)
+
+            command = self.step_controller.pause(step.name, ctx_data, last_result)
+
+            if command == "abort":
+                raise JourneyAbortedError(
+                    message="Journey aborted by user in step-through mode",
+                    context=ErrorContext(
+                        journey_name=journey_name,
+                        path_name=path_name,
+                        step_name=step.name,
+                    ),
+                )
 
         return StepResult(
             step_name=step.name,
@@ -442,6 +612,48 @@ class JourneyRunner:
             request=request,
             duration_ms=duration_ms,
         )
+
+    def _execute_with_step_timeout(
+        self,
+        action: Any,
+        client: Any,
+        context: ExecutionContext,
+        merged_args: dict[str, Any],
+        timeout: float,
+        step_name: str,
+        description: str = "",
+    ) -> Any:
+        """Execute a step action with timeout.
+
+        Args:
+            action: Callable to execute.
+            client: HTTP client.
+            context: Execution context.
+            merged_args: Arguments to pass to action.
+            timeout: Timeout in seconds.
+            step_name: Name of the step for error messages.
+            description: Description for error messages.
+
+        Returns:
+            Result of the action.
+
+        Raises:
+            StepTimeoutError: If step times out.
+        """
+        start_time = time.time()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(action, client, context, **merged_args)
+            try:
+                return future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                elapsed = time.time() - start_time
+                raise StepTimeoutError(
+                    step_name=step_name,
+                    timeout_seconds=timeout,
+                    elapsed_seconds=elapsed,
+                    operation_description=description or f"executing step '{step_name}'",
+                )
 
     def _add_issue(
         self,
@@ -568,9 +780,55 @@ class JourneyRunner:
             return self.db_pool.acquire(timeout)
         return None
 
+    def _persist_result(self, result: JourneyResult, journey: Journey) -> str | None:
+        """Persist journey result to storage if configured.
+
+        Args:
+            result: The JourneyResult to persist.
+            journey: The Journey that was executed.
+
+        Returns:
+            The run ID if persisted, None otherwise.
+        """
+        if not self.persist_results:
+            return None
+
+        try:
+            # Lazy import to avoid circular imports
+            if self.results_repository is None:
+                from venomqa.storage import ResultsRepository
+                self.results_repository = ResultsRepository()
+                self.results_repository.initialize()
+
+            # Merge journey tags with configured tags
+            tags = list(set(self.results_tags + getattr(journey, "tags", [])))
+
+            # Add journey metadata
+            metadata = {
+                **self.results_metadata,
+                "journey_description": getattr(journey, "description", ""),
+                "parallel_paths": self.parallel_paths,
+                "fail_fast": self.fail_fast,
+            }
+
+            run_id = self.results_repository.save_journey_result(
+                result,
+                tags=tags,
+                metadata=metadata,
+            )
+
+            logger.info(f"Persisted journey result: {result.journey_name} (run_id: {run_id})")
+            return run_id
+
+        except Exception as e:
+            logger.warning(f"Failed to persist journey result: {e}")
+            return None
+
     def close(self) -> None:
         """Clean up resources."""
         if self.db_pool:
             self.db_pool.close()
         if self.cache:
             self.cache.clear()
+        if self.results_repository:
+            self.results_repository.close()

@@ -4,19 +4,48 @@ Demonstrates:
 - Basic and filtered search
 - Search suggestions
 - Pagination
+
+This module provides journeys for testing search functionality including
+basic search, filtered search with various criteria, and autocomplete suggestions.
 """
 
+from __future__ import annotations
+
+from typing import Any
 
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class SearchActions:
-    def __init__(self, base_url: str, search_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.search_client = HTTPClient(base_url=search_url or base_url)
+    """Actions for search operations.
 
-    def search(self, query: str, page: int = 1, per_page: int = 20, token: str | None = None):
+    Provides methods for performing searches, managing search indexes,
+    and retrieving search suggestions.
+
+    Args:
+        base_url: Base URL for the main API service.
+        search_url: Optional URL for the search service. Defaults to base_url.
+    """
+
+    def __init__(self, base_url: str, search_url: str | None = None) -> None:
+        self.client = Client(base_url=base_url)
+        self.search_client = Client(base_url=search_url or base_url)
+
+    def search(
+        self, query: str, page: int = 1, per_page: int = 20, token: str | None = None
+    ) -> Any:
+        """Perform a basic search query.
+
+        Args:
+            query: Search query string.
+            page: Page number for pagination.
+            per_page: Number of results per page.
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing search results.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.search_client.get(
             "/api/search",
@@ -24,28 +53,75 @@ class SearchActions:
             headers=headers,
         )
 
-    def search_with_filters(self, query: str, filters: dict, token: str | None = None):
+    def search_with_filters(self, query: str, filters: dict, token: str | None = None) -> Any:
+        """Perform a search with filters applied.
+
+        Args:
+            query: Search query string.
+            filters: Dictionary of filter parameters.
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing filtered search results.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         params = {"q": query}
         params.update(filters)
         return self.search_client.get("/api/search", params=params, headers=headers)
 
-    def get_suggestions(self, query: str, token: str | None = None):
+    def get_suggestions(self, query: str, token: str | None = None) -> Any:
+        """Get autocomplete suggestions for a partial query.
+
+        Args:
+            query: Partial search query string.
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing search suggestions.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.search_client.get(
             "/api/search/suggestions", params={"q": query}, headers=headers
         )
 
-    def index_document(self, doc_id: str, content: dict, token: str | None = None):
+    def index_document(self, doc_id: str, content: dict, token: str | None = None) -> Any:
+        """Index a document for search.
+
+        Args:
+            doc_id: Unique identifier for the document.
+            content: Document content to index.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from indexing request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.search_client.post(f"/api/search/index/{doc_id}", json=content, headers=headers)
 
-    def delete_from_index(self, doc_id: str, token: str | None = None):
+    def delete_from_index(self, doc_id: str, token: str | None = None) -> Any:
+        """Remove a document from the search index.
+
+        Args:
+            doc_id: Unique identifier for the document to remove.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from deletion request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.search_client.delete(f"/api/search/index/{doc_id}", headers=headers)
 
 
-def login_user(client, context):
+def login_user(client: Client, context: dict) -> Any:
+    """Authenticate user and store token in context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from login request.
+    """
     response = client.post(
         "/api/auth/login",
         json={
@@ -58,7 +134,16 @@ def login_user(client, context):
     return response
 
 
-def index_test_document(client, context):
+def index_test_document(client: Client, context: dict) -> Any:
+    """Index a test document for search testing.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from indexing request.
+    """
     actions = SearchActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         search_url=context.get("search_url"),
@@ -77,7 +162,16 @@ def index_test_document(client, context):
     return response
 
 
-def basic_search(client, context):
+def basic_search(client: Client, context: dict) -> Any:
+    """Perform a basic search and store results in context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object containing search results.
+    """
     actions = SearchActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         search_url=context.get("search_url"),
@@ -92,7 +186,16 @@ def basic_search(client, context):
     return response
 
 
-def filtered_search(client, context):
+def filtered_search(client: Client, context: dict) -> Any:
+    """Perform a filtered search with criteria from context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing search_filters.
+
+    Returns:
+        Response object containing filtered search results.
+    """
     actions = SearchActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         search_url=context.get("search_url"),
@@ -106,7 +209,16 @@ def filtered_search(client, context):
     return response
 
 
-def get_search_suggestions(client, context):
+def get_search_suggestions(client: Client, context: dict) -> Any:
+    """Get autocomplete suggestions for partial query.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing partial_query.
+
+    Returns:
+        Response object containing search suggestions.
+    """
     actions = SearchActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         search_url=context.get("search_url"),
@@ -120,7 +232,16 @@ def get_search_suggestions(client, context):
     return response
 
 
-def search_first_page(client, context):
+def search_first_page(client: Client, context: dict) -> Any:
+    """Search for first page of results.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing search_query.
+
+    Returns:
+        Response object containing first page of results.
+    """
     actions = SearchActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         search_url=context.get("search_url"),
@@ -130,7 +251,16 @@ def search_first_page(client, context):
     )
 
 
-def search_second_page(client, context):
+def search_second_page(client: Client, context: dict) -> Any:
+    """Search for second page of results.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing search_query.
+
+    Returns:
+        Response object containing second page of results.
+    """
     actions = SearchActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         search_url=context.get("search_url"),
@@ -140,7 +270,16 @@ def search_second_page(client, context):
     )
 
 
-def delete_indexed_document(client, context):
+def delete_indexed_document(client: Client, context: dict) -> Any:
+    """Remove test document from search index.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing indexed_doc_id.
+
+    Returns:
+        Response object from deletion request.
+    """
     actions = SearchActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         search_url=context.get("search_url"),
@@ -151,7 +290,7 @@ def delete_indexed_document(client, context):
 
 
 basic_search_flow = Journey(
-    name="basic_search",
+    name="content_basic_search",
     description="Basic search with results retrieval",
     steps=[
         Step(name="login", action=login_user),
@@ -164,7 +303,7 @@ basic_search_flow = Journey(
 )
 
 filtered_search_flow = Journey(
-    name="filtered_search",
+    name="content_filtered_search",
     description="Search with various filter combinations",
     steps=[
         Step(name="login", action=login_user),
@@ -180,7 +319,7 @@ filtered_search_flow = Journey(
                         Step(
                             name="search_by_category",
                             action=filtered_search,
-                            context_overrides={"search_filters": {"category": "documents"}},
+                            args={"search_filters": {"category": "documents"}},
                         ),
                     ],
                 ),
@@ -190,7 +329,7 @@ filtered_search_flow = Journey(
                         Step(
                             name="search_by_date",
                             action=filtered_search,
-                            context_overrides={
+                            args={
                                 "search_filters": {
                                     "date_from": "2024-01-01",
                                     "date_to": "2024-12-31",
@@ -206,7 +345,7 @@ filtered_search_flow = Journey(
 )
 
 search_suggestions_flow = Journey(
-    name="search_suggestions",
+    name="content_search_suggestions",
     description="Get search suggestions based on partial input",
     steps=[
         Step(name="login", action=login_user),

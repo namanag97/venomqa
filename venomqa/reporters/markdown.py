@@ -1,4 +1,16 @@
-"""Markdown reporter for human-readable test reports."""
+"""Markdown reporter for human-readable test reports.
+
+Generates well-formatted Markdown reports suitable for documentation,
+GitHub/GitLab rendering, and general human consumption. Reports include
+summary statistics, detailed journey results, issue breakdowns, and
+actionable suggestions.
+
+Example:
+    >>> from venomqa.reporters import MarkdownReporter
+    >>> reporter = MarkdownReporter()
+    >>> report = reporter.generate(journey_results)
+    >>> print(report)  # Markdown formatted output
+"""
 
 from __future__ import annotations
 
@@ -9,14 +21,39 @@ from venomqa.reporters.base import BaseReporter
 
 
 class MarkdownReporter(BaseReporter):
-    """Generate human-readable Markdown reports."""
+    """Generate human-readable Markdown reports from test results.
+
+    Produces comprehensive Markdown documents with:
+    - Header with status and timestamp
+    - Summary statistics in tables
+    - Detailed journey results with step-by-step outcomes
+    - Branch and path results for parallel execution paths
+    - Issues section with severity indicators
+    - Actionable suggestions for fixing failures
+
+    Attributes:
+        output_path: Optional default path for saving reports.
+
+    Example:
+        >>> reporter = MarkdownReporter(output_path="reports/test.md")
+        >>> reporter.save(results)
+        PosixPath('reports/test.md')
+    """
 
     @property
     def file_extension(self) -> str:
+        """Return the Markdown file extension."""
         return ".md"
 
     def generate(self, results: list[JourneyResult]) -> str:
-        """Generate Markdown report from journey results."""
+        """Generate a complete Markdown report from journey results.
+
+        Args:
+            results: List of JourneyResult objects from test execution.
+
+        Returns:
+            Complete Markdown-formatted report string.
+        """
         sections = [
             self._generate_header(results),
             self._generate_summary(results),
@@ -27,7 +64,20 @@ class MarkdownReporter(BaseReporter):
         return "\n\n".join(s for s in sections if s)
 
     def _generate_header(self, results: list[JourneyResult]) -> str:
-        """Generate report header."""
+        """Generate the report header with status overview.
+
+        Creates a Markdown header containing:
+        - Report title
+        - Generation timestamp
+        - Overall pass/fail status
+        - Journey pass count
+
+        Args:
+            results: List of JourneyResult objects.
+
+        Returns:
+            Markdown-formatted header string.
+        """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         total = len(results)
         passed = sum(1 for r in results if r.success)
@@ -40,7 +90,20 @@ class MarkdownReporter(BaseReporter):
 **Journeys:** {passed}/{total} passed"""
 
     def _generate_summary(self, results: list[JourneyResult]) -> str:
-        """Generate summary statistics."""
+        """Generate summary statistics section.
+
+        Creates tables and lists showing:
+        - Total duration
+        - Step pass/fail counts
+        - Path pass/fail counts
+        - Issue counts by severity
+
+        Args:
+            results: List of JourneyResult objects.
+
+        Returns:
+            Markdown-formatted summary section.
+        """
         total_steps = sum(r.total_steps for r in results)
         passed_steps = sum(r.passed_steps for r in results)
         total_paths = sum(r.total_paths for r in results)
@@ -71,7 +134,20 @@ class MarkdownReporter(BaseReporter):
 - **Low:** {low}"""
 
     def _generate_journey_details(self, results: list[JourneyResult]) -> str:
-        """Generate detailed journey results."""
+        """Generate detailed journey results section.
+
+        Creates expandable sections for each journey showing:
+        - Pass/fail status with emoji indicators
+        - Duration and step counts
+        - Step-by-step results in tables
+        - Branch and path outcomes
+
+        Args:
+            results: List of JourneyResult objects.
+
+        Returns:
+            Markdown-formatted journey details section.
+        """
         if not results:
             return ""
 
@@ -104,7 +180,20 @@ class MarkdownReporter(BaseReporter):
         return "\n".join(sections)
 
     def _generate_issues_section(self, results: list[JourneyResult]) -> str:
-        """Generate issues section."""
+        """Generate detailed issues section.
+
+        Creates formatted sections for each issue showing:
+        - Severity with emoji indicators
+        - Journey, path, and step location
+        - Error message
+        - Request/response details if available
+
+        Args:
+            results: List of JourneyResult objects.
+
+        Returns:
+            Markdown-formatted issues section, or empty string if no issues.
+        """
         all_issues = [(r.journey_name, i) for r in results for i in r.issues]
 
         if not all_issues:
@@ -145,7 +234,17 @@ class MarkdownReporter(BaseReporter):
         return "\n".join(sections)
 
     def _generate_suggestions_section(self, results: list[JourneyResult]) -> str:
-        """Generate suggestions section."""
+        """Generate actionable suggestions section.
+
+        Extracts suggestions from issues and presents them as a
+        prioritized list of actions to fix failures.
+
+        Args:
+            results: List of JourneyResult objects.
+
+        Returns:
+            Markdown-formatted suggestions section, or empty string if no suggestions.
+        """
         all_issues = [(r.journey_name, i) for r in results for i in r.issues]
 
         suggestions = {

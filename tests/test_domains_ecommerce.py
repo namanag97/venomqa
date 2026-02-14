@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
+
+from venomqa import Journey
 
 
 class TestEcommerceDomainsImports:
@@ -15,7 +17,7 @@ class TestEcommerceDomainsImports:
 
         assert ecommerce is not None
 
-    def test_ecommerce_has_expected_functions(self) -> None:
+    def test_ecommerce_has_expected_journeys(self) -> None:
         from venomqa.domains.ecommerce import (
             checkout_flow,
             guest_checkout_flow,
@@ -28,117 +30,82 @@ class TestEcommerceDomainsImports:
             payment_failure_flow,
         )
 
-        assert callable(checkout_flow)
-        assert callable(guest_checkout_flow)
-        assert callable(express_checkout_flow)
-        assert callable(inventory_update_flow)
-        assert callable(stock_alert_flow)
-        assert callable(inventory_reconciliation_flow)
-        assert callable(payment_processing_flow)
-        assert callable(refund_flow)
-        assert callable(payment_failure_flow)
+        assert isinstance(checkout_flow, Journey)
+        assert isinstance(guest_checkout_flow, Journey)
+        assert isinstance(express_checkout_flow, Journey)
+        assert isinstance(inventory_update_flow, Journey)
+        assert isinstance(stock_alert_flow, Journey)
+        assert isinstance(inventory_reconciliation_flow, Journey)
+        assert isinstance(payment_processing_flow, Journey)
+        assert isinstance(refund_flow, Journey)
+        assert isinstance(payment_failure_flow, Journey)
 
 
 class TestCheckoutFlows:
     """Tests for checkout-related journey flows."""
 
-    @patch("venomqa.domains.ecommerce.journeys.checkout.checkout_flow")
-    def test_checkout_flow_accepts_client(self, mock_flow: MagicMock) -> None:
+    def test_checkout_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import checkout_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert checkout_flow.name == "ecommerce_checkout"
+        assert "checkout" in checkout_flow.description.lower()
+        assert len(checkout_flow.steps) > 0
 
-        checkout_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.ecommerce.journeys.checkout.guest_checkout_flow")
-    def test_guest_checkout_flow(self, mock_flow: MagicMock) -> None:
+    def test_guest_checkout_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import guest_checkout_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert guest_checkout_flow.name == "ecommerce_guest_checkout"
+        assert "guest" in guest_checkout_flow.description.lower()
 
-        guest_checkout_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.ecommerce.journeys.checkout.express_checkout_flow")
-    def test_express_checkout_flow(self, mock_flow: MagicMock) -> None:
+    def test_express_checkout_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import express_checkout_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
-
-        express_checkout_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
+        assert express_checkout_flow.name == "ecommerce_express_checkout"
+        assert "express" in express_checkout_flow.description.lower()
 
 
 class TestInventoryFlows:
     """Tests for inventory-related journey flows."""
 
-    @patch("venomqa.domains.ecommerce.journeys.inventory.inventory_update_flow")
-    def test_inventory_update_flow(self, mock_flow: MagicMock) -> None:
+    def test_inventory_update_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import inventory_update_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert inventory_update_flow.name == "ecommerce_inventory_update"
+        assert len(inventory_update_flow.steps) > 0
 
-        inventory_update_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.ecommerce.journeys.inventory.stock_alert_flow")
-    def test_stock_alert_flow(self, mock_flow: MagicMock) -> None:
+    def test_stock_alert_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import stock_alert_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert stock_alert_flow.name == "ecommerce_stock_alert"
+        assert len(stock_alert_flow.steps) > 0
 
-        stock_alert_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.ecommerce.journeys.inventory.inventory_reconciliation_flow")
-    def test_inventory_reconciliation_flow(self, mock_flow: MagicMock) -> None:
+    def test_inventory_reconciliation_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import inventory_reconciliation_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
-
-        inventory_reconciliation_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
+        assert inventory_reconciliation_flow.name == "ecommerce_inventory_reconciliation"
+        assert len(inventory_reconciliation_flow.steps) > 0
 
 
 class TestPaymentFlows:
     """Tests for payment-related journey flows."""
 
-    @patch("venomqa.domains.ecommerce.journeys.payment.payment_processing_flow")
-    def test_payment_processing_flow(self, mock_flow: MagicMock) -> None:
+    def test_payment_processing_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import payment_processing_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert payment_processing_flow.name == "ecommerce_payment_processing"
+        assert len(payment_processing_flow.steps) > 0
 
-        payment_processing_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.ecommerce.journeys.payment.refund_flow")
-    def test_refund_flow(self, mock_flow: MagicMock) -> None:
+    def test_refund_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import refund_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
+        assert refund_flow.name == "ecommerce_refund"
+        assert len(refund_flow.steps) > 0
 
-        refund_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
-
-    @patch("venomqa.domains.ecommerce.journeys.payment.payment_failure_flow")
-    def test_payment_failure_flow(self, mock_flow: MagicMock) -> None:
+    def test_payment_failure_flow_structure(self) -> None:
         from venomqa.domains.ecommerce import payment_failure_flow
 
-        mock_client = MagicMock()
-        mock_context = MagicMock()
-
-        payment_failure_flow(mock_client, mock_context)
-        mock_flow.assert_called_once()
+        assert payment_failure_flow.name == "ecommerce_payment_failure"
+        assert len(payment_failure_flow.steps) > 0
 
 
 class TestEcommerceJourneyPatterns:

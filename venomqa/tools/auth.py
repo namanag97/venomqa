@@ -646,3 +646,242 @@ def ensure_authenticated(
             )
         else:
             raise AuthError("Token expired and no refresh token available")
+
+
+def clear_auth(context: Context) -> None:
+    """Clear authentication from context.
+
+    Args:
+        context: Test context to clear auth from.
+
+    Example:
+        >>> clear_auth(context)
+        >>> response = get(client, context, "/api/protected")
+        >>> assert response.status_code == 401
+    """
+    if hasattr(context, "_auth"):
+        delattr(context, "_auth")
+    if hasattr(context, "oauth2_tokens"):
+        delattr(context, "oauth2_tokens")
+    if hasattr(context, "jwt_data"):
+        delattr(context, "jwt_data")
+
+
+def get_token_claims(context: Context) -> dict[str, Any]:
+    """Get all claims from the current JWT token.
+
+    Args:
+        context: Test context containing auth information.
+
+    Returns:
+        dict: JWT claims/payload.
+
+    Raises:
+        AuthError: If no token is set or token is invalid.
+
+    Example:
+        >>> claims = get_token_claims(context)
+        >>> print(f"User ID: {claims['sub']}")
+        >>> print(f"Expires: {claims['exp']}")
+    """
+    auth = getattr(context, "_auth", {})
+    token = auth.get("token")
+
+    if not token:
+        raise AuthError("No token set in context")
+
+    return decode_jwt_payload(token)
+
+
+def has_scope(context: Context, required_scope: str | list[str]) -> bool:
+    """Check if the current token has required scope(s).
+
+    Args:
+        context: Test context containing auth information.
+        required_scope: Scope or list of scopes required.
+
+    Returns:
+        bool: True if token has all required scopes.
+
+    Example:
+        >>> if has_scope(context, "admin"):
+        ...     response = delete(client, context, "/api/users/1")
+        >>>
+        >>> if has_scope(context, ["read", "write"]):
+        ...     response = post(client, context, "/api/data", json={})
+    """
+    try:
+        claims = get_token_claims(context)
+    except AuthError:
+        return False
+
+    token_scopes: list[str] = []
+
+    scope_claim = claims.get("scope", "")
+    if isinstance(scope_claim, str):
+        token_scopes = scope_claim.split()
+    elif isinstance(scope_claim, list):
+        token_scopes = scope_claim
+
+    scopes_claim = claims.get("scopes", [])
+    if isinstance(scopes_claim, list):
+        token_scopes.extend(scopes_claim)
+
+    permissions = claims.get("permissions", [])
+    if isinstance(permissions, list):
+        token_scopes.extend(permissions)
+
+    token_scopes_set = set(token_scopes)
+
+    if isinstance(required_scope, str):
+        required = {required_scope}
+    else:
+        required = set(required_scope)
+
+    return required.issubset(token_scopes_set)
+
+
+def get_user_id(context: Context) -> str | int | None:
+    """Get the user ID from the current token.
+
+    Args:
+        context: Test context containing auth information.
+
+    Returns:
+        str | int | None: User ID or None if not available.
+
+    Example:
+        >>> user_id = get_user_id(context)
+        >>> print(f"Acting as user: {user_id}")
+    """
+    try:
+        claims = get_token_claims(context)
+    except AuthError:
+        return None
+
+    for key in ["sub", "user_id", "userId", "id", "uid"]:
+        if key in claims:
+            return claims[key]
+
+    return None
+
+
+def get_token_expiration(context: Context) -> float | None:
+    """Get the token expiration timestamp.
+
+    Args:
+        context: Test context containing auth information.
+
+    Returns:
+        float | None: Expiration timestamp or None if no expiration.
+
+    Example:
+        >>> exp = get_token_expiration(context)
+        >>> if exp and time.time() > exp:
+        ...     print("Token has expired")
+    """
+    auth = getattr(context, "_auth", {})
+    return auth.get("expires_at")
+
+
+def get_time_until_expiration(context: Context) -> float | None:
+    """Get seconds until token expires.
+
+    Args:
+        context: Test context containing auth information.
+
+    Returns:
+        float | None: Seconds until expiration, or None if no expiration.
+
+    Example:
+        >>> remaining = get_time_until_expiration(context)
+        >>> if remaining and remaining < 60:
+        ...     print(f"Token expires in {remaining} seconds")
+    """
+    expires_at = get_token_expiration(context)
+
+    if expires_at is None:
+        return None
+
+    remaining = expires_at - time.time()
+    return remaining if remaining > 0 else 0
+
+
+def switch_user(
+    client: Client,
+    context: Context,
+    username: str,
+    password: str,
+    login_url: str | None = None,
+) -> dict[str, Any]:
+    """Switch to a different user by logging in.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        username: New user's username.
+        password: New user's password.
+        login_url: Login endpoint URL.
+
+    Returns:
+        dict: Login response data.
+
+    Example:
+        >>> # Start as admin
+        >>> jwt_login(client, context, "admin", "admin123")
+        >>> response = get(client, context, "/api/admin/users")
+        >>>
+        >>> # Switch to regular user
+        >>> switch_user(client, context, "user", "user123")
+        >>> response = get(client, context, "/api/profile")
+    """
+    clear_auth(context)
+    return jwt_login(client, context, username, password, login_url=login_url)
+
+
+def create_auth_header(
+    token: str,
+    auth_type: str = "Bearer",
+) -> dict[str, str]:
+    """Create an authorization header dict.
+
+    Args:
+        token: Authentication token.
+        auth_type: Authorization type (default: Bearer).
+
+    Returns:
+        dict: Header dictionary.
+
+    Example:
+        >>> headers = create_auth_header("my-token")
+        >>> response = httpx.get("https://api.example.com/users", headers=headers)
+    """
+    return {"Authorization": f"{auth_type} {token}"}
+
+
+def is_authenticated(context: Context) -> bool:
+    """Check if context has valid authentication.
+
+    Args:
+        context: Test context to check.
+
+    Returns:
+        bool: True if authenticated with non-expired token.
+
+    Example:
+        >>> if not is_authenticated(context):
+        ...     jwt_login(client, context, "user", "password")
+    """
+    auth = getattr(context, "_auth", {})
+
+    if not auth:
+        return False
+
+    if not auth.get("token") and not auth.get("api_key"):
+        return False
+
+    expires_at = auth.get("expires_at")
+    if expires_at and time.time() > expires_at:
+        return False
+
+    return True

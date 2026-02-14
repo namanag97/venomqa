@@ -4,29 +4,74 @@ Demonstrates:
 - WebSocket-based real-time messaging
 - Direct and group chat flows
 - Message delivery confirmation
+
+This module provides journeys for testing real-time chat functionality
+including direct messaging, group chats, and message delivery tracking.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 from venomqa.clients.websocket import AsyncWebSocketClient
 
 
 class ChatActions:
-    def __init__(self, base_url: str, ws_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
+    """Actions for chat and messaging operations.
+
+    Provides methods for creating conversations, sending messages,
+    and managing chat groups via HTTP and WebSocket protocols.
+
+    Args:
+        base_url: Base URL for the main API service.
+        ws_url: Optional WebSocket URL. Defaults to base_url with ws:// protocol.
+    """
+
+    def __init__(self, base_url: str, ws_url: str | None = None) -> None:
+        self.client = Client(base_url=base_url)
         self.ws_url = ws_url or base_url.replace("http", "ws")
 
-    def create_conversation(self, participant_ids: list, token: str | None = None):
+    def create_conversation(self, participant_ids: list, token: str | None = None) -> Any:
+        """Create a new conversation with specified participants.
+
+        Args:
+            participant_ids: List of user IDs to include in conversation.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from conversation creation request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.post(
             "/api/conversations", json={"participant_ids": participant_ids}, headers=headers
         )
 
-    def get_conversation(self, conversation_id: str, token: str | None = None):
+    def get_conversation(self, conversation_id: str, token: str | None = None) -> Any:
+        """Retrieve conversation details by ID.
+
+        Args:
+            conversation_id: Unique identifier of the conversation.
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing conversation details.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.get(f"/api/conversations/{conversation_id}", headers=headers)
 
-    def send_message(self, conversation_id: str, content: str, token: str | None = None):
+    def send_message(self, conversation_id: str, content: str, token: str | None = None) -> Any:
+        """Send a message in a conversation.
+
+        Args:
+            conversation_id: Unique identifier of the conversation.
+            content: Message content to send.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from message send request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.post(
             f"/api/conversations/{conversation_id}/messages",
@@ -34,7 +79,17 @@ class ChatActions:
             headers=headers,
         )
 
-    def get_messages(self, conversation_id: str, page: int = 1, token: str | None = None):
+    def get_messages(self, conversation_id: str, page: int = 1, token: str | None = None) -> Any:
+        """Retrieve messages from a conversation.
+
+        Args:
+            conversation_id: Unique identifier of the conversation.
+            page: Page number for pagination.
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing paginated messages.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.get(
             f"/api/conversations/{conversation_id}/messages",
@@ -42,32 +97,79 @@ class ChatActions:
             headers=headers,
         )
 
-    def mark_read(self, conversation_id: str, message_id: str, token: str | None = None):
+    def mark_read(self, conversation_id: str, message_id: str, token: str | None = None) -> Any:
+        """Mark a message as read.
+
+        Args:
+            conversation_id: Unique identifier of the conversation.
+            message_id: Unique identifier of the message to mark read.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from mark read request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.post(
             f"/api/conversations/{conversation_id}/messages/{message_id}/read",
             headers=headers,
         )
 
-    def create_group(self, name: str, member_ids: list, token: str | None = None):
+    def create_group(self, name: str, member_ids: list, token: str | None = None) -> Any:
+        """Create a new group chat.
+
+        Args:
+            name: Name for the group chat.
+            member_ids: List of user IDs to add as members.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from group creation request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.post(
             "/api/groups", json={"name": name, "member_ids": member_ids}, headers=headers
         )
 
-    def add_group_member(self, group_id: str, user_id: str, token: str | None = None):
+    def add_group_member(self, group_id: str, user_id: str, token: str | None = None) -> Any:
+        """Add a member to an existing group.
+
+        Args:
+            group_id: Unique identifier of the group.
+            user_id: User ID to add to the group.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from add member request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.client.post(
             f"/api/groups/{group_id}/members", json={"user_id": user_id}, headers=headers
         )
 
-    def get_ws_client(self, token: str):
+    def get_ws_client(self, token: str) -> AsyncWebSocketClient:
+        """Get a configured WebSocket client for real-time messaging.
+
+        Args:
+            token: Authentication token for WebSocket connection.
+
+        Returns:
+            Configured AsyncWebSocketClient instance.
+        """
         return AsyncWebSocketClient(
             url=f"{self.ws_url}/ws/chat", default_headers={"Authorization": f"Bearer {token}"}
         )
 
 
-def login_user1(client, context):
+def login_user1(client: Client, context: dict) -> Any:
+    """Authenticate first test user and store token in context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from login request.
+    """
     response = client.post(
         "/api/auth/login",
         json={
@@ -81,7 +183,16 @@ def login_user1(client, context):
     return response
 
 
-def login_user2(client, context):
+def login_user2(client: Client, context: dict) -> Any:
+    """Authenticate second test user and store token in context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from login request.
+    """
     response = client.post(
         "/api/auth/login",
         json={
@@ -95,7 +206,16 @@ def login_user2(client, context):
     return response
 
 
-def create_direct_conversation(client, context):
+def create_direct_conversation(client: Client, context: dict) -> Any:
+    """Create a direct conversation between two users.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user IDs.
+
+    Returns:
+        Response object from conversation creation request.
+    """
     actions = ChatActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         ws_url=context.get("ws_url", "ws://localhost:8000"),
@@ -109,7 +229,16 @@ def create_direct_conversation(client, context):
     return response
 
 
-def send_direct_message(client, context):
+def send_direct_message(client: Client, context: dict) -> Any:
+    """Send a message in the direct conversation.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing conversation_id.
+
+    Returns:
+        Response object from message send request.
+    """
     actions = ChatActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         ws_url=context.get("ws_url", "ws://localhost:8000"),
@@ -124,7 +253,16 @@ def send_direct_message(client, context):
     return response
 
 
-def receive_messages(client, context):
+def receive_messages(client: Client, context: dict) -> Any:
+    """Retrieve messages as the second user.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing conversation_id.
+
+    Returns:
+        Response object containing received messages.
+    """
     actions = ChatActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         ws_url=context.get("ws_url", "ws://localhost:8000"),
@@ -139,7 +277,16 @@ def receive_messages(client, context):
     return response
 
 
-def mark_message_read(client, context):
+def mark_message_read(client: Client, context: dict) -> Any:
+    """Mark a message as read by recipient.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing message_id.
+
+    Returns:
+        Response object from mark read request.
+    """
     actions = ChatActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         ws_url=context.get("ws_url", "ws://localhost:8000"),
@@ -151,7 +298,16 @@ def mark_message_read(client, context):
     )
 
 
-def create_group_chat(client, context):
+def create_group_chat(client: Client, context: dict) -> Any:
+    """Create a group chat with multiple members.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user IDs.
+
+    Returns:
+        Response object from group creation request.
+    """
     actions = ChatActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         ws_url=context.get("ws_url", "ws://localhost:8000"),
@@ -166,7 +322,16 @@ def create_group_chat(client, context):
     return response
 
 
-def send_group_message(client, context):
+def send_group_message(client: Client, context: dict) -> Any:
+    """Send a message in the group chat.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing group_id.
+
+    Returns:
+        Response object from message send request.
+    """
     actions = ChatActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         ws_url=context.get("ws_url", "ws://localhost:8000"),
@@ -178,7 +343,16 @@ def send_group_message(client, context):
     )
 
 
-def get_group_messages(client, context):
+def get_group_messages(client: Client, context: dict) -> Any:
+    """Retrieve messages from the group chat.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing group_id.
+
+    Returns:
+        Response object containing group messages.
+    """
     actions = ChatActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         ws_url=context.get("ws_url", "ws://localhost:8000"),
@@ -190,7 +364,7 @@ def get_group_messages(client, context):
 
 
 direct_message_flow = Journey(
-    name="direct_message",
+    name="realtime_direct_message",
     description="Direct messaging between two users",
     steps=[
         Step(name="login_user1", action=login_user1),
@@ -207,7 +381,7 @@ direct_message_flow = Journey(
 )
 
 group_chat_flow = Journey(
-    name="group_chat",
+    name="realtime_group_chat",
     description="Group chat with multiple members",
     steps=[
         Step(name="login_user1", action=login_user1),
@@ -222,7 +396,7 @@ group_chat_flow = Journey(
 )
 
 message_delivery_flow = Journey(
-    name="message_delivery",
+    name="realtime_message_delivery",
     description="Test message delivery confirmation",
     steps=[
         Step(name="login_user1", action=login_user1),

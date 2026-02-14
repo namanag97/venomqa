@@ -4,13 +4,15 @@ Provides multiple report formats for test results:
 - MarkdownReporter: Human-readable reports
 - JSONReporter: Structured JSON output
 - JUnitReporter: JUnit XML for CI/CD integration
-- HTMLReporter: Beautiful HTML reports with charts
+- HTMLReporter: Beautiful HTML reports with interactive features
+- DashboardReporter: Comprehensive dashboard with trends and analytics
 - SlackReporter: Slack webhook notifications
 - DiscordReporter: Discord webhook notifications
 - SARIFReporter: SARIF format for GitHub Code Scanning
 """
 
 from venomqa.reporters.base import BaseReporter
+from venomqa.reporters.dashboard import DashboardReporter
 from venomqa.reporters.discord import DiscordReporter
 from venomqa.reporters.html import HTMLReporter
 from venomqa.reporters.json_report import JSONReporter
@@ -21,6 +23,7 @@ from venomqa.reporters.slack import SlackReporter
 
 __all__ = [
     "BaseReporter",
+    "DashboardReporter",
     "DiscordReporter",
     "HTMLReporter",
     "JSONReporter",

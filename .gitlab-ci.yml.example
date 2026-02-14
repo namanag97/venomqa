@@ -1,0 +1,362 @@
+# VenomQA CI/CD Integration for GitLab CI
+#
+# This workflow demonstrates how to integrate VenomQA into GitLab CI/CD.
+# Copy this file to .gitlab-ci.yml and customize as needed.
+#
+# Features:
+# - Multi-stage pipeline with parallel journey execution
+# - Docker service orchestration using GitLab services
+# - Artifact management for reports
+# - Proper exit code handling
+# - Cache optimization
+#
+# Exit codes:
+# - 0: All journeys passed
+# - 1: Some journeys failed
+# - 2: Configuration error
+
+stages:
+  - validate
+  - test
+  - report
+  - deploy
+
+variables:
+  # Python configuration
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHON_VERSION: "3.12"
+
+  # VenomQA configuration
+  VENOMQA_BASE_URL: "http://localhost:8000"
+  VENOMQA_TIMEOUT: "30"
+  VENOMQA_REPORT_DIR: "reports"
+
+  # Database configuration
+  POSTGRES_USER: "qa"
+  POSTGRES_PASSWORD: "$QA_DB_PASSWORD"
+  POSTGRES_DB: "venomqa_qa"
+  POSTGRES_HOST: "postgres"
+  DATABASE_URL: "postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:5432/$POSTGRES_DB"
+
+  # Redis configuration
+  REDIS_HOST: "redis"
+  REDIS_URL: "redis://$REDIS_HOST:6379/0"
+
+# Cache pip packages between jobs
+cache:
+  key: "${CI_COMMIT_REF_SLUG}-pip"
+  paths:
+    - .cache/pip/
+    - .venv/
+
+# Default before_script for all jobs
+default:
+  before_script:
+    - python -V
+    - pip install --upgrade pip
+    - pip install virtualenv
+    - virtualenv .venv
+    - source .venv/bin/activate
+
+# Base template for test jobs
+.test-template:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  services:
+    - name: postgres:15-alpine
+      alias: postgres
+      variables:
+        POSTGRES_USER: $POSTGRES_USER
+        POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+        POSTGRES_DB: $POSTGRES_DB
+    - name: redis:7-alpine
+      alias: redis
+  before_script:
+    - !reference [default, before_script]
+    - pip install venomqa[all]
+    - if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+    - mkdir -p $VENOMQA_REPORT_DIR
+  artifacts:
+    when: always
+    paths:
+      - $VENOMQA_REPORT_DIR/
+    reports:
+      junit: $VENOMQA_REPORT_DIR/junit-*.xml
+    expire_in: 30 days
+
+# ============================================================================
+# VALIDATE STAGE
+# ============================================================================
+
+validate-config:
+  stage: validate
+  image: python:${PYTHON_VERSION}
+  script:
+    - pip install pyyaml venomqa
+    - |
+      if [ -f "qa/venomqa.yaml" ]; then
+        echo "Validating venomqa.yaml..."
+        python -c "import yaml; yaml.safe_load(open('qa/venomqa.yaml'))" || exit 2
+        echo "Configuration is valid"
+
+        # List available journeys
+        venomqa list --config qa/venomqa.yaml 2>/dev/null || echo "No journeys found"
+      else
+        echo "Warning: No venomqa.yaml found, using defaults"
+      fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# ============================================================================
+# TEST STAGE - Parallel Journey Groups
+# ============================================================================
+
+# Auth domain journeys
+test-auth:
+  extends: .test-template
+  variables:
+    JOURNEY_GROUP: "auth"
+  script:
+    - |
+      # Wait for services to be ready
+      echo "Waiting for PostgreSQL..."
+      until pg_isready -h $POSTGRES_HOST -U $POSTGRES_USER; do sleep 2; done
+
+      echo "Waiting for Redis..."
+      until redis-cli -h $REDIS_HOST ping; do sleep 2; done
+
+      # Start application (customize as needed)
+      # docker compose -f docker-compose.qa.yml up -d --wait
+
+      # Run auth journeys
+      set +e
+      venomqa run auth_* \
+        --config qa/venomqa.yaml \
+        --format text
+
+      EXIT_CODE=$?
+
+      # Generate reports
+      venomqa report --format junit --output $VENOMQA_REPORT_DIR/junit-auth.xml || true
+      venomqa report --format html --output $VENOMQA_REPORT_DIR/report-auth.html || true
+      venomqa report --format json --output $VENOMQA_REPORT_DIR/results-auth.json || true
+
+      exit $EXIT_CODE
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# E-commerce domain journeys
+test-ecommerce:
+  extends: .test-template
+  variables:
+    JOURNEY_GROUP: "ecommerce"
+  script:
+    - |
+      # Wait for services
+      until pg_isready -h $POSTGRES_HOST -U $POSTGRES_USER; do sleep 2; done
+      until redis-cli -h $REDIS_HOST ping; do sleep 2; done
+
+      # Run ecommerce journeys
+      set +e
+      venomqa run checkout_* cart_* payment_* \
+        --config qa/venomqa.yaml \
+        --format text
+
+      EXIT_CODE=$?
+
+      venomqa report --format junit --output $VENOMQA_REPORT_DIR/junit-ecommerce.xml || true
+      venomqa report --format html --output $VENOMQA_REPORT_DIR/report-ecommerce.html || true
+
+      exit $EXIT_CODE
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# API domain journeys
+test-api:
+  extends: .test-template
+  variables:
+    JOURNEY_GROUP: "api"
+  script:
+    - |
+      until pg_isready -h $POSTGRES_HOST -U $POSTGRES_USER; do sleep 2; done
+      until redis-cli -h $REDIS_HOST ping; do sleep 2; done
+
+      set +e
+      venomqa run crud_* api_* versioning_* \
+        --config qa/venomqa.yaml \
+        --format text
+
+      EXIT_CODE=$?
+
+      venomqa report --format junit --output $VENOMQA_REPORT_DIR/junit-api.xml || true
+      venomqa report --format html --output $VENOMQA_REPORT_DIR/report-api.html || true
+
+      exit $EXIT_CODE
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# Run all journeys (for nightly/scheduled runs)
+test-all:
+  extends: .test-template
+  script:
+    - |
+      until pg_isready -h $POSTGRES_HOST -U $POSTGRES_USER; do sleep 2; done
+      until redis-cli -h $REDIS_HOST ping; do sleep 2; done
+
+      set +e
+      venomqa run \
+        --config qa/venomqa.yaml \
+        --format text
+
+      EXIT_CODE=$?
+
+      venomqa report --format junit --output $VENOMQA_REPORT_DIR/junit-all.xml || true
+      venomqa report --format html --output $VENOMQA_REPORT_DIR/report-all.html || true
+      venomqa report --format json --output $VENOMQA_REPORT_DIR/results-all.json || true
+
+      exit $EXIT_CODE
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: manual
+      allow_failure: true
+
+# ============================================================================
+# REPORT STAGE
+# ============================================================================
+
+aggregate-reports:
+  stage: report
+  image: python:${PYTHON_VERSION}
+  needs:
+    - job: test-auth
+      artifacts: true
+      optional: true
+    - job: test-ecommerce
+      artifacts: true
+      optional: true
+    - job: test-api
+      artifacts: true
+      optional: true
+  script:
+    - pip install venomqa
+    - |
+      # Aggregate all JSON results
+      python -c "
+      import json
+      import glob
+
+      all_results = []
+      for f in glob.glob('$VENOMQA_REPORT_DIR/results-*.json'):
+          with open(f) as fp:
+              all_results.extend(json.load(fp))
+
+      # Calculate summary
+      total = len(all_results)
+      passed = sum(1 for r in all_results if r.get('success'))
+      failed = total - passed
+
+      summary = {
+          'total': total,
+          'passed': passed,
+          'failed': failed,
+          'pass_rate': (passed / total * 100) if total > 0 else 0,
+          'journeys': all_results
+      }
+
+      with open('$VENOMQA_REPORT_DIR/summary.json', 'w') as f:
+          json.dump(summary, f, indent=2)
+
+      print(f'Total: {total}, Passed: {passed}, Failed: {failed}')
+      print(f'Pass rate: {summary[\"pass_rate\"]:.1f}%')
+      "
+  artifacts:
+    when: always
+    paths:
+      - $VENOMQA_REPORT_DIR/
+    expire_in: 90 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# Generate GitLab Pages report
+pages:
+  stage: report
+  image: python:${PYTHON_VERSION}
+  needs:
+    - job: aggregate-reports
+      artifacts: true
+  script:
+    - mkdir -p public
+    - cp -r $VENOMQA_REPORT_DIR/* public/ 2>/dev/null || true
+    - |
+      # Create index page
+      cat > public/index.html << 'EOF'
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>VenomQA Reports</title>
+        <style>
+          body { font-family: sans-serif; margin: 40px; }
+          a { color: #4a6ee0; }
+        </style>
+      </head>
+      <body>
+        <h1>VenomQA Test Reports</h1>
+        <ul>
+          <li><a href="report-auth.html">Auth Journey Report</a></li>
+          <li><a href="report-ecommerce.html">E-commerce Journey Report</a></li>
+          <li><a href="report-api.html">API Journey Report</a></li>
+          <li><a href="summary.json">Summary (JSON)</a></li>
+        </ul>
+      </body>
+      </html>
+      EOF
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# ============================================================================
+# DEPLOY STAGE
+# ============================================================================
+
+deploy-staging:
+  stage: deploy
+  image: alpine:latest
+  needs:
+    - job: test-auth
+    - job: test-ecommerce
+    - job: test-api
+  environment:
+    name: staging
+    url: https://staging.example.com
+  script:
+    - echo "Deploying to staging..."
+    # Add your deployment commands here
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  needs:
+    - job: test-auth
+    - job: test-ecommerce
+    - job: test-api
+  environment:
+    name: production
+    url: https://example.com
+  script:
+    - echo "Deploying to production..."
+    # Add your deployment commands here
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual

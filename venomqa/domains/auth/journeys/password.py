@@ -6,15 +6,14 @@ Demonstrates:
 - Password strength enforcement
 """
 
-
 from venomqa import Checkpoint, Journey, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class PasswordActions:
     def __init__(self, base_url: str, auth_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.auth_client = HTTPClient(base_url=auth_url or base_url)
+        self.client = Client(base_url=base_url)
+        self.auth_client = Client(base_url=auth_url or base_url)
 
     def request_reset(self, email: str):
         return self.auth_client.post("/api/auth/forgot-password", json={"email": email})
@@ -140,7 +139,7 @@ def login_user(client, context):
 
 
 password_reset_flow = Journey(
-    name="password_reset",
+    name="auth_password_reset",
     description="Complete password reset flow",
     steps=[
         Step(name="request_reset", action=request_password_reset),
@@ -154,7 +153,7 @@ password_reset_flow = Journey(
 )
 
 password_change_flow = Journey(
-    name="password_change",
+    name="auth_password_change",
     description="Change password while logged in",
     steps=[
         Step(name="login", action=login_user),
@@ -167,7 +166,7 @@ password_change_flow = Journey(
 )
 
 password_strength_flow = Journey(
-    name="password_strength",
+    name="auth_password_strength",
     description="Test password strength enforcement",
     steps=[
         Step(name="login", action=login_user),

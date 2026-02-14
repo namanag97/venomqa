@@ -1,0 +1,133 @@
+# VenomQA Seed File Example
+# This file demonstrates the seed data format for VenomQA
+
+# Metadata (optional)
+_metadata:
+  description: "Base seed data for e-commerce testing"
+  version: "1.0"
+  author: "QA Team"
+
+# Users - Created first since other resources depend on them
+users:
+  - id: user_seller_1
+    email: seller@example.com
+    password: seller123!
+    role: seller
+    name: Test Seller
+    is_active: true
+    created_at: "2024-01-01T00:00:00Z"
+
+  - id: user_buyer_1
+    email: buyer@example.com
+    password: buyer123!
+    role: buyer
+    name: Test Buyer
+    is_active: true
+    created_at: "2024-01-01T00:00:00Z"
+
+  - id: user_admin_1
+    email: admin@example.com
+    password: admin123!
+    role: admin
+    name: Test Admin
+    is_superuser: true
+    created_at: "2024-01-01T00:00:00Z"
+
+# Categories
+categories:
+  - id: cat_electronics
+    name: Electronics
+    slug: electronics
+    description: Electronic devices and accessories
+
+  - id: cat_clothing
+    name: Clothing
+    slug: clothing
+    description: Apparel and fashion
+
+# Products - Reference seller_id from users using ${resource_type.logical_id.field}
+products:
+  - id: product_1
+    seller_id: ${users.user_seller_1.id}
+    title: Wireless Headphones
+    description: Premium wireless headphones with noise cancellation
+    price: 199.99
+    stock: 50
+    category_id: ${categories.cat_electronics.id}
+    is_active: true
+
+  - id: product_2
+    seller_id: ${users.user_seller_1.id}
+    title: Cotton T-Shirt
+    description: Comfortable cotton t-shirt
+    price: 29.99
+    stock: 100
+    category_id: ${categories.cat_clothing.id}
+    is_active: true
+
+  - id: product_3
+    seller_id: ${users.user_seller_1.id}
+    title: Smartphone Case
+    description: Protective case for smartphones
+    price: 14.99
+    stock: 200
+    category_id: ${categories.cat_electronics.id}
+    is_active: true
+
+# Shopping carts
+carts:
+  - id: cart_1
+    user_id: ${users.user_buyer_1.id}
+    status: active
+    created_at: "2024-01-15T10:00:00Z"
+
+# Cart items - Reference cart and product IDs
+cart_items:
+  - id: cart_item_1
+    cart_id: ${carts.cart_1.id}
+    product_id: ${products.product_1.id}
+    quantity: 2
+    unit_price: ${products.product_1.price}
+
+  - id: cart_item_2
+    cart_id: ${carts.cart_1.id}
+    product_id: ${products.product_3.id}
+    quantity: 1
+    unit_price: ${products.product_3.price}
+
+# Orders - Previous completed orders for testing order history
+orders:
+  - id: order_1
+    user_id: ${users.user_buyer_1.id}
+    status: completed
+    total: 229.98
+    shipping_address: "123 Test St, Test City, TC 12345"
+    payment_method: credit_card
+    created_at: "2024-01-10T14:30:00Z"
+    completed_at: "2024-01-12T09:00:00Z"
+
+# Order items
+order_items:
+  - id: order_item_1
+    order_id: ${orders.order_1.id}
+    product_id: ${products.product_1.id}
+    quantity: 1
+    unit_price: 199.99
+    subtotal: 199.99
+
+  - id: order_item_2
+    order_id: ${orders.order_1.id}
+    product_id: ${products.product_2.id}
+    quantity: 1
+    unit_price: 29.99
+    subtotal: 29.99
+
+# Reviews
+reviews:
+  - id: review_1
+    user_id: ${users.user_buyer_1.id}
+    product_id: ${products.product_1.id}
+    rating: 5
+    title: "Excellent quality!"
+    content: "These headphones are amazing. Great sound and comfortable to wear."
+    created_at: "2024-01-13T16:00:00Z"

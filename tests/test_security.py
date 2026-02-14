@@ -389,9 +389,12 @@ class TestXSSPrevention:
     def test_step_name_xss_in_report(self, mock_client: MockClient) -> None:
         from venomqa.reporters.markdown import MarkdownReporter
 
+        def xss_action(client, ctx):
+            raise Exception("<script>alert('xss')</script>")
+
         journey = Journey(
-            name="<script>alert('xss')</script>",
-            steps=[Step(name="test", action=lambda c, ctx: c.get("/"))],
+            name="xss_test",
+            steps=[Step(name="test", action=xss_action)],
         )
 
         mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})])

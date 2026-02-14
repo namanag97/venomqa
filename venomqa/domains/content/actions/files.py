@@ -3,14 +3,13 @@
 Reusable file management actions.
 """
 
-
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class FileActions:
     def __init__(self, base_url: str, storage_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.storage_client = HTTPClient(base_url=storage_url or base_url, timeout=300)
+        self.client = Client(base_url=base_url)
+        self.storage_client = Client(base_url=storage_url or base_url, timeout=300)
 
     def upload(
         self, file_content: bytes, filename: str, content_type: str, token: str | None = None

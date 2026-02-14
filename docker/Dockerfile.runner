@@ -1,0 +1,169 @@
+# VenomQA Docker Runner
+#
+# A pre-built Docker image for running VenomQA journeys in any CI/CD system.
+# This image includes VenomQA and common tools for testing.
+#
+# Build:
+#   docker build -f docker/Dockerfile.runner -t venomqa-runner:latest .
+#
+# Usage:
+#   docker run --rm \
+#     -e API_BASE_URL=http://host.docker.internal:8000 \
+#     -v $(pwd)/qa:/app/qa:ro \
+#     -v $(pwd)/reports:/app/reports \
+#     venomqa-runner:latest \
+#     run --config qa/venomqa.yaml
+#
+# With docker-compose:
+#   services:
+#     venomqa:
+#       image: venomqa-runner:latest
+#       volumes:
+#         - ./qa:/app/qa:ro
+#         - ./reports:/app/reports
+#       environment:
+#         - API_BASE_URL=http://api:8000
+#       depends_on:
+#         - api
+#
+# Exit codes:
+# - 0: All journeys passed
+# - 1: Some journeys failed
+# - 2: Configuration error
+
+FROM python:3.12-slim AS base
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies and common tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Build essentials
+    build-essential \
+    # Networking tools
+    curl \
+    wget \
+    netcat-openbsd \
+    iputils-ping \
+    dnsutils \
+    # Database clients
+    postgresql-client \
+    # Redis CLI
+    redis-tools \
+    # MySQL client
+    default-mysql-client \
+    # MongoDB tools
+    # Note: MongoDB tools need separate installation for newer versions
+    # JSON processing
+    jq \
+    # Git for potential cloning
+    git \
+    # SSL/TLS support
+    ca-certificates \
+    openssl \
+    # Process management
+    procps \
+    # Compression
+    gzip \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Install VenomQA and dependencies
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir \
+    venomqa[all] \
+    # Additional useful packages
+    httpx \
+    pyyaml \
+    python-dotenv \
+    pytest \
+    pytest-asyncio
+
+# Copy VenomQA source (for development/custom builds)
+# Comment out if using published package
+COPY venomqa/ ./venomqa/
+RUN pip install --no-cache-dir -e .
+
+# Create directories
+RUN mkdir -p /app/qa /app/reports /app/logs
+
+# Copy helper scripts
+COPY docker/scripts/ /usr/local/bin/
+
+# Make scripts executable
+RUN chmod +x /usr/local/bin/*.sh 2>/dev/null || true
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import venomqa; print('healthy')" || exit 1
+
+# Default environment variables
+ENV VENOMQA_BASE_URL=http://localhost:8000 \
+    VENOMQA_TIMEOUT=30 \
+    VENOMQA_REPORT_DIR=/app/reports \
+    VENOMQA_LOG_LEVEL=INFO
+
+# Expose port for potential web report server
+EXPOSE 9000
+
+# Create non-root user for security
+RUN groupadd -r venomqa && useradd -r -g venomqa venomqa \
+    && chown -R venomqa:venomqa /app
+
+USER venomqa
+
+# Set entrypoint
+ENTRYPOINT ["venomqa"]
+
+# Default command - show help
+CMD ["--help"]
+
+# ============================================================================
+# Multi-stage build for smaller production image
+# ============================================================================
+FROM base AS production
+
+# Remove development files
+USER root
+RUN rm -rf /app/venomqa /app/pyproject.toml \
+    && pip uninstall -y pip setuptools wheel \
+    && apt-get purge -y build-essential git \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+USER venomqa
+
+# ============================================================================
+# Development image with additional tools
+# ============================================================================
+FROM base AS development
+
+USER root
+
+# Install development tools
+RUN pip install --no-cache-dir \
+    ipython \
+    pytest-cov \
+    mypy \
+    ruff \
+    black \
+    httpie
+
+# Install additional debugging tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    vim \
+    less \
+    htop \
+    strace \
+    && rm -rf /var/lib/apt/lists/*
+
+USER venomqa
+
+# Default to shell for development
+CMD ["/bin/bash"]

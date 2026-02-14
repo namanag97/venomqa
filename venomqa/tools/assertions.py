@@ -732,3 +732,515 @@ def assert_custom(
     if not condition_fn(response):
         msg = message or "Custom assertion condition failed"
         raise AssertionError(msg)
+
+
+def assert_redirect(
+    response: httpx.Response,
+    expected_status: int | list[int] | None = None,
+    message: str | None = None,
+) -> None:
+    """Assert response is a redirect (3xx status code).
+
+    Args:
+        response: HTTP response to check.
+        expected_status: Expected redirect status code(s). If None, accepts any 3xx.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If not a redirect.
+
+    Example:
+        >>> response = get(client, context, "/old-path", follow_redirects=False)
+        >>> assert_redirect(response)
+        >>> assert_redirect(response, expected_status=301)
+    """
+    is_redirect = 300 <= response.status_code < 400
+
+    if expected_status is not None:
+        if isinstance(expected_status, int):
+            expected_codes = {expected_status}
+        else:
+            expected_codes = set(expected_status)
+        if response.status_code not in expected_codes:
+            msg = message or (
+                f"Expected redirect status {expected_codes}, got {response.status_code}"
+            )
+            raise AssertionError(msg)
+    elif not is_redirect:
+        msg = message or f"Expected redirect (3xx), got {response.status_code}"
+        raise AssertionError(msg)
+
+
+def assert_redirect_to(
+    response: httpx.Response,
+    expected_location: str,
+    message: str | None = None,
+) -> None:
+    """Assert response redirects to a specific location.
+
+    Args:
+        response: HTTP response to check.
+        expected_location: Expected redirect location (full URL or path).
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If redirect location doesn't match.
+
+    Example:
+        >>> response = get(client, context, "/login", follow_redirects=False)
+        >>> assert_redirect_to(response, "/dashboard")
+    """
+    location = response.headers.get("Location") or response.headers.get("location")
+
+    if not location:
+        msg = message or "Response has no Location header"
+        raise AssertionError(msg)
+
+    if expected_location not in location:
+        msg = message or (f"Expected redirect to '{expected_location}', got '{location}'")
+        raise AssertionError(msg)
+
+
+def assert_length(
+    response: httpx.Response,
+    expected_length: int | tuple[int, int],
+    message: str | None = None,
+) -> None:
+    """Assert response content length.
+
+    Args:
+        response: HTTP response to check.
+        expected_length: Expected length or (min, max) tuple.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If length doesn't match.
+
+    Example:
+        >>> response = get(client, context, "/api/data")
+        >>> assert_length(response, expected_length=1000)
+        >>> assert_length(response, expected_length=(100, 5000))
+    """
+    content_length = len(response.content)
+
+    if isinstance(expected_length, tuple):
+        min_len, max_len = expected_length
+        if not (min_len <= content_length <= max_len):
+            msg = message or (
+                f"Content length {content_length} not in range [{min_len}, {max_len}]"
+            )
+            raise AssertionError(msg)
+    else:
+        if content_length != expected_length:
+            msg = message or (f"Expected content length {expected_length}, got {content_length}")
+            raise AssertionError(msg)
+
+
+def assert_json_keys(
+    response: httpx.Response,
+    expected_keys: list[str],
+    path: str | None = None,
+    exact: bool = False,
+    message: str | None = None,
+) -> None:
+    """Assert JSON response has expected keys.
+
+    Args:
+        response: HTTP response to check.
+        expected_keys: List of keys that must be present.
+        path: Dot-separated path to object. If None, checks root.
+        exact: If True, response must have exactly these keys (no more).
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If keys don't match.
+
+    Example:
+        >>> response = get(client, context, "/api/users/1")
+        >>> assert_json_keys(response, ["id", "name", "email"])
+        >>> assert_json_keys(response, ["id", "name"], exact=True)
+    """
+    try:
+        data = response.json()
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"Response is not valid JSON: {e}") from e
+
+    if path:
+        data = assert_json_path(response, path)
+
+    if not isinstance(data, dict):
+        raise AssertionError(f"Value at '{path or 'root'}' is not a dictionary")
+
+    actual_keys = set(data.keys())
+    expected_set = set(expected_keys)
+
+    missing = expected_set - actual_keys
+    if missing:
+        msg = message or f"Missing required keys: {missing}"
+        raise AssertionError(msg)
+
+    if exact:
+        extra = actual_keys - expected_set
+        if extra:
+            msg = message or f"Unexpected keys (exact match required): {extra}"
+            raise AssertionError(msg)
+
+
+def assert_json_has_key(
+    response: httpx.Response,
+    key: str,
+    path: str | None = None,
+    message: str | None = None,
+) -> None:
+    """Assert JSON response has a specific key.
+
+    Args:
+        response: HTTP response to check.
+        key: Key that must be present.
+        path: Dot-separated path to object. If None, checks root.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If key is not present.
+
+    Example:
+        >>> response = get(client, context, "/api/users/1")
+        >>> assert_json_has_key(response, "email")
+    """
+    assert_json_keys(response, [key], path=path, exact=False, message=message)
+
+
+def assert_is_empty(
+    response: httpx.Response,
+    path: str | None = None,
+    message: str | None = None,
+) -> None:
+    """Assert JSON value is empty (empty list, dict, string, or None).
+
+    Args:
+        response: HTTP response to check.
+        path: Dot-separated path to value. If None, checks root.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If value is not empty.
+
+    Example:
+        >>> response = get(client, context, "/api/users")
+        >>> assert_is_empty(response, path="errors")
+    """
+    try:
+        data = response.json()
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"Response is not valid JSON: {e}") from e
+
+    if path:
+        data = assert_json_path(response, path)
+
+    is_empty = data is None or data == [] or data == {} or data == ""
+
+    if not is_empty:
+        msg = message or f"Expected empty value at '{path or 'root'}', got: {data!r}"
+        raise AssertionError(msg)
+
+
+def assert_is_not_empty(
+    response: httpx.Response,
+    path: str | None = None,
+    message: str | None = None,
+) -> None:
+    """Assert JSON value is not empty.
+
+    Args:
+        response: HTTP response to check.
+        path: Dot-separated path to value. If None, checks root.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If value is empty.
+
+    Example:
+        >>> response = get(client, context, "/api/users")
+        >>> assert_is_not_empty(response, path="data")
+    """
+    try:
+        data = response.json()
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"Response is not valid JSON: {e}") from e
+
+    if path:
+        data = assert_json_path(response, path)
+
+    is_empty = data is None or data == [] or data == {} or data == ""
+
+    if is_empty:
+        msg = message or f"Expected non-empty value at '{path or 'root'}'"
+        raise AssertionError(msg)
+
+
+def assert_starts_with(
+    response: httpx.Response,
+    prefix: str,
+    message: str | None = None,
+) -> None:
+    """Assert response body starts with a specific string.
+
+    Args:
+        response: HTTP response to check.
+        prefix: String that response should start with.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If response doesn't start with prefix.
+
+    Example:
+        >>> response = get(client, context, "/api/data")
+        >>> assert_starts_with(response, '{"data":')
+    """
+    if not response.text.startswith(prefix):
+        actual = response.text[: len(prefix) + 50]
+        msg = message or f"Response does not start with '{prefix}'. Got: '{actual}...'"
+        raise AssertionError(msg)
+
+
+def assert_ends_with(
+    response: httpx.Response,
+    suffix: str,
+    message: str | None = None,
+) -> None:
+    """Assert response body ends with a specific string.
+
+    Args:
+        response: HTTP response to check.
+        suffix: String that response should end with.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If response doesn't end with suffix.
+
+    Example:
+        >>> response = get(client, context, "/api/data")
+        >>> assert_ends_with(response, '"success":true}')
+    """
+    if not response.text.endswith(suffix):
+        actual = response.text[-(len(suffix) + 50) :]
+        msg = message or f"Response does not end with '{suffix}'. Got: '...{actual}'"
+        raise AssertionError(msg)
+
+
+def assert_cookie_exists(
+    response: httpx.Response,
+    cookie_name: str,
+    message: str | None = None,
+) -> None:
+    """Assert response sets a specific cookie.
+
+    Args:
+        response: HTTP response to check.
+        cookie_name: Name of the cookie to check.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If cookie is not set.
+
+    Example:
+        >>> response = post(client, context, "/login", json={"user": "john"})
+        >>> assert_cookie_exists(response, "session_id")
+    """
+    set_cookie_headers = response.headers.get_list("Set-Cookie")
+    cookies = [h.split("=")[0] for h in set_cookie_headers if "=" in h]
+
+    if cookie_name not in cookies:
+        msg = message or f"Cookie '{cookie_name}' not found in response"
+        raise AssertionError(msg)
+
+
+def assert_cookie_value(
+    response: httpx.Response,
+    cookie_name: str,
+    expected_value: str,
+    message: str | None = None,
+) -> None:
+    """Assert response sets a cookie with a specific value.
+
+    Args:
+        response: HTTP response to check.
+        cookie_name: Name of the cookie to check.
+        expected_value: Expected cookie value (or part of it).
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If cookie value doesn't match.
+
+    Example:
+        >>> response = post(client, context, "/login", json={"user": "john"})
+        >>> assert_cookie_value(response, "session_id", "abc123")
+    """
+    set_cookie_headers = response.headers.get_list("Set-Cookie")
+
+    for header in set_cookie_headers:
+        if header.startswith(f"{cookie_name}="):
+            parts = header.split(";", 1)[0]
+            value = parts.split("=", 1)[1] if "=" in parts else ""
+            if expected_value in value:
+                return
+            msg = message or (
+                f"Cookie '{cookie_name}' value '{value}' does not contain '{expected_value}'"
+            )
+            raise AssertionError(msg)
+
+    msg = message or f"Cookie '{cookie_name}' not found in response"
+    raise AssertionError(msg)
+
+
+def assert_json_value_greater_than(
+    response: httpx.Response,
+    path: str,
+    minimum: int | float,
+    message: str | None = None,
+) -> None:
+    """Assert JSON value at path is greater than minimum.
+
+    Args:
+        response: HTTP response to check.
+        path: Dot-separated path to numeric value.
+        minimum: Minimum value (exclusive).
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If value is not greater than minimum.
+
+    Example:
+        >>> response = get(client, context, "/api/stats")
+        >>> assert_json_value_greater_than(response, "total_users", 100)
+    """
+    value = assert_json_path(response, path)
+
+    if not isinstance(value, (int, float)):
+        raise AssertionError(f"Value at '{path}' is not numeric: {type(value).__name__}")
+
+    if value <= minimum:
+        msg = message or f"Value {value} at '{path}' is not greater than {minimum}"
+        raise AssertionError(msg)
+
+
+def assert_json_value_less_than(
+    response: httpx.Response,
+    path: str,
+    maximum: int | float,
+    message: str | None = None,
+) -> None:
+    """Assert JSON value at path is less than maximum.
+
+    Args:
+        response: HTTP response to check.
+        path: Dot-separated path to numeric value.
+        maximum: Maximum value (exclusive).
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If value is not less than maximum.
+
+    Example:
+        >>> response = get(client, context, "/api/stats")
+        >>> assert_json_value_less_than(response, "response_time_ms", 1000)
+    """
+    value = assert_json_path(response, path)
+
+    if not isinstance(value, (int, float)):
+        raise AssertionError(f"Value at '{path}' is not numeric: {type(value).__name__}")
+
+    if value >= maximum:
+        msg = message or f"Value {value} at '{path}' is not less than {maximum}"
+        raise AssertionError(msg)
+
+
+def assert_json_value_between(
+    response: httpx.Response,
+    path: str,
+    minimum: int | float,
+    maximum: int | float,
+    message: str | None = None,
+) -> None:
+    """Assert JSON value at path is within a range.
+
+    Args:
+        response: HTTP response to check.
+        path: Dot-separated path to numeric value.
+        minimum: Minimum value (inclusive).
+        maximum: Maximum value (inclusive).
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If value is outside range.
+
+    Example:
+        >>> response = get(client, context, "/api/product/123")
+        >>> assert_json_value_between(response, "price", 10, 100)
+    """
+    value = assert_json_path(response, path)
+
+    if not isinstance(value, (int, float)):
+        raise AssertionError(f"Value at '{path}' is not numeric: {type(value).__name__}")
+
+    if not (minimum <= value <= maximum):
+        msg = message or f"Value {value} at '{path}' not in range [{minimum}, {maximum}]"
+        raise AssertionError(msg)
+
+
+def assert_json_value_equals(
+    response: httpx.Response,
+    path: str,
+    expected: Any,
+    message: str | None = None,
+) -> None:
+    """Assert JSON value at path equals expected value.
+
+    Args:
+        response: HTTP response to check.
+        path: Dot-separated path to value.
+        expected: Expected value.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If value doesn't equal expected.
+
+    Example:
+        >>> response = get(client, context, "/api/users/1")
+        >>> assert_json_value_equals(response, "status", "active")
+    """
+    assert_json_path(response, path, expected_value=expected, message=message)
+
+
+def assert_all(
+    response: httpx.Response,
+    *assertions: Callable[[httpx.Response], None],
+) -> None:
+    """Run multiple assertions and collect all failures.
+
+    Args:
+        response: HTTP response to check.
+        *assertions: Assertion functions to run.
+
+    Raises:
+        AssertionError: If any assertions fail, with all errors combined.
+
+    Example:
+        >>> assert_all(
+        ...     response,
+        ...     lambda r: assert_status_ok(r),
+        ...     lambda r: assert_content_type(r, "application/json"),
+        ...     lambda r: assert_json_has_key(r, "id"),
+        ... )
+    """
+    errors: list[str] = []
+
+    for assertion in assertions:
+        try:
+            assertion(response)
+        except AssertionError as e:
+            errors.append(str(e))
+
+    if errors:
+        combined = "\n  - ".join(["Multiple assertions failed:"] + errors)
+        raise AssertionError(combined)

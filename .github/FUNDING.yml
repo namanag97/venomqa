@@ -1,0 +1,29 @@
+# Funding configuration for VenomQA
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+github: namanagarwal
+
+# Open Collective - Uncomment and update if you set up a collective
+# open_collective: venomqa
+
+# Patreon - Uncomment and update if you have a Patreon
+# patreon: venomqa
+
+# Ko-fi - Uncomment and update if you have Ko-fi
+# ko_fi: venomqa
+
+# Tidelift - Uncomment if you're on Tidelift
+# tidelift: pypi/venomqa
+
+# Community Bridge - Uncomment for Linux Foundation projects
+# community_bridge: venomqa
+
+# Liberapay - Uncomment and update if you use Liberapay
+# liberapay: venomqa
+
+# IssueHunt - Uncomment and update if you use IssueHunt
+# issuehunt: venomqa
+
+# Custom funding URLs
+custom:
+  # - ['Buy me a coffee', 'https://buymeacoffee.com/venomqa']

@@ -40,6 +40,10 @@ class QAConfig(BaseSettings):
     ports: list[dict[str, Any]] = Field(default_factory=list)
     adapters: dict[str, Any] = Field(default_factory=dict)
 
+    # Data generation settings
+    data_seed: int | None = Field(default=None, description="Seed for reproducible fake data generation")
+    data_locale: str = Field(default="en_US", description="Locale for generated data (e.g., de_DE, fr_FR)")
+
     @field_validator("db_url", mode="before")
     @classmethod
     def validate_db_url(cls, v: str | None) -> str | None:
@@ -85,7 +89,38 @@ def load_config(config_path: str | Path | None = None) -> QAConfig:
     env_overrides = _get_env_overrides()
     config_data.update(env_overrides)
 
-    return QAConfig(**config_data)
+    config = QAConfig(**config_data)
+
+    # Configure global fake data generator if seed or locale is set
+    _configure_fake_generator(config)
+
+    return config
+
+
+def _configure_fake_generator(config: QAConfig) -> None:
+    """Configure the global fake data generator from config."""
+    try:
+        from venomqa.data import fake, set_global_seed
+
+        # Set locale if different from default
+        if config.data_locale != "en_US":
+            # Create a new generator with the specified locale
+            from venomqa.data.generators import FakeDataGenerator
+            import venomqa.data as data_module
+
+            new_fake = FakeDataGenerator(
+                locale=config.data_locale,
+                seed=config.data_seed,
+            )
+            # Replace the global fake instance
+            data_module.fake = new_fake
+            data_module.generators.fake = new_fake
+        elif config.data_seed is not None:
+            # Just set the seed
+            set_global_seed(config.data_seed)
+    except ImportError:
+        # Data module not available or faker not installed
+        pass
 
 
 def _get_env_overrides() -> dict[str, Any]:
@@ -97,6 +132,8 @@ def _get_env_overrides() -> dict[str, Any]:
         "VENOMQA_DB_URL": "db_url",
         "VENOMQA_TIMEOUT": ("timeout", int),
         "VENOMQA_VERBOSE": ("verbose", lambda x: x.lower() in ("true", "1", "yes")),
+        "VENOMQA_DATA_SEED": ("data_seed", int),
+        "VENOMQA_DATA_LOCALE": "data_locale",
     }
 
     for env_key, config_key in env_mappings.items():

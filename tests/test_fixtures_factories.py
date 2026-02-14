@@ -88,7 +88,7 @@ class TestDataFactory:
             started_at=kwargs.get("started_at", now),
             finished_at=kwargs.get("finished_at", now),
             response=kwargs.get("response"),
-            error=kwargs.get("error"),
+            error=kwargs.get("error", "Test error" if not success else None),
             request=kwargs.get("request"),
             duration_ms=kwargs.get("duration_ms", 0.0),
         )

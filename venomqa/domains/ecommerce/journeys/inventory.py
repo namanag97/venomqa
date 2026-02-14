@@ -6,15 +6,14 @@ Demonstrates:
 - Inventory reconciliation
 """
 
-
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class InventoryActions:
     def __init__(self, base_url: str, inventory_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.inventory_client = HTTPClient(base_url=inventory_url or base_url)
+        self.client = Client(base_url=base_url)
+        self.inventory_client = Client(base_url=inventory_url or base_url)
 
     def create_product(self, product_data: dict, token: str | None = None):
         headers = {"Authorization": f"Bearer {token}"} if token else {}
@@ -222,7 +221,7 @@ def reconcile_inventory(client, context):
 
 
 inventory_update_flow = Journey(
-    name="inventory_update",
+    name="ecommerce_inventory_update",
     description="Test inventory stock updates with reservations",
     steps=[
         Step(name="login_admin", action=login_admin),
@@ -248,14 +247,12 @@ inventory_update_flow = Journey(
 )
 
 stock_alert_flow = Journey(
-    name="stock_alert",
+    name="ecommerce_stock_alert",
     description="Test low stock alert generation",
     steps=[
         Step(name="login_admin", action=login_admin),
         Checkpoint(name="authenticated"),
-        Step(
-            name="create_product", action=create_product, context_overrides={"initial_stock": 100}
-        ),
+        Step(name="create_product", action=create_product, args={"initial_stock": 100}),
         Step(name="deplete_stock", action=deplete_stock),
         Checkpoint(name="low_stock"),
         Step(name="check_alerts", action=check_low_stock_alerts),
@@ -263,17 +260,15 @@ stock_alert_flow = Journey(
 )
 
 inventory_reconciliation_flow = Journey(
-    name="inventory_reconciliation",
+    name="ecommerce_inventory_reconciliation",
     description="Test inventory count reconciliation",
     steps=[
         Step(name="login_admin", action=login_admin),
         Checkpoint(name="authenticated"),
-        Step(
-            name="create_product", action=create_product, context_overrides={"initial_stock": 100}
-        ),
+        Step(name="create_product", action=create_product, args={"initial_stock": 100}),
         Step(name="verify_stock", action=verify_inventory),
         Checkpoint(name="stock_verified"),
-        Step(name="reconcile", action=reconcile_inventory, context_overrides={"actual_count": 95}),
+        Step(name="reconcile", action=reconcile_inventory, args={"actual_count": 95}),
         Step(name="verify_reconciliation", action=verify_inventory),
     ],
 )

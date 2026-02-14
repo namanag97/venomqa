@@ -33,7 +33,26 @@ todo_app/
 
 ## Quick Start
 
-### Run the Application
+### Run the Application and Tests
+
+```bash
+cd examples/todo_app
+
+# Start app with PostgreSQL
+docker compose up -d
+
+# Check health
+curl http://localhost:5001/health
+
+# Run VenomQA tests
+cd qa
+venomqa run
+
+# View reports
+open reports/venomqa-report-*.md
+```
+
+### Alternative: Using Docker Compose from docker/ directory
 
 ```bash
 cd examples/todo_app
@@ -42,23 +61,7 @@ cd examples/todo_app
 docker compose -f docker/docker-compose.yml up -d
 
 # Check health
-curl http://localhost:5000/health
-```
-
-### Run QA Tests
-
-```bash
-# From the todo_app directory
-cd qa
-
-# Start test infrastructure
-docker compose -f docker-compose.qa.yml up -d
-
-# Run VenomQA tests
-docker compose -f docker-compose.qa.yml exec venomqa venomqa run
-
-# View reports
-open reports/journey_report.html
+curl http://localhost:5001/health
 ```
 
 ## API Endpoints
@@ -80,7 +83,7 @@ open reports/journey_report.html
 ### Create a Todo
 
 ```bash
-curl -X POST http://localhost:5000/todos \
+curl -X POST http://localhost:5001/todos \
   -H "Content-Type: application/json" \
   -d '{"title": "Buy groceries", "description": "Milk, eggs, bread"}'
 ```
@@ -88,13 +91,13 @@ curl -X POST http://localhost:5000/todos \
 ### List Todos
 
 ```bash
-curl "http://localhost:5000/todos?page=1&limit=10"
+curl "http://localhost:5001/todos?page=1&limit=10"
 ```
 
 ### Upload Attachment
 
 ```bash
-curl -X POST http://localhost:5000/todos/1/attachments \
+curl -X POST http://localhost:5001/todos/1/attachments \
   -F "file=@document.pdf"
 ```
 
@@ -139,7 +142,7 @@ sys.path.insert(0, '../../../')
 from venomqa import Client, JourneyRunner
 from journeys.crud_journey import crud_journey
 
-client = Client(base_url="http://localhost:5000")
+client = Client(base_url="http://localhost:5001")
 runner = JourneyRunner(client=client)
 result = runner.run(crud_journey)
 

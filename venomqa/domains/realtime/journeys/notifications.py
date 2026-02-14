@@ -4,59 +4,134 @@ Demonstrates:
 - Push notification delivery
 - Notification preferences
 - Multi-device delivery
+
+This module provides journeys for testing notification functionality
+including push notifications, preference management, and multi-device delivery.
 """
 
+from __future__ import annotations
+
+from typing import Any
 
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.clients import HTTPClient
+from venomqa.client import Client
 
 
 class NotificationActions:
-    def __init__(self, base_url: str, notification_url: str | None = None):
-        self.client = HTTPClient(base_url=base_url)
-        self.notification_client = HTTPClient(base_url=notification_url or base_url)
+    """Actions for notification operations.
+
+    Provides methods for sending notifications, managing notification
+    preferences, and registering devices for push notifications.
+
+    Args:
+        base_url: Base URL for the main API service.
+        notification_url: Optional URL for the notification service.
+    """
+
+    def __init__(self, base_url: str, notification_url: str | None = None) -> None:
+        self.client = Client(base_url=base_url)
+        self.notification_client = Client(base_url=notification_url or base_url)
 
     def send_notification(
         self,
         user_id: str,
         title: str,
         body: str,
-        data: dict | None = None,
+        data: dict[str, Any] | None = None,
         token: str | None = None,
-    ):
+    ) -> Any:
+        """Send a notification to a specific user.
+
+        Args:
+            user_id: ID of the user to notify.
+            title: Notification title.
+            body: Notification body text.
+            data: Optional additional data payload.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from send notification request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
-        payload = {"user_id": user_id, "title": title, "body": body}
+        base_payload: dict[str, Any] = {"user_id": user_id, "title": title, "body": body}
         if data:
-            payload["data"] = data
+            base_payload["data"] = data
         return self.notification_client.post(
-            "/api/notifications/send", json=payload, headers=headers
+            "/api/notifications/send", json=base_payload, headers=headers
         )
 
-    def get_notifications(self, user_id: str, page: int = 1, token: str | None = None):
+    def get_notifications(self, user_id: str, page: int = 1, token: str | None = None) -> Any:
+        """Retrieve notifications for a user.
+
+        Args:
+            user_id: ID of the user.
+            page: Page number for pagination.
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing user notifications.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.notification_client.get(
             f"/api/notifications/{user_id}", params={"page": page}, headers=headers
         )
 
-    def mark_read(self, notification_id: str, token: str | None = None):
+    def mark_read(self, notification_id: str, token: str | None = None) -> Any:
+        """Mark a notification as read.
+
+        Args:
+            notification_id: Unique identifier of the notification.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from mark read request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.notification_client.post(
             f"/api/notifications/{notification_id}/read", headers=headers
         )
 
-    def mark_all_read(self, user_id: str, token: str | None = None):
+    def mark_all_read(self, user_id: str, token: str | None = None) -> Any:
+        """Mark all notifications as read for a user.
+
+        Args:
+            user_id: ID of the user.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from mark all read request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.notification_client.post(
             f"/api/notifications/{user_id}/read-all", headers=headers
         )
 
-    def get_preferences(self, user_id: str, token: str | None = None):
+    def get_preferences(self, user_id: str, token: str | None = None) -> Any:
+        """Get notification preferences for a user.
+
+        Args:
+            user_id: ID of the user.
+            token: Optional authentication token.
+
+        Returns:
+            Response object containing notification preferences.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.notification_client.get(
             f"/api/notifications/{user_id}/preferences", headers=headers
         )
 
-    def update_preferences(self, user_id: str, preferences: dict, token: str | None = None):
+    def update_preferences(self, user_id: str, preferences: dict, token: str | None = None) -> Any:
+        """Update notification preferences for a user.
+
+        Args:
+            user_id: ID of the user.
+            preferences: Dictionary of preference settings.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from preference update request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.notification_client.patch(
             f"/api/notifications/{user_id}/preferences",
@@ -66,7 +141,18 @@ class NotificationActions:
 
     def register_device(
         self, user_id: str, device_token: str, platform: str, token: str | None = None
-    ):
+    ) -> Any:
+        """Register a device for push notifications.
+
+        Args:
+            user_id: ID of the user.
+            device_token: Device push token from FCM/APNs.
+            platform: Platform type (ios, android, web).
+            token: Optional authentication token.
+
+        Returns:
+            Response object from device registration request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.notification_client.post(
             f"/api/notifications/{user_id}/devices",
@@ -74,7 +160,17 @@ class NotificationActions:
             headers=headers,
         )
 
-    def unregister_device(self, user_id: str, device_token: str, token: str | None = None):
+    def unregister_device(self, user_id: str, device_token: str, token: str | None = None) -> Any:
+        """Unregister a device from push notifications.
+
+        Args:
+            user_id: ID of the user.
+            device_token: Device push token to unregister.
+            token: Optional authentication token.
+
+        Returns:
+            Response object from device unregistration request.
+        """
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         return self.notification_client.delete(
             f"/api/notifications/{user_id}/devices/{device_token}",
@@ -82,7 +178,16 @@ class NotificationActions:
         )
 
 
-def login_user(client, context):
+def login_user(client: Client, context: dict) -> Any:
+    """Authenticate user and store token and user_id in context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary for storing state.
+
+    Returns:
+        Response object from login request.
+    """
     response = client.post(
         "/api/auth/login",
         json={
@@ -97,7 +202,16 @@ def login_user(client, context):
     return response
 
 
-def send_push_notification(client, context):
+def send_push_notification(client: Client, context: dict) -> Any:
+    """Send a push notification and store notification_id in context.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user_id.
+
+    Returns:
+        Response object from send notification request.
+    """
     actions = NotificationActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         notification_url=context.get("notification_url", "http://localhost:8004"),
@@ -115,7 +229,16 @@ def send_push_notification(client, context):
     return response
 
 
-def get_user_notifications(client, context):
+def get_user_notifications(client: Client, context: dict) -> Any:
+    """Retrieve notifications for the authenticated user.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user_id.
+
+    Returns:
+        Response object containing user notifications.
+    """
     actions = NotificationActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         notification_url=context.get("notification_url", "http://localhost:8004"),
@@ -128,7 +251,16 @@ def get_user_notifications(client, context):
     return response
 
 
-def mark_notification_read(client, context):
+def mark_notification_read(client: Client, context: dict) -> Any:
+    """Mark a notification as read.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing notification_id.
+
+    Returns:
+        Response object from mark read request.
+    """
     actions = NotificationActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         notification_url=context.get("notification_url", "http://localhost:8004"),
@@ -139,7 +271,16 @@ def mark_notification_read(client, context):
     return response
 
 
-def mark_all_read(client, context):
+def mark_all_read(client: Client, context: dict) -> Any:
+    """Mark all notifications as read for the user.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user_id.
+
+    Returns:
+        Response object from mark all read request.
+    """
     actions = NotificationActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         notification_url=context.get("notification_url", "http://localhost:8004"),
@@ -147,7 +288,16 @@ def mark_all_read(client, context):
     return actions.mark_all_read(user_id=context["user_id"], token=context["token"])
 
 
-def get_notification_preferences(client, context):
+def get_notification_preferences(client: Client, context: dict) -> Any:
+    """Retrieve notification preferences for the user.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user_id.
+
+    Returns:
+        Response object containing notification preferences.
+    """
     actions = NotificationActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         notification_url=context.get("notification_url", "http://localhost:8004"),
@@ -158,7 +308,16 @@ def get_notification_preferences(client, context):
     return response
 
 
-def update_notification_preferences(client, context):
+def update_notification_preferences(client: Client, context: dict) -> Any:
+    """Update notification preferences for the user.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user_id and new_preferences.
+
+    Returns:
+        Response object from preference update request.
+    """
     actions = NotificationActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         notification_url=context.get("notification_url", "http://localhost:8004"),
@@ -172,7 +331,16 @@ def update_notification_preferences(client, context):
     return response
 
 
-def disable_all_notifications(client, context):
+def disable_all_notifications(client: Client, context: dict) -> Any:
+    """Disable all notification channels for the user.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user_id.
+
+    Returns:
+        Response object from preference update request.
+    """
     actions = NotificationActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         notification_url=context.get("notification_url", "http://localhost:8004"),
@@ -184,7 +352,16 @@ def disable_all_notifications(client, context):
     )
 
 
-def register_device(client, context):
+def register_device(client: Client, context: dict) -> Any:
+    """Register a device for push notifications.
+
+    Args:
+        client: HTTP client for making requests.
+        context: Test context dictionary containing user_id.
+
+    Returns:
+        Response object from device registration request.
+    """
     actions = NotificationActions(
         base_url=context.get("base_url", "http://localhost:8000"),
         notification_url=context.get("notification_url", "http://localhost:8004"),
@@ -201,7 +378,7 @@ def register_device(client, context):
 
 
 push_notification_flow = Journey(
-    name="push_notification",
+    name="realtime_push_notification",
     description="Send and receive push notifications",
     steps=[
         Step(name="login", action=login_user),
@@ -215,7 +392,7 @@ push_notification_flow = Journey(
 )
 
 notification_preferences_flow = Journey(
-    name="notification_preferences",
+    name="realtime_notification_preferences",
     description="Manage notification preferences",
     steps=[
         Step(name="login", action=login_user),
@@ -231,9 +408,7 @@ notification_preferences_flow = Journey(
                         Step(
                             name="update_enable",
                             action=update_notification_preferences,
-                            context_overrides={
-                                "new_preferences": {"email": True, "push": True, "sms": True}
-                            },
+                            args={"new_preferences": {"email": True, "push": True, "sms": True}},
                         ),
                         Step(name="verify_enabled", action=get_notification_preferences),
                     ],
@@ -251,7 +426,7 @@ notification_preferences_flow = Journey(
 )
 
 notification_delivery_flow = Journey(
-    name="notification_delivery",
+    name="realtime_notification_delivery",
     description="Test multi-device notification delivery",
     steps=[
         Step(name="login", action=login_user),

@@ -4,47 +4,332 @@ This module provides reusable wait/polling action functions for:
 - Waiting for HTTP responses
 - Waiting for specific conditions
 - Polling with custom predicates
+- Async-first with sync wrappers
 
 Example:
-    >>> from venomqa.tools import wait_for_response, wait_for_condition, wait_for_status
+    >>> from venomqa.tools.wait import wait_for, poll_until
     >>>
-    >>> # Wait for endpoint to return 200
-    >>> response = wait_for_status(client, context, "/health", 200, timeout=30)
-    >>>
-    >>> # Wait for custom condition
-    >>> response = wait_for_condition(
-    ...     client, context,
-    ...     condition_fn=lambda r: r.json().get("status") == "ready",
-    ...     path="/api/job/123"
+    >>> # Simple condition wait
+    >>> await wait_for(
+    ...     lambda: client.get("/orders/123").json()["status"] == "shipped",
+    ...     timeout=60,
+    ...     interval=5
     ... )
+    >>>
+    >>> # Standalone poll until condition
+    >>> result = await poll_until(
+    ...     lambda: client.get("/api/job/123").json(),
+    ...     condition=lambda r: r.get("status") == "completed",
+    ...     timeout=120,
+    ...     interval=2
+    ... )
+    >>>
+    >>> # Legacy API still supported
+    >>> response = wait_for_status(client, context, "/health", 200, timeout=30)
 """
 
 from __future__ import annotations
 
+import asyncio
 import time
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 import httpx
 
 from venomqa.errors import VenomQAError
+from venomqa.errors.retry import WaitTimeoutError
 from venomqa.tools.http import get
 
 if TYPE_CHECKING:
     from venomqa.client import Client
     from venomqa.state.context import Context
 
-
-class WaitTimeoutError(VenomQAError):
-    """Raised when a wait operation times out."""
-
-    pass
+T = TypeVar("T")
 
 
 class WaitError(VenomQAError):
-    """Raised when a wait operation fails."""
+    """Raised when a wait operation fails (not timeout)."""
 
     pass
+
+
+# Re-export for backward compatibility
+__all__ = [
+    "WaitTimeoutError",
+    "WaitError",
+    "wait_for",
+    "poll_until",
+    "wait_for_response",
+    "wait_for_status",
+    "wait_for_condition",
+    "wait_until",
+    "wait_for_health_check",
+    "wait_for_json_path",
+    "wait_for_email_received",
+    "poll",
+    "retry_on_failure",
+    "wait_for_value_change",
+    "wait_for_stable_value",
+    "wait_all",
+    "wait_any",
+    "wait_for_retry_success",
+]
+
+
+# =============================================================================
+# NEW SIMPLIFIED API
+# =============================================================================
+
+
+async def wait_for(
+    condition: Callable[[], bool] | Callable[[], Awaitable[bool]],
+    timeout: float = 30.0,
+    interval: float = 1.0,
+    description: str | None = None,
+    raise_on_timeout: bool = True,
+) -> bool:
+    """Wait for a condition to become true.
+
+    This is the primary wait function with a simple, flexible API.
+    Works with both sync and async condition functions.
+
+    Args:
+        condition: Function returning bool (sync or async).
+        timeout: Maximum wait time in seconds.
+        interval: Time between checks in seconds.
+        description: Description for error messages.
+        raise_on_timeout: If True, raise WaitTimeoutError on timeout.
+
+    Returns:
+        True if condition was met, False if timed out (when raise_on_timeout=False).
+
+    Raises:
+        WaitTimeoutError: If timeout reached and raise_on_timeout=True.
+
+    Example:
+        >>> # Wait for job to complete
+        >>> await wait_for(
+        ...     lambda: client.get("/jobs/123").json()["status"] == "done",
+        ...     timeout=60,
+        ...     interval=5,
+        ...     description="job 123 to complete"
+        ... )
+    """
+    start_time = time.time()
+    attempts = 0
+    last_error: Exception | None = None
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            if raise_on_timeout:
+                raise WaitTimeoutError(
+                    condition_description=description or "condition to be true",
+                    timeout_seconds=timeout,
+                    elapsed_seconds=elapsed,
+                    poll_attempts=attempts,
+                    poll_interval=interval,
+                )
+            return False
+
+        attempts += 1
+        try:
+            result = condition()
+            if asyncio.iscoroutine(result):
+                result = await result
+
+            if result:
+                return True
+        except Exception as e:
+            last_error = e
+            # Continue polling on exception
+
+        await asyncio.sleep(interval)
+
+    # Unreachable but makes type checker happy
+    return False
+
+
+def wait_for_sync(
+    condition: Callable[[], bool],
+    timeout: float = 30.0,
+    interval: float = 1.0,
+    description: str | None = None,
+    raise_on_timeout: bool = True,
+) -> bool:
+    """Synchronous version of wait_for.
+
+    Args:
+        condition: Sync function returning bool.
+        timeout: Maximum wait time in seconds.
+        interval: Time between checks in seconds.
+        description: Description for error messages.
+        raise_on_timeout: If True, raise WaitTimeoutError on timeout.
+
+    Returns:
+        True if condition was met, False if timed out.
+
+    Example:
+        >>> wait_for_sync(
+        ...     lambda: client.get("/health").status_code == 200,
+        ...     timeout=30
+        ... )
+    """
+    start_time = time.time()
+    attempts = 0
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            if raise_on_timeout:
+                raise WaitTimeoutError(
+                    condition_description=description or "condition to be true",
+                    timeout_seconds=timeout,
+                    elapsed_seconds=elapsed,
+                    poll_attempts=attempts,
+                    poll_interval=interval,
+                )
+            return False
+
+        attempts += 1
+        try:
+            if condition():
+                return True
+        except Exception:
+            pass  # Continue polling on exception
+
+        time.sleep(interval)
+
+
+async def poll_until(
+    fetcher: Callable[[], T] | Callable[[], Awaitable[T]],
+    condition: Callable[[T], bool],
+    timeout: float = 30.0,
+    interval: float = 1.0,
+    description: str | None = None,
+) -> T:
+    """Poll a resource until a condition is met.
+
+    Repeatedly fetches a value and checks it against a condition.
+    Returns the value when condition is satisfied.
+
+    Args:
+        fetcher: Function to fetch the current value (sync or async).
+        condition: Predicate function to check the fetched value.
+        timeout: Maximum wait time in seconds.
+        interval: Time between polls in seconds.
+        description: Description for error messages.
+
+    Returns:
+        The fetched value that satisfied the condition.
+
+    Raises:
+        WaitTimeoutError: If timeout reached before condition is met.
+
+    Example:
+        >>> # Wait for order status
+        >>> order = await poll_until(
+        ...     fetcher=lambda: client.get("/orders/123").json(),
+        ...     condition=lambda o: o["status"] in ("shipped", "delivered"),
+        ...     timeout=120,
+        ...     interval=5,
+        ...     description="order 123 to be shipped"
+        ... )
+        >>> print(f"Order status: {order['status']}")
+    """
+    start_time = time.time()
+    attempts = 0
+    last_value: T | None = None
+    last_error: Exception | None = None
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            raise WaitTimeoutError(
+                condition_description=description or "condition to be met",
+                timeout_seconds=timeout,
+                elapsed_seconds=elapsed,
+                poll_attempts=attempts,
+                poll_interval=interval,
+                last_value=last_value,
+            )
+
+        attempts += 1
+        try:
+            value = fetcher()
+            if asyncio.iscoroutine(value):
+                value = await value
+
+            last_value = value
+
+            if condition(value):
+                return value
+        except Exception as e:
+            last_error = e
+            # Continue polling on exception
+
+        await asyncio.sleep(interval)
+
+
+def poll_until_sync(
+    fetcher: Callable[[], T],
+    condition: Callable[[T], bool],
+    timeout: float = 30.0,
+    interval: float = 1.0,
+    description: str | None = None,
+) -> T:
+    """Synchronous version of poll_until.
+
+    Args:
+        fetcher: Sync function to fetch the current value.
+        condition: Predicate function to check the fetched value.
+        timeout: Maximum wait time in seconds.
+        interval: Time between polls in seconds.
+        description: Description for error messages.
+
+    Returns:
+        The fetched value that satisfied the condition.
+
+    Example:
+        >>> order = poll_until_sync(
+        ...     fetcher=lambda: client.get("/orders/123").json(),
+        ...     condition=lambda o: o["status"] == "shipped",
+        ...     timeout=60
+        ... )
+    """
+    start_time = time.time()
+    attempts = 0
+    last_value: T | None = None
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            raise WaitTimeoutError(
+                condition_description=description or "condition to be met",
+                timeout_seconds=timeout,
+                elapsed_seconds=elapsed,
+                poll_attempts=attempts,
+                poll_interval=interval,
+                last_value=last_value,
+            )
+
+        attempts += 1
+        try:
+            value = fetcher()
+            last_value = value
+
+            if condition(value):
+                return value
+        except Exception:
+            pass  # Continue polling on exception
+
+        time.sleep(interval)
+
+
+# =============================================================================
+# LEGACY API (for backward compatibility)
+# =============================================================================
 
 
 def wait_for_response(
@@ -84,10 +369,14 @@ def wait_for_response(
     """
     start_time = time.time()
     last_error: Exception | None = None
+    last_status: int | None = None
+    attempts = 0
 
     while time.time() - start_time < timeout:
+        attempts += 1
         try:
             response = get(client, context, path, **kwargs)
+            last_status = response.status_code
             min_status, max_status = expected_status_range
             if min_status <= response.status_code <= max_status:
                 return response
@@ -97,10 +386,15 @@ def wait_for_response(
         time.sleep(interval)
 
     elapsed = time.time() - start_time
-    msg = f"Timeout after {elapsed:.1f}s waiting for response from {path}"
-    if last_error:
-        msg += f" (last error: {last_error})"
-    raise WaitTimeoutError(msg)
+    raise WaitTimeoutError(
+        condition_description=f"response from {path} with status {expected_status_range[0]}-{expected_status_range[1]}",
+        timeout_seconds=timeout,
+        elapsed_seconds=elapsed,
+        poll_attempts=attempts,
+        poll_interval=interval,
+        last_value=f"status={last_status}" if last_status else f"error={last_error}",
+        expected_value=f"status in range {expected_status_range}",
+    )
 
 
 def wait_for_status(
@@ -147,8 +441,10 @@ def wait_for_status(
 
     start_time = time.time()
     last_status: int | None = None
+    attempts = 0
 
     while time.time() - start_time < timeout:
+        attempts += 1
         try:
             response = get(client, context, path, **kwargs)
             last_status = response.status_code
@@ -160,11 +456,16 @@ def wait_for_status(
         time.sleep(interval)
 
     elapsed = time.time() - start_time
-    status_str = ", ".join(map(str, expected_statuses))
-    msg = f"Timeout after {elapsed:.1f}s waiting for status {status_str} from {path}"
-    if last_status is not None:
-        msg += f" (last status: {last_status})"
-    raise WaitTimeoutError(msg)
+    status_str = ", ".join(map(str, sorted(expected_statuses)))
+    raise WaitTimeoutError(
+        condition_description=f"status {status_str} from {path}",
+        timeout_seconds=timeout,
+        elapsed_seconds=elapsed,
+        poll_attempts=attempts,
+        poll_interval=interval,
+        last_value=last_status,
+        expected_value=status_str,
+    )
 
 
 def wait_for_condition(
@@ -174,6 +475,7 @@ def wait_for_condition(
     path: str = "",
     timeout: float = 30.0,
     interval: float = 1.0,
+    description: str | None = None,
     **kwargs: Any,
 ) -> httpx.Response:
     """Wait for a custom condition to be met on an HTTP response.
@@ -185,6 +487,7 @@ def wait_for_condition(
         path: API endpoint path or full URL (optional if condition doesn't need HTTP).
         timeout: Maximum time to wait in seconds.
         interval: Time between polling attempts in seconds.
+        description: Optional description for error messages.
         **kwargs: Additional arguments passed to GET request.
 
     Returns:
@@ -198,7 +501,8 @@ def wait_for_condition(
         >>> response = wait_for_condition(
         ...     client, context,
         ...     condition_fn=lambda r: r.json().get("status") == "completed",
-        ...     path="/api/jobs/123"
+        ...     path="/api/jobs/123",
+        ...     description="job 123 to complete"
         ... )
         >>>
         >>> # Wait for specific data
@@ -211,8 +515,10 @@ def wait_for_condition(
     start_time = time.time()
     last_result: bool | None = None
     last_error: Exception | None = None
+    attempts = 0
 
     while time.time() - start_time < timeout:
+        attempts += 1
         try:
             if path:
                 response = get(client, context, path, **kwargs)
@@ -229,14 +535,16 @@ def wait_for_condition(
         time.sleep(interval)
 
     elapsed = time.time() - start_time
-    msg = f"Timeout after {elapsed:.1f}s waiting for condition"
-    if path:
-        msg += f" on {path}"
-    if last_result is not None:
-        msg += f" (last result: {last_result})"
-    if last_error:
-        msg += f" (last error: {last_error})"
-    raise WaitTimeoutError(msg)
+    desc = description or f"condition on {path}" if path else "custom condition"
+    raise WaitTimeoutError(
+        condition_description=desc,
+        timeout_seconds=timeout,
+        elapsed_seconds=elapsed,
+        poll_attempts=attempts,
+        poll_interval=interval,
+        last_value=f"condition={last_result}" if last_error is None else f"error={last_error}",
+        expected_value="condition to return True",
+    )
 
 
 def wait_until(
@@ -548,3 +856,309 @@ def retry_on_failure(
                 time.sleep(retry_delay)
 
     raise last_exception or WaitError("Retry failed with unknown error")
+
+
+def wait_for_value_change(
+    client: Client,
+    context: Context,
+    path: str,
+    initial_value: Any,
+    get_value_fn: Callable[[httpx.Response], Any] | None = None,
+    timeout: float = 30.0,
+    interval: float = 1.0,
+    **kwargs: Any,
+) -> httpx.Response:
+    """Wait for a value to change from its initial state.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        path: API endpoint path or full URL.
+        initial_value: The initial value to compare against.
+        get_value_fn: Function to extract value from response. Default: response.json().
+        timeout: Maximum time to wait in seconds.
+        interval: Time between polling attempts in seconds.
+        **kwargs: Additional arguments passed to GET request.
+
+    Returns:
+        httpx.Response: The HTTP response with changed value.
+
+    Raises:
+        WaitTimeoutError: If timeout is reached without value changing.
+
+    Example:
+        >>> response = wait_for_value_change(
+        ...     client, context,
+        ...     path="/api/job/123",
+        ...     initial_value="pending",
+        ...     get_value_fn=lambda r: r.json().get("status")
+        ... )
+    """
+    if get_value_fn is None:
+
+        def _default_get_value(r: httpx.Response) -> Any:
+            return r.json()
+
+        get_value_fn = _default_get_value
+
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        try:
+            response = get(client, context, path, **kwargs)
+            current_value = get_value_fn(response)
+
+            if current_value != initial_value:
+                return response
+        except Exception:
+            pass
+
+        time.sleep(interval)
+
+    elapsed = time.time() - start_time
+    raise WaitTimeoutError(
+        f"Timeout after {elapsed:.1f}s waiting for value to change from {initial_value!r}"
+    )
+
+
+def wait_for_stable_value(
+    client: Client,
+    context: Context,
+    path: str,
+    stability_count: int = 3,
+    get_value_fn: Callable[[httpx.Response], Any] | None = None,
+    timeout: float = 30.0,
+    interval: float = 1.0,
+    **kwargs: Any,
+) -> httpx.Response:
+    """Wait for a value to stabilize (remain the same for N consecutive checks).
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        path: API endpoint path or full URL.
+        stability_count: Number of consecutive checks with same value.
+        get_value_fn: Function to extract value from response. Default: response.json().
+        timeout: Maximum time to wait in seconds.
+        interval: Time between polling attempts in seconds.
+        **kwargs: Additional arguments passed to GET request.
+
+    Returns:
+        httpx.Response: The HTTP response with stable value.
+
+    Raises:
+        WaitTimeoutError: If timeout is reached without stabilization.
+
+    Example:
+        >>> response = wait_for_stable_value(
+        ...     client, context,
+        ...     path="/api/metrics",
+        ...     stability_count=3,
+        ...     get_value_fn=lambda r: r.json().get("active_connections")
+        ... )
+    """
+    if get_value_fn is None:
+
+        def _default_get_value_stable(r: httpx.Response) -> Any:
+            return r.json()
+
+        get_value_fn = _default_get_value_stable
+
+    start_time = time.time()
+    consecutive_matches = 0
+    last_value: Any = object()
+
+    while time.time() - start_time < timeout:
+        try:
+            response = get(client, context, path, **kwargs)
+            current_value = get_value_fn(response)
+
+            if current_value == last_value:
+                consecutive_matches += 1
+                if consecutive_matches >= stability_count:
+                    return response
+            else:
+                consecutive_matches = 1
+                last_value = current_value
+
+        except Exception:
+            consecutive_matches = 0
+            last_value = object()
+
+        time.sleep(interval)
+
+    elapsed = time.time() - start_time
+    raise WaitTimeoutError(
+        f"Timeout after {elapsed:.1f}s waiting for value to stabilize "
+        f"(needed {stability_count} consecutive matches, got {consecutive_matches})"
+    )
+
+
+def wait_all(
+    client: Client,
+    context: Context,
+    conditions: list[Callable[[], bool]],
+    timeout: float = 30.0,
+    interval: float = 0.5,
+) -> None:
+    """Wait for all conditions to be true.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        conditions: List of condition functions that return True when met.
+        timeout: Maximum time to wait in seconds.
+        interval: Time between polling attempts in seconds.
+
+    Raises:
+        WaitTimeoutError: If timeout is reached without all conditions being met.
+
+    Example:
+        >>> wait_all(
+        ...     client, context,
+        ...     conditions=[
+        ...         lambda: db_exists(client, context, "users", {"email": "test@example.com"}),
+        ...         lambda: count_emails(client, context, "test@example.com") > 0,
+        ...     ],
+        ...     timeout=60
+        ... )
+    """
+    start_time = time.time()
+    failed_conditions: list[int] = []
+
+    while time.time() - start_time < timeout:
+        failed_conditions = []
+
+        for i, condition in enumerate(conditions):
+            try:
+                if not condition():
+                    failed_conditions.append(i)
+            except Exception:
+                failed_conditions.append(i)
+
+        if not failed_conditions:
+            return
+
+        time.sleep(interval)
+
+    elapsed = time.time() - start_time
+    raise WaitTimeoutError(
+        f"Timeout after {elapsed:.1f}s waiting for conditions. "
+        f"Failed conditions: {failed_conditions}"
+    )
+
+
+def wait_any(
+    client: Client,
+    context: Context,
+    conditions: list[Callable[[], bool]],
+    timeout: float = 30.0,
+    interval: float = 0.5,
+) -> int:
+    """Wait for any condition to be true.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        conditions: List of condition functions that return True when met.
+        timeout: Maximum time to wait in seconds.
+        interval: Time between polling attempts in seconds.
+
+    Returns:
+        int: Index of the first condition that succeeded.
+
+    Raises:
+        WaitTimeoutError: If timeout is reached without any condition being met.
+
+    Example:
+        >>> idx = wait_any(
+        ...     client, context,
+        ...     conditions=[
+        ...         lambda: db_exists(client, context, "orders", {"status": "completed"}),
+        ...         lambda: db_exists(client, context, "orders", {"status": "failed"}),
+        ...     ],
+        ...     timeout=60
+        ... )
+        >>> print(f"Order ended with condition {idx}")
+    """
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        for i, condition in enumerate(conditions):
+            try:
+                if condition():
+                    return i
+            except Exception:
+                pass
+
+        time.sleep(interval)
+
+    elapsed = time.time() - start_time
+    raise WaitTimeoutError(f"Timeout after {elapsed:.1f}s waiting for any condition to be met")
+
+
+def wait_for_retry_success(
+    client: Client,
+    context: Context,
+    action_fn: Callable[[], httpx.Response],
+    success_status: int | list[int] = 200,
+    max_attempts: int = 5,
+    retry_delay: float = 2.0,
+    backoff_multiplier: float = 2.0,
+) -> httpx.Response:
+    """Wait for an action to succeed with exponential backoff.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        action_fn: Function that returns an HTTP response.
+        success_status: Expected status code(s).
+        max_attempts: Maximum number of attempts.
+        retry_delay: Initial delay between retries in seconds.
+        backoff_multiplier: Multiplier for delay after each failure.
+
+    Returns:
+        httpx.Response: The successful response.
+
+    Raises:
+        WaitError: If all attempts fail.
+
+    Example:
+        >>> response = wait_for_retry_success(
+        ...     client, context,
+        ...     action_fn=lambda: post(client, context, "/api/process", json={"id": 123}),
+        ...     success_status=[200, 201],
+        ...     max_attempts=10,
+        ...     retry_delay=1.0
+        ... )
+    """
+    if isinstance(success_status, int):
+        success_statuses = {success_status}
+    else:
+        success_statuses = set(success_status)
+
+    current_delay = retry_delay
+    last_response: httpx.Response | None = None
+    last_error: Exception | None = None
+
+    for attempt in range(max_attempts):
+        try:
+            response = action_fn()
+
+            if response.status_code in success_statuses:
+                return response
+
+            last_response = response
+        except Exception as e:
+            last_error = e
+
+        if attempt < max_attempts - 1:
+            time.sleep(current_delay)
+            current_delay *= backoff_multiplier
+
+    if last_response:
+        raise WaitError(
+            f"Action failed after {max_attempts} attempts. Last status: {last_response.status_code}"
+        )
+
+    raise WaitError(f"Action failed after {max_attempts} attempts. Last error: {last_error}")

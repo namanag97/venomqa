@@ -667,3 +667,213 @@ def configure_email(
         context._email_config["mailtrap_inbox_id"] = mailtrap_inbox_id
     if mailtrap_url:
         context._email_config["mailtrap_url"] = mailtrap_url
+
+
+def extract_verification_link(
+    email: dict[str, Any],
+    keywords: list[str] | None = None,
+) -> str | None:
+    """Extract a verification/confirmation link from an email.
+
+    Args:
+        email: Email dictionary.
+        keywords: Keywords to identify verification links (default: verify, confirm, activate).
+
+    Returns:
+        str | None: Verification URL or None if not found.
+
+    Example:
+        >>> email = get_latest_email(client, context, "user@example.com")
+        >>> verify_url = extract_verification_link(email)
+        >>> if verify_url:
+        ...     response = get(client, context, verify_url)
+    """
+    keywords = keywords or ["verify", "confirm", "activate", "validate", "reset"]
+
+    links = extract_links_from_email(email)
+
+    for link in links:
+        link_lower = link.lower()
+        for keyword in keywords:
+            if keyword in link_lower:
+                return link
+
+    return links[0] if links else None
+
+
+def extract_otp_code(
+    email: dict[str, Any],
+    length: int = 6,
+) -> str | None:
+    """Extract an OTP/verification code from an email.
+
+    Args:
+        email: Email dictionary.
+        length: Expected length of the OTP code (default: 6).
+
+    Returns:
+        str | None: OTP code or None if not found.
+
+    Example:
+        >>> email = get_latest_email(client, context, "user@example.com")
+        >>> otp = extract_otp_code(email, length=6)
+        >>> print(f"Your OTP is: {otp}")
+    """
+    pattern = rf"\b\d{{{length}}}\b"
+    return extract_code_from_email(email, pattern)
+
+
+def extract_all_codes(
+    email: dict[str, Any],
+    pattern: str = r"\b\d{4,8}\b",
+) -> list[str]:
+    """Extract all codes matching a pattern from an email.
+
+    Args:
+        email: Email dictionary.
+        pattern: Regex pattern for codes (default: 4-8 digit numbers).
+
+    Returns:
+        list: List of all matching codes.
+
+    Example:
+        >>> email = get_latest_email(client, context, "user@example.com")
+        >>> codes = extract_all_codes(email)
+        >>> print(f"Found codes: {codes}")
+    """
+    import re
+
+    body = email.get("body_text", "") or email.get("body_html", "")
+
+    matches = re.findall(pattern, body)
+    return list(dict.fromkeys(matches))
+
+
+def email_to_plain_text(
+    email: dict[str, Any],
+) -> str:
+    """Convert email body to plain text, stripping HTML.
+
+    Args:
+        email: Email dictionary.
+
+    Returns:
+        str: Plain text body.
+
+    Example:
+        >>> email = get_latest_email(client, context, "user@example.com")
+        >>> text = email_to_plain_text(email)
+        >>> print(text)
+    """
+    import re
+
+    body = email.get("body_text", "")
+
+    if not body:
+        body = email.get("body_html", "")
+
+    body = re.sub(r"<br\s*/?>", "\n", body, flags=re.IGNORECASE)
+    body = re.sub(r"</p>", "\n\n", body, flags=re.IGNORECASE)
+    body = re.sub(r"<[^>]+>", "", body)
+    body = re.sub(r"&nbsp;", " ", body)
+    body = re.sub(r"&amp;", "&", body)
+    body = re.sub(r"&lt;", "<", body)
+    body = re.sub(r"&gt;", ">", body)
+    body = re.sub(r"\n\s*\n", "\n\n", body)
+
+    return body.strip()
+
+
+def email_contains(
+    email: dict[str, Any],
+    text: str,
+    case_sensitive: bool = False,
+) -> bool:
+    """Check if email body contains specific text.
+
+    Args:
+        email: Email dictionary.
+        text: Text to search for.
+        case_sensitive: Whether to perform case-sensitive search.
+
+    Returns:
+        bool: True if text is found.
+
+    Example:
+        >>> email = get_latest_email(client, context, "user@example.com")
+        >>> if email_contains(email, "Welcome"):
+        ...     print("Welcome email received")
+    """
+    body = email_to_plain_text(email)
+
+    if not case_sensitive:
+        return text.lower() in body.lower()
+
+    return text in body
+
+
+def get_email_recipients(
+    email: dict[str, Any],
+) -> list[str]:
+    """Get all recipient email addresses from an email.
+
+    Args:
+        email: Email dictionary.
+
+    Returns:
+        list: List of recipient email addresses (To, Cc, Bcc).
+
+    Example:
+        >>> email = get_latest_email(client, context)
+        >>> recipients = get_email_recipients(email)
+        >>> print(f"Sent to: {recipients}")
+    """
+    recipients = list(email.get("to", []))
+
+    raw = email.get("raw", {})
+    if isinstance(raw, dict):
+        cc = raw.get("Content", {}).get("Headers", {}).get("Cc", [])
+        if isinstance(cc, list):
+            recipients.extend(_extract_addresses(cc))
+        elif isinstance(cc, str):
+            recipients.append(_extract_address(cc))
+
+    return list(dict.fromkeys(recipients))
+
+
+def count_emails(
+    client: Client,
+    context: Context,
+    to_address: str | None = None,
+    from_address: str | None = None,
+    subject_contains: str | None = None,
+    email_service: str = "mailhog",
+) -> int:
+    """Count emails matching filters.
+
+    Args:
+        client: VenomQA client instance.
+        context: Test context containing configuration and state.
+        to_address: Filter by recipient email address.
+        from_address: Filter by sender email address.
+        subject_contains: Filter by subject containing string.
+        email_service: Email service to use.
+
+    Returns:
+        int: Number of matching emails.
+
+    Example:
+        >>> count = count_emails(client, context, to_address="user@example.com")
+        >>> print(f"User has {count} emails")
+    """
+    emails = list_emails(
+        client=client,
+        context=context,
+        to_address=to_address,
+        from_address=from_address,
+        subject_contains=subject_contains,
+        limit=10000,
+        email_service=email_service,
+    )
+
+    return len(emails)
