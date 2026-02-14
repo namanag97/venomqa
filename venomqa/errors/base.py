@@ -179,10 +179,36 @@ class ErrorContext:
 
 
 class VenomQAError(Exception):
-    """Base exception for all VenomQA errors."""
+    """Base exception for all VenomQA errors.
+
+    All VenomQA errors include:
+    - A unique error code for programmatic handling
+    - Rich context for debugging
+    - Actionable suggestions for fixing the issue
+    - Documentation links for learning more
+
+    Attributes:
+        error_code: Unique ErrorCode for this error type
+        message: Human-readable error description
+        context: ErrorContext with execution details
+        suggestions: List of actionable steps to resolve the issue
+        docs_url: Link to relevant documentation
+        recoverable: Whether the error can be retried
+        cause: The underlying exception (if any)
+
+    Example:
+        try:
+            runner.run(journey)
+        except VenomQAError as e:
+            print(f"Error [{e.error_code.value}]: {e.message}")
+            for suggestion in e.suggestions:
+                print(f"  - {suggestion}")
+    """
 
     error_code: ErrorCode = ErrorCode.UNKNOWN
     default_message: str = "An unexpected error occurred"
+    default_suggestions: list[str] = []
+    docs_path: str = "errors/overview"
 
     def __init__(
         self,
@@ -191,6 +217,7 @@ class VenomQAError(Exception):
         context: ErrorContext | None = None,
         cause: Exception | None = None,
         recoverable: bool = True,
+        suggestions: list[str] | None = None,
         **extra_context: Any,
     ) -> None:
         self.message = message or self.default_message
@@ -198,28 +225,80 @@ class VenomQAError(Exception):
         self.context = context or ErrorContext()
         self.cause = cause
         self.recoverable = recoverable
+        self._suggestions = suggestions
 
         if extra_context:
             self.context.extra.update(extra_context)
 
         super().__init__(self.message)
 
+    @property
+    def suggestions(self) -> list[str]:
+        """Get actionable suggestions for resolving this error."""
+        if self._suggestions is not None:
+            return self._suggestions
+        return self.default_suggestions.copy()
+
+    @property
+    def docs_url(self) -> str:
+        """Get the documentation URL for this error type."""
+        return f"{DOCS_BASE_URL}/{self.docs_path}"
+
     def __str__(self) -> str:
+        """Format error as a readable string with context."""
         parts = [f"[{self.error_code.value}] {self.message}"]
-        if self.context.journey_name:
-            parts.append(f"journey={self.context.journey_name}")
-        if self.context.path_name:
-            parts.append(f"path={self.context.path_name}")
-        if self.context.step_name:
-            parts.append(f"step={self.context.step_name}")
+
+        # Add location context
+        location = self.context.format_location()
+        if location != "unknown location":
+            parts.append(f"at {location}")
+
         return " | ".join(parts)
 
+    def format_verbose(self) -> str:
+        """Format error with full details including suggestions."""
+        lines = [
+            f"Error [{self.error_code.value}]: {self.message}",
+            "",
+        ]
+
+        # Location
+        location = self.context.format_location()
+        if location != "unknown location":
+            lines.append(f"Location: {location}")
+
+        # Request/Response details
+        if self.context.request:
+            method = self.context.request.get("method", "?")
+            url = self.context.request.get("url", "?")
+            lines.append(f"Request: {method} {url}")
+
+        if self.context.response:
+            status = self.context.response.get("status", "?")
+            lines.append(f"Response: HTTP {status}")
+
+        # Suggestions
+        if self.suggestions:
+            lines.append("")
+            lines.append("Suggestions:")
+            for suggestion in self.suggestions:
+                lines.append(f"  - {suggestion}")
+
+        # Documentation
+        lines.append("")
+        lines.append(f"Learn more: {self.docs_url}")
+
+        return "\n".join(lines)
+
     def to_dict(self) -> dict[str, Any]:
+        """Convert error to dictionary for serialization."""
         return {
             "error_code": self.error_code.value,
             "error_type": self.__class__.__name__,
             "message": self.message,
             "recoverable": self.recoverable,
+            "suggestions": self.suggestions,
+            "docs_url": self.docs_url,
             "context": self.context.to_dict(),
             "cause": str(self.cause) if self.cause else None,
         }
