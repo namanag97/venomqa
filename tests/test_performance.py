@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from venomqa.client import Client, AsyncClient, RequestRecord
+from venomqa.http import Client, AsyncClient, RequestRecord
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import Journey, Step
 from venomqa.errors import RetryExhaustedError
