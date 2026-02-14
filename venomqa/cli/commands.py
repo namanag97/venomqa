@@ -489,6 +489,99 @@ def preflight(ctx: click.Context, output_json: bool) -> None:
         sys.exit(0 if result.success else 1)
 
 
+@cli.command("smoke-test")
+@click.argument("base_url")
+@click.option("--token", "-t", default=None, help="Bearer token for authenticated checks")
+@click.option("--health-path", default="/health", help="Health endpoint path")
+@click.option("--auth-path", default="/api/v1/workspaces", help="Auth-protected endpoint path")
+@click.option("--create-path", default=None, help="POST endpoint to test resource creation")
+@click.option("--create-payload", default=None, help="JSON payload for create check")
+@click.option("--list-path", default=None, help="GET endpoint to test list/pagination")
+@click.option("--timeout", default=10.0, type=float, help="HTTP timeout in seconds")
+@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
+@click.option(
+    "--auto-openapi",
+    default=None,
+    help="Auto-discover checks from OpenAPI spec URL",
+)
+def smoke_test(
+    base_url: str,
+    token: str | None,
+    health_path: str,
+    auth_path: str,
+    create_path: str | None,
+    create_payload: str | None,
+    list_path: str | None,
+    timeout: float,
+    output_json: bool,
+    auto_openapi: str | None,
+) -> None:
+    """Run a quick smoke test against an API before full test suites.
+
+    Validates that the API is minimally functional by checking health,
+    authentication, and optionally resource creation and listing.
+
+    \b
+    Examples:
+        venomqa smoke-test http://localhost:8000
+        venomqa smoke-test http://localhost:8000 --token $TOKEN
+        venomqa smoke-test http://localhost:8000 --token $TOKEN \\
+            --create-path /api/v1/items --create-payload '{"name": "test"}'
+        venomqa smoke-test http://localhost:8000 --auto-openapi /openapi.json
+
+    Exit codes:
+        0 - All checks passed, API is ready
+        1 - One or more checks failed
+    """
+    import json as json_module
+
+    # Parse create payload from JSON string
+    parsed_payload: dict[str, Any] | None = None
+    if create_payload:
+        try:
+            parsed_payload = json_module.loads(create_payload)
+        except json_module.JSONDecodeError as e:
+            click.echo(f"Error: Invalid JSON in --create-payload: {e}", err=True)
+            sys.exit(EXIT_CONFIG_ERROR)
+
+    # Auto-discover mode
+    if auto_openapi:
+        from venomqa.preflight import AutoPreflight
+
+        spec_url = auto_openapi
+        if not spec_url.startswith("http"):
+            spec_url = f"{base_url.rstrip('/')}{spec_url}"
+
+        try:
+            auto = AutoPreflight.from_openapi(
+                spec_url=spec_url,
+                token=token,
+                timeout=timeout,
+            )
+            report = auto.run()
+        except Exception as e:
+            click.echo(f"Error fetching OpenAPI spec: {e}", err=True)
+            sys.exit(EXIT_FAILURE)
+    else:
+        from venomqa.preflight import SmokeTest
+
+        smoke = SmokeTest(base_url=base_url, token=token, timeout=timeout)
+        report = smoke.run_all(
+            health_path=health_path,
+            auth_path=auth_path,
+            create_path=create_path,
+            create_payload=parsed_payload,
+            list_path=list_path,
+        )
+
+    if output_json:
+        click.echo(json_module.dumps(report.to_dict(), indent=2))
+    else:
+        report.print_report()
+
+    sys.exit(EXIT_SUCCESS if report.passed else EXIT_FAILURE)
+
+
 @cli.command()
 @click.argument("journey_names", nargs=-1)
 @click.option("--no-infra", is_flag=True, help="Skip infrastructure setup/teardown")
