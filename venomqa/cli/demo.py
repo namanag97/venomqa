@@ -285,9 +285,29 @@ def demo(port: int, server_only: bool, keep_running: bool, verbose: bool, explai
             server.shutdown()
         return
 
+    # Explain mode header
+    if explain:
+        console.print(Panel(
+            "[bold]What is VenomQA?[/bold]\n\n"
+            "VenomQA is a stateful API testing framework that:\n"
+            "  [green]●[/green] Tests complete user journeys, not isolated endpoints\n"
+            "  [green]●[/green] Passes context between steps (like auth tokens)\n"
+            "  [green]●[/green] Supports branching to test multiple paths\n"
+            "  [green]●[/green] Captures and reports issues with full context\n\n"
+            "[dim]Let's watch a simple CRUD journey in action...[/dim]",
+            title="Learning Mode",
+            border_style="blue",
+        ))
+        console.print()
+
     # Run demo journey
     console.print("[cyan]Running demo journey...[/cyan]")
     console.print()
+
+    if explain:
+        console.print("[dim]Journey: demo_journey - Tests basic CRUD operations[/dim]")
+        console.print("[dim]Each step will execute in sequence, passing data forward[/dim]")
+        console.print()
 
     base_url = f"http://127.0.0.1:{port}"
     results = run_demo_journey(base_url)
