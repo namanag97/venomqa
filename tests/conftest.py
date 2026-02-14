@@ -64,7 +64,7 @@ def pytest_collection_modifyitems(config, items):
             if "integration" in item.keywords:
                 item.add_marker(skip_integration)
 
-from venomqa.client import Client, RequestRecord
+from venomqa.http import Client, RequestRecord
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (
     Branch,
