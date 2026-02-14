@@ -1212,6 +1212,252 @@ def assert_json_value_equals(
     assert_json_path(response, path, expected_value=expected, message=message)
 
 
+def assert_status(
+    response: Any,
+    expected: int | list[int],
+    message: str | None = None,
+) -> None:
+    """Assert HTTP status code, supporting any response-like object.
+
+    Works with httpx.Response, requests.Response, or any object with
+    a status_code attribute. This is the protocol-agnostic version of
+    assert_status_code, designed to work with the combinatorial executor
+    and live API testing where the response type may not be httpx.Response.
+
+    Args:
+        response: Any response-like object with a status_code attribute.
+        expected: Expected status code or list of acceptable codes.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If status code doesn't match.
+
+    Example:
+        >>> response = client.get("/api/users")
+        >>> assert_status(response, 200)
+        >>> assert_status(response, [200, 201])
+    """
+    status_code = getattr(response, "status_code", None)
+    if status_code is None:
+        raise AssertionError(
+            f"Response object does not have a status_code attribute: {type(response)}"
+        )
+
+    if isinstance(expected, int):
+        expected_codes = {expected}
+    else:
+        expected_codes = set(expected)
+
+    if status_code not in expected_codes:
+        expected_str = ", ".join(map(str, sorted(expected_codes)))
+        body_preview = ""
+        if hasattr(response, "text"):
+            body_preview = f" Response: {response.text[:500]}"
+        elif hasattr(response, "_json"):
+            body_preview = f" Response: {response._json}"
+        msg = message or (
+            f"Expected status code {expected_str}, got {status_code}.{body_preview}"
+        )
+        raise AssertionError(msg)
+
+
+def assert_json_path_generic(
+    response: Any,
+    path: str,
+    expected: Any = None,
+    message: str | None = None,
+) -> Any:
+    """Assert value at JSON path on any response-like object.
+
+    Supports JSONPath-style paths (e.g., '$.data[0].id') as well as
+    simple dot-separated paths (e.g., 'data.0.id'). Works with any
+    response that has a .json() method or a ._json attribute.
+
+    Args:
+        response: Any response-like object with .json() or ._json.
+        path: Path to check. Supports '$.data[0].id' or 'data.0.id'.
+        expected: Expected value at path. If None, just checks path exists.
+        message: Custom error message.
+
+    Returns:
+        The value at the specified path.
+
+    Raises:
+        AssertionError: If path doesn't exist or value doesn't match.
+
+    Example:
+        >>> response = client.get("/api/users/1")
+        >>> assert_json_path_generic(response, "$.data.name", "Alice")
+        >>> assert_json_path_generic(response, "data.0.id", 42)
+    """
+    # Extract JSON data
+    data = None
+    if hasattr(response, "json") and callable(response.json):
+        try:
+            data = response.json()
+        except Exception:
+            pass
+    if data is None and hasattr(response, "_json"):
+        data = response._json
+    if data is None:
+        raise AssertionError("Response does not contain valid JSON data")
+
+    # Normalize JSONPath: strip leading '$.' or '$'
+    normalized = path
+    if normalized.startswith("$."):
+        normalized = normalized[2:]
+    elif normalized.startswith("$"):
+        normalized = normalized[1:]
+
+    # Expand array indices: "data[0].id" -> "data.0.id"
+    normalized = re.sub(r"\[(\d+)\]", r".\1", normalized)
+
+    parts = normalized.split(".")
+    current = data
+    traversed: list[str] = []
+
+    for part in parts:
+        if not part:
+            continue
+        traversed.append(part)
+        current_path = ".".join(traversed)
+
+        if isinstance(current, dict):
+            if part not in current:
+                msg = message or f"Path '$.{current_path}' not found in response"
+                raise AssertionError(msg)
+            current = current[part]
+        elif isinstance(current, list):
+            try:
+                idx = int(part)
+                current = current[idx]
+            except (ValueError, IndexError) as e:
+                msg = message or f"Invalid array index '{part}' at path '$.{current_path}'"
+                raise AssertionError(msg) from e
+        else:
+            msg = message or (
+                f"Cannot traverse '{part}' on {type(current).__name__} "
+                f"at path '$.{current_path}'"
+            )
+            raise AssertionError(msg)
+
+    if expected is not None and current != expected:
+        msg = message or (
+            f"Expected {expected!r} at path '{path}', got {current!r}"
+        )
+        raise AssertionError(msg)
+
+    return current
+
+
+def assert_header_generic(
+    response: Any,
+    name: str,
+    expected: str,
+    message: str | None = None,
+) -> None:
+    """Assert response header value on any response-like object.
+
+    Works with httpx.Response, requests.Response, or any object with
+    a headers attribute (dict-like or object).
+
+    Args:
+        response: Any response-like object with a headers attribute.
+        name: Header name (case-insensitive for most HTTP libraries).
+        expected: Expected header value.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If header doesn't exist or value doesn't match.
+
+    Example:
+        >>> response = client.get("/api/users")
+        >>> assert_header_generic(response, "Content-Type", "application/json")
+    """
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        raise AssertionError(
+            f"Response object does not have a headers attribute: {type(response)}"
+        )
+
+    actual = None
+    if isinstance(headers, dict):
+        # Case-insensitive lookup for plain dicts
+        for k, v in headers.items():
+            if k.lower() == name.lower():
+                actual = v
+                break
+    else:
+        # httpx.Headers and similar have .get() with case-insensitive lookup
+        actual = headers.get(name)
+
+    if actual is None:
+        msg = message or f"Header '{name}' not found in response"
+        raise AssertionError(msg)
+
+    if actual != expected:
+        msg = message or (
+            f"Header '{name}' expected '{expected}', got '{actual}'"
+        )
+        raise AssertionError(msg)
+
+
+def assert_schema(
+    response: Any,
+    schema: dict[str, Any],
+    message: str | None = None,
+) -> None:
+    """Assert response matches JSON schema, supporting any response-like object.
+
+    Protocol-agnostic version of assert_json_schema. Works with any response
+    that has a .json() method or ._json attribute.
+
+    Args:
+        response: Any response-like object with .json() or ._json.
+        schema: JSON Schema to validate against.
+        message: Custom error message.
+
+    Raises:
+        AssertionError: If schema validation fails.
+
+    Example:
+        >>> schema = {
+        ...     "type": "object",
+        ...     "required": ["id", "name"],
+        ...     "properties": {
+        ...         "id": {"type": "integer"},
+        ...         "name": {"type": "string"},
+        ...     },
+        ... }
+        >>> response = client.get("/api/users/1")
+        >>> assert_schema(response, schema)
+    """
+    try:
+        import jsonschema
+    except ImportError:
+        raise AssertionError(
+            "jsonschema library not installed. Install with: pip install jsonschema"
+        ) from None
+
+    # Extract JSON data
+    data = None
+    if hasattr(response, "json") and callable(response.json):
+        try:
+            data = response.json()
+        except Exception:
+            pass
+    if data is None and hasattr(response, "_json"):
+        data = response._json
+    if data is None:
+        raise AssertionError("Response does not contain valid JSON data")
+
+    try:
+        jsonschema.validate(instance=data, schema=schema)
+    except jsonschema.ValidationError as e:
+        msg = message or f"JSON schema validation failed: {e.message}"
+        raise AssertionError(msg) from e
+
+
 def assert_all(
     response: httpx.Response,
     *assertions: Callable[[httpx.Response], None],
