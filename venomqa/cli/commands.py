@@ -447,6 +447,11 @@ from venomqa.cli.docker import docker
 
 cli.add_command(docker)
 
+# Register demo command
+from venomqa.cli.demo import demo
+
+cli.add_command(demo)
+
 
 @cli.command()
 @click.option(
