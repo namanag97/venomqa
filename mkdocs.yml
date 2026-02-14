@@ -1,10 +1,10 @@
 # Site metadata
 site_name: VenomQA
-site_url: https://namanagarwal.github.io/venomqa
+site_url: https://namanag97.github.io/venomqa
 site_description: State-Based API Testing Framework - Test your entire app, not just endpoints
 site_author: Naman Agarwal
-repo_name: namanagarwal/venomqa
-repo_url: https://github.com/namanagarwal/venomqa
+repo_name: namanag97/venomqa
+repo_url: https://github.com/namanag97/venomqa
 edit_uri: edit/main/docs/
 
 # Copyright
