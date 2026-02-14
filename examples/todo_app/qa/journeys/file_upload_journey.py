@@ -1,14 +1,8 @@
 """File upload journey - test file attachment operations."""
 
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-
 from venomqa import Journey, Step, Checkpoint
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "actions"))
-from todo_actions import (
+from ..actions import (
     create_todo,
     upload_attachment,
     download_attachment,
@@ -47,9 +41,9 @@ file_upload_journey = Journey(
             description="Upload an image file",
         ),
         Step(
-            name="delete_first_attachment",
+            name="delete_second_attachment",
             action=delete_attachment,
-            description="Delete the first attachment",
+            description="Delete the second attachment (image)",
         ),
         Step(
             name="cleanup_todo",
