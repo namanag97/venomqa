@@ -29,7 +29,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, TypeVar
 
-from venomqa.clients.graphql import GraphQLResponse
+from venomqa.http.graphql import GraphQLResponse
 
 logger = logging.getLogger(__name__)
 
