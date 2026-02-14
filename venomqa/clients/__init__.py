@@ -1,9 +1,9 @@
 """VenomQA Protocol Clients Module.
 
-.. deprecated::
-    This module is deprecated. Import from `venomqa.http` instead::
+.. deprecated:: 0.2.0
+    This module path is deprecated. Import from `venomqa.http` instead::
 
-        # Old (still works for backward compatibility):
+        # Old (deprecated):
         from venomqa.clients import GraphQLClient, gRPCClient
 
         # New (preferred):
@@ -28,6 +28,17 @@ Example:
     >>> grpc.connect()
     >>> response = grpc.call("MyService", "MyMethod", request)
 """
+
+import warnings
+
+# Issue deprecation warning when this module is imported
+warnings.warn(
+    "Importing from 'venomqa.clients' is deprecated. "
+    "Use 'from venomqa.http import GraphQLClient, GrpcClient' instead. "
+    "This import path will be removed in version 1.0.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 # Re-export from new location for backward compatibility
 from venomqa.http.base import (
