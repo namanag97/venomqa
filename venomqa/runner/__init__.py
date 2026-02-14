@@ -711,8 +711,6 @@ class JourneyRunner:
         Returns:
             Formatted error string with request/response details.
         """
-        import json
-
         lines: list[str] = []
         lines.append("")
         lines.append(f"Step '{step_name}' failed: {error}")
