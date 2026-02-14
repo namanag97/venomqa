@@ -1,0 +1,22 @@
+# VenomQA Preflight - Generic REST API
+# A minimal smoke test config for any REST API.
+
+base_url: "${API_URL:http://localhost:8000}"
+timeout: 10.0
+
+auth:
+  token_env_var: "API_TOKEN"
+  header: "Authorization"
+  prefix: "Bearer"
+
+health_checks:
+  - path: /health
+    expected_status: [200]
+
+auth_checks:
+  - path: /api/v1/me
+    expected_status: [200]
+
+list_checks:
+  - path: /api/v1/resources
+    expected_type: array
