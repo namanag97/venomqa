@@ -1,0 +1,53 @@
+# VenomQA Preflight - DIP API
+# Smoke tests for the DIP (Data Integration Platform) API.
+# This config was originally developed during the VenomQA preflight
+# real-world testing that led to the configurable preflight system.
+
+base_url: "${DIP_API_URL:http://localhost:8000}"
+timeout: 10.0
+
+auth:
+  token_env_var: "DIP_API_TOKEN"
+  header: "Authorization"
+  prefix: "Bearer"
+
+health_checks:
+  - path: /health
+    expected_status: [200]
+    expected_json:
+      status: "healthy"
+
+auth_checks:
+  - path: /api/v1/workspaces
+    expected_status: [200]
+
+  - path: /api/v1/me
+    expected_status: [200]
+
+crud_checks:
+  - name: "Create workspace"
+    path: /api/v1/workspaces
+    payload:
+      name: "Preflight Test ${RANDOM}"
+      slug: "preflight-test-${RANDOM}"
+    expected_status: [201, 409]
+
+  - name: "Create item in workspace"
+    path: /api/v1/items
+    payload:
+      name: "Test Item ${RANDOM}"
+      value: 42
+    expected_status: [201]
+
+list_checks:
+  - path: /api/v1/workspaces
+    expected_type: array
+
+  - path: /api/v1/items
+    expected_type: array
+
+custom_checks:
+  - name: "OpenAPI spec"
+    method: GET
+    path: /openapi.json
+    expected_status: [200]
