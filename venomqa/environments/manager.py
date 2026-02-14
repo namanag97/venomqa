@@ -154,7 +154,7 @@ class EnvFileSecretProvider(SecretProvider):
             return
 
         if not self.env_file.exists():
-            logger.warning(f"Environment file not found: {self.env_file}")
+            logger.debug(f"Environment file not found: {self.env_file}")
             self._loaded = True
             return
 
