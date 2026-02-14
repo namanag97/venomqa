@@ -14,15 +14,9 @@ This showcases VenomQA's key features:
 - Branching paths for comprehensive testing
 """
 
-import sys
-from pathlib import Path
-
-# Add the qa directory to the path for action imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from venomqa import Journey, Step, Checkpoint, Branch, Path as JourneyPath
 
-from actions.hello_actions import (
+from ..actions import (
     check_health,
     create_item,
     delete_item,
