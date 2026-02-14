@@ -592,8 +592,10 @@ class DatabaseCheck(BaseCheck):
         create_path: str | None = None,
         create_payload: dict[str, Any] | None = None,
         read_path: str | None = None,
+        auth_header: str = "Authorization",
+        auth_prefix: str = "Bearer",
     ) -> None:
-        super().__init__(base_url, token, timeout)
+        super().__init__(base_url, token, timeout, auth_header, auth_prefix)
         self.create_path = create_path
         self.create_payload = create_payload or {}
         self.read_path = read_path
