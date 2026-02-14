@@ -1,4 +1,25 @@
-"""Custom exception hierarchy for VenomQA."""
+"""Custom exception hierarchy for VenomQA.
+
+VenomQA provides a comprehensive error hierarchy with:
+- Structured error codes for programmatic handling
+- Rich context for debugging
+- Actionable suggestions for recovery
+- Documentation links for learning more
+
+All VenomQA errors inherit from VenomQAError and include:
+- error_code: A unique ErrorCode enum for categorization
+- context: ErrorContext with journey/step/request details
+- suggestions: List of actionable steps to resolve the issue
+- docs_url: Link to relevant documentation
+
+Example:
+    try:
+        runner.run(journey)
+    except ConnectionError as e:
+        print(f"Error: {e}")
+        print(f"Suggestions: {e.suggestions}")
+        print(f"Learn more: {e.docs_url}")
+"""
 
 from __future__ import annotations
 
@@ -8,43 +29,92 @@ from enum import Enum
 from typing import Any
 
 
-class ErrorCode(Enum):
-    """Standardized error codes for VenomQA."""
+# Base documentation URL
+DOCS_BASE_URL = "https://venomqa.dev/docs"
 
+
+class ErrorCode(Enum):
+    """Standardized error codes for VenomQA.
+
+    Error codes are organized by category:
+    - E0xx: Connection errors
+    - E1xx: Request errors
+    - E2xx: Validation errors
+    - E3xx: State management errors
+    - E4xx: Journey execution errors
+    - E5xx: Resilience errors (circuit breaker, retry, rate limit)
+    - E6xx: Plugin/reporter errors
+    - E9xx: Unknown/internal errors
+
+    Use these codes for:
+    - Programmatic error handling in CI/CD
+    - Log aggregation and alerting
+    - Error categorization in reports
+    """
+
+    # Connection errors (E0xx)
     CONNECTION_FAILED = "E001"
     CONNECTION_TIMEOUT = "E002"
     CONNECTION_REFUSED = "E003"
     CONNECTION_RESET = "E004"
 
+    # Request errors (E1xx)
     REQUEST_TIMEOUT = "E101"
     REQUEST_FAILED = "E102"
     REQUEST_ABORTED = "E103"
 
+    # Validation errors (E2xx)
     VALIDATION_FAILED = "E201"
     INVALID_CONFIG = "E202"
     INVALID_JOURNEY = "E203"
     INVALID_STEP = "E204"
     SCHEMA_MISMATCH = "E205"
 
+    # State management errors (E3xx)
     STATE_NOT_CONNECTED = "E301"
     STATE_CHECKPOINT_FAILED = "E302"
     STATE_ROLLBACK_FAILED = "E303"
     STATE_RESET_FAILED = "E304"
 
+    # Journey execution errors (E4xx)
     JOURNEY_FAILED = "E401"
     JOURNEY_TIMEOUT = "E402"
     JOURNEY_ABORTED = "E403"
     BRANCH_FAILED = "E404"
     PATH_FAILED = "E405"
 
+    # Resilience errors (E5xx)
     CIRCUIT_OPEN = "E501"
     RETRY_EXHAUSTED = "E502"
     RATE_LIMITED = "E503"
 
+    # Plugin/reporter errors (E6xx)
     PLUGIN_ERROR = "E601"
     REPORTER_ERROR = "E602"
 
+    # Unknown/internal errors (E9xx)
     UNKNOWN = "E999"
+
+    @property
+    def category(self) -> str:
+        """Get the error category name."""
+        code_num = int(self.value[1:])
+        if code_num < 100:
+            return "connection"
+        elif code_num < 200:
+            return "request"
+        elif code_num < 300:
+            return "validation"
+        elif code_num < 400:
+            return "state"
+        elif code_num < 500:
+            return "journey"
+        elif code_num < 600:
+            return "resilience"
+        elif code_num < 700:
+            return "plugin"
+        else:
+            return "unknown"
 
 
 @dataclass
