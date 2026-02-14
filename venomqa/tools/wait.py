@@ -42,7 +42,7 @@ from venomqa.errors.retry import WaitTimeoutError
 from venomqa.tools.http import get
 
 if TYPE_CHECKING:
-    from venomqa.client import Client
+    from venomqa.http import Client
     from venomqa.state.context import Context
 
 T = TypeVar("T")
