@@ -191,7 +191,7 @@ class TestClient:
             mock_httpx.request.side_effect = [error_response, error_response, success_response]
             client._client = mock_httpx
 
-            with patch("venomqa.client.time.sleep"):
+            with patch("venomqa.http.rest.time.sleep"):
                 response = client.get("/flaky-endpoint")
 
         assert response.status_code == 200
@@ -210,7 +210,7 @@ class TestClient:
             mock_httpx.request.return_value = error_response
             client._client = mock_httpx
 
-            with patch("venomqa.client.time.sleep"):
+            with patch("venomqa.http.rest.time.sleep"):
                 response = client.get("/always-down")
 
         assert response.status_code == 503
@@ -232,7 +232,7 @@ class TestClient:
             ]
             client._client = mock_httpx
 
-            with patch("venomqa.client.time.sleep"):
+            with patch("venomqa.http.rest.time.sleep"):
                 response = client.get("/slow-endpoint")
 
         assert response.status_code == 200
@@ -244,7 +244,7 @@ class TestClient:
             mock_httpx.request.side_effect = httpx.TimeoutException("timeout")
             client._client = mock_httpx
 
-            with patch("venomqa.client.time.sleep"):
+            with patch("venomqa.http.rest.time.sleep"):
                 with pytest.raises(httpx.TimeoutException):
                     client.get("/always-timeout")
 
