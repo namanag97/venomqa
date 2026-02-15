@@ -296,12 +296,12 @@ Added `journey.validate_or_raise()` for strict validation.
 
 ### Sprint 2 (Next Week)
 - [ ] TD-004: Request/response on failure
-- [ ] TD-003: Import path fix
-- [ ] TD-006: StateManager warning
+- [x] TD-003: Import path fix - FIXED
+- [x] TD-006: StateManager warning - FIXED (warns on checkpoint/branch without StateManager)
 
 ### Sprint 3
 - [ ] TD-008: Fix doc links
-- [ ] TD-005: Journey validation
+- [x] TD-005: Journey validation - FIXED (comprehensive validation with tests)
 - [ ] TD-016: .env warning
 
 ### Backlog
