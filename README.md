@@ -49,45 +49,42 @@ User uploads file → Does it appear in listing?
                   → Did quota decrease?
 ```
 
-VenomQA tests these **cross-feature effects** automatically
+VenomQA tests these **cross-feature effects** automatically.
 
 ---
 
-## Quick Start
+## Core Concepts
 
-```bash
-pip install venomqa
-```
+### 1. State Graphs
+Model your app as states and transitions. VenomQA explores **all paths**:
 
 ```python
-from venomqa import Client, StateGraph
-
-# Define your app as a state graph
 graph = StateGraph(name="my_app")
-
-# Add states (nodes)
 graph.add_node("empty", initial=True)
 graph.add_node("has_data")
+graph.add_edge("empty", "has_data", action=create_item)
+graph.add_edge("has_data", "empty", action=delete_item)
 
-# Add transitions (edges)
-graph.add_edge("empty", "has_data", action=create_item, name="create")
-graph.add_edge("has_data", "empty", action=delete_item, name="delete")
+result = graph.explore(client)  # Tests all possible paths
+```
 
-# Add invariants (rules that must ALWAYS be true)
-graph.add_invariant(
-    "count_matches",
-    check=lambda client, db, ctx: api_count == db_count,
-    description="API count must match database"
-)
+### 2. Invariants
+Rules that must **always** be true:
 
-# Explore ALL paths and verify invariants
-client = Client(base_url="http://localhost:8000")
-result = graph.explore(client)
+```python
+graph.add_invariant("counts_match",
+    check=lambda c, db, ctx: ctx["api_count"] == ctx["db_count"],
+    description="API must match database")
+```
 
-print(result.summary())
-# Paths explored: 18
-# Invariant violations: 0
-# ALL PATHS PASSED
+### 3. Journeys
+Chain steps with automatic context:
+
+```python
+journey = Journey(name="crud", steps=[
+    Step(name="create", action=create_item),
+    Step(name="verify", action=get_item),
+])
 ```
 
 ---
