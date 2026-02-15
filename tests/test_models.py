@@ -444,3 +444,234 @@ class TestSeverity:
 
     def test_severity_comparison(self) -> None:
         assert Severity.CRITICAL.value != Severity.LOW.value
+
+
+class TestJourneyValidation:
+    """Tests for Journey.validate() method (TD-005)."""
+
+    def test_validate_empty_journey(self) -> None:
+        """Validate catches empty journey with no steps."""
+        journey = Journey(name="empty_journey", steps=[])
+        issues = journey.validate()
+
+        assert len(issues) == 1
+        assert "no steps" in issues[0].lower()
+
+    def test_validate_returns_empty_for_valid_journey(self, sample_step: Step) -> None:
+        """Validate returns empty list for valid journey."""
+        journey = Journey(name="valid", steps=[sample_step])
+        issues = journey.validate()
+
+        assert issues == []
+
+    def test_validate_duplicate_step_names_in_main_path(self) -> None:
+        """Validate catches duplicate step names in main path."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        journey = Journey(
+            name="duplicate_steps",
+            steps=[
+                Step(name="get_user", action=action),
+                Step(name="get_user", action=action),  # Duplicate
+            ],
+        )
+        issues = journey.validate()
+
+        assert len(issues) == 1
+        assert "duplicate" in issues[0].lower()
+        assert "get_user" in issues[0]
+
+    def test_validate_duplicate_step_names_across_branches(self) -> None:
+        """Validate catches duplicate step names across branches and main path."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        checkpoint = Checkpoint(name="cp1")
+        branch = Branch(
+            checkpoint_name="cp1",
+            paths=[
+                Path(
+                    name="path1",
+                    steps=[Step(name="shared_name", action=action)],
+                ),
+                Path(
+                    name="path2",
+                    steps=[Step(name="shared_name", action=action)],  # Duplicate
+                ),
+            ],
+        )
+
+        journey = Journey(
+            name="dup_across_branches",
+            steps=[
+                Step(name="setup", action=action),
+                checkpoint,
+                branch,
+            ],
+        )
+        issues = journey.validate()
+
+        assert len(issues) == 1
+        assert "duplicate" in issues[0].lower()
+        assert "shared_name" in issues[0]
+
+    def test_validate_branch_without_paths(self) -> None:
+        """Validate catches branches with no paths defined."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        checkpoint = Checkpoint(name="cp1")
+        branch = Branch(checkpoint_name="cp1", paths=[])
+
+        journey = Journey(
+            name="empty_branch",
+            steps=[
+                Step(name="setup", action=action),
+                checkpoint,
+                branch,
+            ],
+        )
+        issues = journey.validate()
+
+        assert len(issues) == 1
+        assert "no paths" in issues[0].lower()
+        assert "cp1" in issues[0]
+
+    def test_validate_path_without_steps(self) -> None:
+        """Validate catches paths with no steps defined."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        checkpoint = Checkpoint(name="cp1")
+        branch = Branch(
+            checkpoint_name="cp1",
+            paths=[
+                Path(name="empty_path", steps=[]),
+            ],
+        )
+
+        journey = Journey(
+            name="empty_path_journey",
+            steps=[
+                Step(name="setup", action=action),
+                checkpoint,
+                branch,
+            ],
+        )
+        issues = journey.validate()
+
+        assert len(issues) == 1
+        assert "no steps" in issues[0].lower()
+        assert "empty_path" in issues[0]
+
+    def test_validate_multiple_issues(self) -> None:
+        """Validate reports all issues found, not just the first."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        checkpoint = Checkpoint(name="cp1")
+        branch = Branch(
+            checkpoint_name="cp1",
+            paths=[
+                Path(name="path1", steps=[]),  # Empty path
+                Path(
+                    name="path2",
+                    steps=[Step(name="dup", action=action)],
+                ),
+                Path(
+                    name="path3",
+                    steps=[Step(name="dup", action=action)],  # Duplicate
+                ),
+            ],
+        )
+
+        journey = Journey(
+            name="multi_issue",
+            steps=[
+                Step(name="setup", action=action),
+                checkpoint,
+                branch,
+            ],
+        )
+        issues = journey.validate()
+
+        # Should have at least 2 issues (empty path + duplicate)
+        assert len(issues) >= 2
+
+    def test_validate_or_raise_raises_on_issues(self) -> None:
+        """validate_or_raise() raises JourneyValidationError for invalid journey."""
+        journey = Journey(name="empty", steps=[])
+
+        with pytest.raises(JourneyValidationError) as exc_info:
+            journey.validate_or_raise()
+
+        assert "validation issue" in str(exc_info.value).lower()
+
+    def test_validate_or_raise_passes_for_valid(self, sample_step: Step) -> None:
+        """validate_or_raise() does not raise for valid journey."""
+        journey = Journey(name="valid", steps=[sample_step])
+
+        # Should not raise
+        journey.validate_or_raise()
+
+    def test_validate_complex_nested_structure(self) -> None:
+        """Validate handles complex nested branch structures."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        checkpoint1 = Checkpoint(name="cp1")
+        checkpoint2 = Checkpoint(name="cp2")
+
+        branch1 = Branch(
+            checkpoint_name="cp1",
+            paths=[
+                Path(
+                    name="path1",
+                    steps=[
+                        Step(name="step_in_path1", action=action),
+                        checkpoint2,
+                    ],
+                ),
+                Path(
+                    name="path2",
+                    steps=[Step(name="step_in_path2", action=action)],
+                ),
+            ],
+        )
+
+        journey = Journey(
+            name="complex_nested",
+            steps=[
+                Step(name="setup", action=action),
+                checkpoint1,
+                branch1,
+            ],
+        )
+        issues = journey.validate()
+
+        assert issues == []
+
+    def test_validate_callable_action(self) -> None:
+        """Validate accepts callable actions."""
+        def valid_action(client, ctx):
+            return client.get("/test")
+
+        journey = Journey(
+            name="callable_action",
+            steps=[Step(name="test", action=valid_action)],
+        )
+        issues = journey.validate()
+
+        assert issues == []
+
+    def test_validate_string_action_reference(self) -> None:
+        """Validate accepts string action references."""
+        journey = Journey(
+            name="string_action",
+            steps=[Step(name="test", action="my_plugin.my_action")],
+        )
+        issues = journey.validate()
+
+        # String references are valid (resolved at runtime)
+        assert issues == []
