@@ -92,14 +92,23 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 ---
 
-### TD-005: No Validation of Journey Structure
+### TD-005: No Validation of Journey Structure [FIXED]
 **Location:** `venomqa/core/models.py`
 
-**Problem:** Invalid journey structures fail at runtime with confusing errors.
+**Problem:** (RESOLVED)
+Previously, invalid journey structures failed at runtime with confusing errors.
 
-**Fix:** Add `journey.validate()` method, call on load.
+**Solution:** The `Journey.validate()` method now performs comprehensive validation:
+- Checks journey has steps defined
+- Validates step names are unique across journey and branches
+- Ensures branches have at least one path
+- Verifies paths have at least one step
+- Confirms actions are callable or valid string references
 
-**Effort:** 3 hours
+The runner calls `journey.validate()` before execution and logs warnings for any issues.
+Added `journey.validate_or_raise()` for strict validation.
+
+**Status:** FIXED
 
 ---
 
