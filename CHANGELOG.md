@@ -7,9 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-15
+
 ### Added
 
-- Initial public release
+- **State Graph Testing** - Model apps as state machines, explore all paths automatically
+- **Invariant System** - Define rules that must always hold true
+- **Journey Validation** - `journey.validate()` catches structural issues before runtime
+- **Enhanced Error Messages** - Request/response details shown on failure
+- **Preflight Smoke Tests** - `venomqa smoke-test` for quick API health checks
+- **Demo Command** - `venomqa demo --explain` for instant experience
+- **Doctor Command** - `venomqa doctor` for system diagnostics
+- **Watch Mode** - Auto-rerun tests on file changes
+- **Load Testing** - Built-in load testing with `venomqa load`
+- **Security Scanning** - OWASP-style security tests
+- **GraphQL Support** - Full GraphQL client and test generation
+- **Multiple Reporters** - HTML, JSON, JUnit, Markdown, Slack, Discord, SARIF
+- **Combinatorial Testing** - Generate test combinations from parameters
+
+### Improved
+
+- StateManager warnings when checkpoint/branch used without database
+- Better import handling - no more sys.path hacks in generated code
+- Comprehensive test suite (2400+ tests)
+
+### Fixed
+
+- Journey discovery now unified across CLI and plugins
+- Checkpoint validation in branch structures
 
 ## [0.1.0] - 2024-01-15
 
