@@ -1,51 +1,55 @@
 # VenomQA
 
-**State-Based API Testing Framework** - Test your entire app, not just endpoints.
+**Test APIs like a human QA would** - State-based testing that catches what unit tests miss.
 
 [![PyPI version](https://badge.fury.io/py/venomqa.svg)](https://pypi.org/project/venomqa/)
-[![Python versions](https://img.shields.io/pypi/pyversions/venomqa.svg)](https://pypi.org/project/venomqa/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://pypi.org/project/venomqa/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
-## The Problem
+## Install & Run in 60 Seconds
 
-Every action in your app has **cascading effects**. When a user uploads a file:
-- Does it appear in the file list?
-- Does the storage usage update?
-- Does the quota remaining decrease?
-- Can search find it?
+```bash
+# Install
+pip install venomqa
 
-Traditional API testing checks endpoints in isolation. **VenomQA tests like a human QA** - verifying consistency across your entire application after every action.
+# Try the built-in demo (no setup needed)
+venomqa demo --explain
+```
+
+That's it. You'll see VenomQA testing a sample API with state graphs, journeys, and invariants.
 
 ---
 
-## First 5 Minutes Checklist
+## Add to Your Project
 
-Get up and running fast:
+```bash
+# In your project directory
+venomqa init --with-sample
 
-```
-[ ] 1. Install VenomQA
-      pip install venomqa
+# Configure (edit venomqa.yaml)
+base_url: "http://localhost:8000"
 
-[ ] 2. Start a test server (or use your own API)
-      cd examples/quickstart
-      pip install fastapi uvicorn
-      python test_server.py
-
-[ ] 3. Create venomqa.yaml
-      base_url: "http://localhost:8000"
-      timeout: 30
-
-[ ] 4. Write your first journey
-      mkdir journeys
-      # Create journeys/hello.py (see Quick Start below)
-
-[ ] 5. Run it
-      venomqa run hello_world
+# Run
+venomqa smoke-test  # Quick health check
+venomqa run         # Full test suite
 ```
 
-Need help? See [Troubleshooting](docs/getting-started/quickstart.md#troubleshooting) or [FAQ](docs/faq.md).
+---
+
+## Why VenomQA?
+
+Traditional tests check endpoints in isolation. Real bugs happen when features **interact**:
+
+```
+User uploads file → Does it appear in listing?
+                  → Did storage usage increase?
+                  → Can search find it?
+                  → Did quota decrease?
+```
+
+VenomQA tests these **cross-feature effects** automatically
 
 ---
 
