@@ -290,23 +290,33 @@ venomqa smoke-test     # Run preflight checks
 
 ---
 
-## Documentation
+## CLI Commands
 
-- [Getting Started](docs/getting-started/)
-- [State Graph Guide](docs/specs/VISION.md)
-- [Examples](examples/)
-- [API Reference](docs/reference/)
+| Command | What it does |
+|---------|-------------|
+| `venomqa demo` | Run built-in demo |
+| `venomqa init` | Create new project |
+| `venomqa run` | Execute all journeys |
+| `venomqa smoke-test` | Quick API health check |
+| `venomqa list` | Show discovered journeys |
+| `venomqa validate` | Check configuration |
+| `venomqa doctor` | System diagnostics |
 
 ---
 
-## Why "Venom"?
+## Documentation
 
-Like venom spreading through a system, VenomQA **penetrates every corner** of your application to find inconsistencies that isolated tests miss.
+| Guide | Description |
+|-------|-------------|
+| [SETUP.md](SETUP.md) | Complete setup guide |
+| [docs/getting-started/](docs/getting-started/) | Tutorials |
+| [examples/](examples/) | Working examples |
+| [docs/reference/](docs/reference/) | API reference |
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+MIT - [LICENSE](LICENSE)
 
 Built by [Naman Agarwal](https://github.com/namanagarwal)
