@@ -18,8 +18,8 @@ from venomqa.v1.world import World
 from venomqa.v1.world.rollbackable import Rollbackable
 from venomqa.v1.world.checkpoint import Checkpoint, SystemCheckpoint
 
-from venomqa.v1.agent import Agent
-from venomqa.v1.agent.strategies import Strategy, BFS, DFS, Random
+from venomqa.v1.agent import Agent, Scheduler
+from venomqa.v1.agent.strategies import Strategy, BFS, DFS, Random, CoverageGuided, Weighted
 
 from venomqa.v1.dsl import Journey, Step
 from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
