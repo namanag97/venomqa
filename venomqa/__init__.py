@@ -449,6 +449,9 @@ __author__ = "Naman Agarwal"
 __license__ = "MIT"
 
 __all__ = [
+    # v1 API
+    "v1",
+    # Legacy exports
     "Journey",
     "JourneyResult",
     "Step",
