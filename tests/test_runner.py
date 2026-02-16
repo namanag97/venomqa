@@ -379,7 +379,8 @@ class TestParallelExecution:
             ]
         )
 
-        runner = JourneyRunner(client=mock_client, parallel_paths=3)
+        state_manager = MockStateManager()
+        runner = JourneyRunner(client=mock_client, parallel_paths=3, state_manager=state_manager)
         result = runner.run(journey)
 
         assert result.success is True
