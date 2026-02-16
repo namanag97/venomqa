@@ -72,10 +72,24 @@ class Graph:
         self._states[state.id] = state
         return state
 
-    def add_transition(self, transition: Transition) -> None:
-        """Add a transition and mark as explored."""
+    def add_transition(self, transition: Transition) -> bool:
+        """Add a transition and mark as explored.
+
+        With state deduplication, the same logical transition may be attempted
+        multiple times. This method deduplicates transitions.
+
+        Returns:
+            True if transition was added, False if it was a duplicate.
+        """
+        key = (transition.from_state_id, transition.action_name, transition.to_state_id)
+        if key in self._transition_keys:
+            # Duplicate transition - already recorded
+            return False
+
+        self._transition_keys.add(key)
         self._transitions.append(transition)
         self._explored.add((transition.from_state_id, transition.action_name))
+        return True
 
     def add_action(self, action: Action) -> None:
         """Register an action."""
