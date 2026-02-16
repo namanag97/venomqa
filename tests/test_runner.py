@@ -414,7 +414,8 @@ class TestParallelExecution:
             ]
         )
 
-        runner = JourneyRunner(client=mock_client, parallel_paths=1)
+        state_manager = MockStateManager()
+        runner = JourneyRunner(client=mock_client, parallel_paths=1, state_manager=state_manager)
         runner.run(journey)
 
         assert execution_order == ["first", "second"]
