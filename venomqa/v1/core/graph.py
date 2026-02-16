@@ -172,3 +172,8 @@ class Graph:
     @property
     def explored_count(self) -> int:
         return len(self._explored)
+
+    @property
+    def unique_transition_count(self) -> int:
+        """Number of unique transitions (deduplicated)."""
+        return len(self._transition_keys)
