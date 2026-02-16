@@ -379,7 +379,7 @@ class TestActionResolver:
             resolver.resolve("missing")
 
     def test_registry_action_resolver(self) -> None:
-        with patch("venomqa.runner.resolver.get_registry") as mock_get_registry:
+        with patch("venomqa.plugins.registry.get_registry") as mock_get_registry:
             mock_registry = MagicMock()
             mock_action = lambda c, ctx: None
             mock_registry.resolve_action.return_value = mock_action
