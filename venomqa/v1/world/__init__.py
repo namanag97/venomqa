@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from venomqa.v1.core.state import State, Observation
@@ -21,6 +22,10 @@ class World:
     - Observes state from all registered systems
     - Creates checkpoints across all systems
     - Rolls back all systems to a checkpoint
+
+    The key insight: checkpoint and rollback are ATOMIC across all systems.
+    When you checkpoint, every system saves its state at the same logical moment.
+    When you rollback, every system restores together.
     """
 
     def __init__(
@@ -31,6 +36,7 @@ class World:
         self.api = api
         self.systems: dict[str, Rollbackable] = systems or {}
         self._checkpoints: dict[str, Checkpoint] = {}
+        self._current_state_id: str | None = None
 
     def register_system(self, name: str, system: Rollbackable) -> None:
         """Register a system for observation and rollback."""
@@ -41,14 +47,52 @@ class World:
         return action.execute(self.api)
 
     def observe(self) -> State:
-        """Get current state from all systems."""
+        """Get current state from all systems.
+
+        Note: The returned state has no checkpoint_id.
+        Use observe_and_checkpoint() if you need to rollback to this state later.
+        """
         observations: dict[str, Observation] = {}
         for name, system in self.systems.items():
             observations[name] = system.observe()
         return State.create(observations=observations)
 
+    def observe_and_checkpoint(self, checkpoint_name: str) -> State:
+        """Atomically observe state and create a checkpoint.
+
+        This is the primary method for exploration. It:
+        1. Creates a checkpoint across all systems
+        2. Observes current state from all systems
+        3. Returns a State with checkpoint_id attached
+
+        The returned State can be rolled back to via its checkpoint_id.
+
+        Args:
+            checkpoint_name: Human-readable name for the checkpoint.
+
+        Returns:
+            State with checkpoint_id set.
+        """
+        # First checkpoint, then observe (order matters for consistency)
+        checkpoint_id = self.checkpoint(checkpoint_name)
+
+        # Observe state
+        observations: dict[str, Observation] = {}
+        for name, system in self.systems.items():
+            observations[name] = system.observe()
+
+        state = State.create(
+            observations=observations,
+            checkpoint_id=checkpoint_id,
+        )
+        self._current_state_id = state.id
+        return state
+
     def checkpoint(self, name: str) -> str:
         """Create a checkpoint across all systems.
+
+        Args:
+            name: Human-readable name for the checkpoint.
 
         Returns:
             The checkpoint ID.
@@ -62,7 +106,14 @@ class World:
         return cp.id
 
     def rollback(self, checkpoint_id: str) -> None:
-        """Roll back all systems to a checkpoint."""
+        """Roll back all systems to a checkpoint.
+
+        Args:
+            checkpoint_id: The checkpoint to rollback to.
+
+        Raises:
+            ValueError: If checkpoint_id is unknown.
+        """
         cp = self._checkpoints.get(checkpoint_id)
         if cp is None:
             raise ValueError(f"Unknown checkpoint: {checkpoint_id}")
@@ -75,6 +126,10 @@ class World:
     def get_checkpoint(self, checkpoint_id: str) -> Checkpoint | None:
         """Get a checkpoint by ID."""
         return self._checkpoints.get(checkpoint_id)
+
+    def has_checkpoint(self, checkpoint_id: str) -> bool:
+        """Check if a checkpoint exists."""
+        return checkpoint_id in self._checkpoints
 
 
 __all__ = [
