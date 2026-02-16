@@ -51,8 +51,12 @@ class World:
         self.systems[name] = system
 
     def act(self, action: Action) -> ActionResult:
-        """Execute an action via the API."""
-        return action.execute(self.api)
+        """Execute an action via the API.
+
+        The action receives the API client and optionally the context.
+        Actions can store/retrieve data via context for sharing.
+        """
+        return action.execute(self.api, self.context)
 
     def observe(self) -> State:
         """Get current state from all systems.
