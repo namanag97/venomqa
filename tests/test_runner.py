@@ -347,7 +347,8 @@ class TestBranching:
             ]
         )
 
-        runner = JourneyRunner(client=mock_client)
+        state_manager = MockStateManager()
+        runner = JourneyRunner(client=mock_client, state_manager=state_manager)
         runner.run(journey)
 
         assert ("path1", "initial") in context_values
