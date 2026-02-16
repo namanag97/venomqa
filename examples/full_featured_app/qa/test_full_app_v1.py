@@ -409,7 +409,6 @@ def main():
     finally:
         # Clean up
         db.close()
-        cache.close()
         api.close()
 
     # Print results
