@@ -81,6 +81,11 @@ class ActionResult:
 # Type alias for action preconditions
 Precondition = Callable[["State"], bool]
 
+# Import ResponseAssertion at runtime to avoid circular import
+def _get_response_assertion_type():
+    from venomqa.v1.core.invariant import ResponseAssertion
+    return ResponseAssertion
+
 
 @dataclass
 class Action:
@@ -99,6 +104,19 @@ class Action:
             context.set("order_id", response.json()["id"])
             return ActionResult.from_response(response)
 
+    Response assertions:
+        Action(
+            name="create_user",
+            execute=create_user,
+            expected_status=[201],  # Shorthand for ResponseAssertion
+        )
+
+        Action(
+            name="delete_nonexistent",
+            execute=delete_user,
+            expect_failure=True,  # Expect 4xx/5xx
+        )
+
     The framework automatically detects whether your action accepts context.
     """
 
@@ -107,6 +125,9 @@ class Action:
     preconditions: list[Precondition] = field(default_factory=list)
     description: str = ""
     tags: list[str] = field(default_factory=list)
+    expected_status: list[int] | None = None
+    expect_failure: bool = False
+    response_assertion: Any = None  # ResponseAssertion, avoid circular import
     _accepts_context: bool | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
