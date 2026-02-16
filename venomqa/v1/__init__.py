@@ -29,6 +29,17 @@ from venomqa.v1.dsl.compiler import compile as compile_journey
 
 from venomqa.v1.adapters.http import HttpClient
 
+# Observation helpers
+from venomqa.v1.core.observers import (
+    has_rows,
+    latest_row,
+    row_with_status,
+    column_value,
+    aggregate,
+    combine_observers,
+    COMMON_QUERIES,
+)
+
 # Type aliases
 StateID = str
 TransitionID = str
