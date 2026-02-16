@@ -6,6 +6,14 @@ This module enables state-based testing where:
 - Invariants are rules that must hold true at every state
 - The explorer traverses all paths and verifies invariants
 
+Architecture:
+    The exploration uses a parent-pointer tree structure for memory efficiency.
+    Instead of copying path/context at each branch (O(B^D * D) memory), we store
+    parent pointers and reconstruct paths on demand (O(total_nodes) memory).
+
+    Exploration uses DFS with explicit stack, streaming results as paths complete.
+    This bounds memory to O(depth) for the stack, regardless of branching factor.
+
 Example:
     >>> from venomqa.core.graph import StateGraph, StateNode, Edge, Invariant
     >>>
@@ -28,19 +36,25 @@ Example:
     ...     description="API count matches database count"
     ... )
     >>>
-    >>> # Explore all paths
+    >>> # Explore all paths (streaming internally, returns accumulated result)
     >>> result = graph.explore(client, db_connection)
     >>> print(result.summary())
+    >>>
+    >>> # Or stream results as they complete (memory-efficient for large graphs)
+    >>> for path_result in graph.explore_iter(client, db_connection):
+    ...     if not path_result.success:
+    ...         print(f"Failed: {path_result.path}")
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Iterator, Protocol
 
 logger = logging.getLogger(__name__)
 
