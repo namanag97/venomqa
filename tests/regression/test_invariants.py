@@ -364,14 +364,17 @@ class TestEdgeCaseInvariants:
         graph.add_edge("A", "B", action=lambda c, ctx: "ok", name="a_to_b")
         graph.add_edge("B", "A", action=lambda c, ctx: "ok", name="b_to_a")  # Cycle
 
-        results = list(graph.explore_iter(client=None, max_depth=5))
+        max_depth = 5
+        results = list(graph.explore_iter(client=None, max_depth=max_depth))
 
         # Should terminate (not infinite loop)
         assert len(results) >= 1
 
-        # No path should exceed max_depth
+        # No path should exceed max_depth + 1 (path length = edges + 1)
         for result in results:
-            assert len(result.path) <= 5
+            assert len(result.path) <= max_depth + 1, (
+                f"Path length {len(result.path)} exceeds max_depth {max_depth} + 1"
+            )
 
     def test_error_in_action_marks_path_failed(self):
         """INVARIANT: Exception in action must mark path as failed."""
