@@ -240,4 +240,9 @@ __all__ = [
     "BFS",
     "DFS",
     "Random",
+    "CoverageGuided",
+    "Weighted",
+    "Scheduler",
+    "ScheduledRun",
+    "RunResult",
 ]
