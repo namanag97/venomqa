@@ -8,7 +8,7 @@ from venomqa.v1.core.state import State
 from venomqa.v1.core.action import Action
 from venomqa.v1.core.transition import Transition
 from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import Invariant, Violation
+from venomqa.v1.core.invariant import Invariant, Violation, InvariantTiming, Severity
 from venomqa.v1.core.result import ExplorationResult
 from venomqa.v1.agent.strategies import Strategy, BFS, DFS, Random, CoverageGuided, Weighted
 from venomqa.v1.agent.scheduler import Scheduler, ScheduledRun, RunResult
