@@ -20,7 +20,7 @@ from venomqa.core.models import (
     Step,
     StepResult,
 )
-from venomqa.runner import JourneyRunner
+from venomqa.runner import JourneyRunner, MissingStateManagerError
 from .conftest import MockClient, MockHTTPResponse, MockStateManager
 
 
