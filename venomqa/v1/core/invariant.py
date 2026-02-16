@@ -10,7 +10,7 @@ import uuid
 
 if TYPE_CHECKING:
     from venomqa.v1.core.state import State
-    from venomqa.v1.core.action import Action
+    from venomqa.v1.core.action import Action, ActionResult
     from venomqa.v1.core.transition import Transition
     from venomqa.v1.world import World
 
@@ -24,14 +24,43 @@ class Severity(Enum):
     LOW = "low"  # Minor issues
 
 
+class InvariantTiming(Enum):
+    """When to check an invariant."""
+
+    POST_ACTION = "post_action"  # After action executes (default)
+    PRE_ACTION = "pre_action"  # Before action executes
+    BOTH = "both"  # Before and after
+
+
 @dataclass
 class Invariant:
-    """A rule that must always hold."""
+    """A rule that must always hold.
+
+    Invariants can be checked at different times:
+    - POST_ACTION (default): After each action
+    - PRE_ACTION: Before each action
+    - BOTH: Before and after each action
+
+    Example:
+        # Post-action invariant (default)
+        Invariant(
+            name="order_count_consistent",
+            check=lambda world: db_count == api_count,
+        )
+
+        # Pre-action invariant
+        Invariant(
+            name="must_be_logged_in",
+            check=lambda world: world.context.has("user_id"),
+            timing=InvariantTiming.PRE_ACTION,
+        )
+    """
 
     name: str
     check: Callable[["World"], bool]
     message: str = ""
     severity: Severity = Severity.MEDIUM
+    timing: InvariantTiming = InvariantTiming.POST_ACTION
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -40,6 +69,65 @@ class Invariant:
         if not isinstance(other, Invariant):
             return NotImplemented
         return self.name == other.name
+
+
+@dataclass
+class ResponseAssertion:
+    """An assertion about the action's response.
+
+    Use this to specify expected responses for actions.
+
+    Example:
+        # Expect success
+        ResponseAssertion(expected_status=[200, 201])
+
+        # Expect failure
+        ResponseAssertion(expected_status=[400, 404], expect_failure=True)
+
+        # Custom check
+        ResponseAssertion(
+            check=lambda result: result.response.body.get("id") is not None
+        )
+    """
+
+    expected_status: list[int] | None = None
+    expect_failure: bool = False  # If True, action should fail (4xx/5xx)
+    check: Callable[["ActionResult"], bool] | None = None
+    message: str = ""
+
+    def validate(self, result: "ActionResult") -> tuple[bool, str]:
+        """Validate the action result against assertions.
+
+        Returns:
+            (passed, message) tuple.
+        """
+        if self.expected_status is not None:
+            if result.response is None:
+                return False, f"No response received, expected status {self.expected_status}"
+            if result.response.status_code not in self.expected_status:
+                return False, (
+                    f"Expected status {self.expected_status}, "
+                    f"got {result.response.status_code}"
+                )
+
+        if self.expect_failure:
+            if result.response and result.response.ok:
+                return False, f"Expected failure, but got success: {result.response.status_code}"
+        elif not self.expect_failure:
+            if result.response and not result.response.ok:
+                # Not expecting failure but got one - this is allowed unless
+                # expected_status was specified
+                if self.expected_status is not None:
+                    return False, f"Expected success, got {result.response.status_code}"
+
+        if self.check is not None:
+            try:
+                if not self.check(result):
+                    return False, self.message or "Custom assertion failed"
+            except Exception as e:
+                return False, f"Assertion check raised exception: {e}"
+
+        return True, ""
 
 
 @dataclass
