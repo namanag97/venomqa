@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from venomqa.v1.core.state import Observation
 from venomqa.v1.world.rollbackable import SystemCheckpoint
+
+# Type for custom observation queries
+ObservationQuery = Callable[["PostgresAdapter"], dict[str, Any]]
 
 
 class PostgresAdapter:
@@ -16,15 +19,32 @@ class PostgresAdapter:
     - checkpoint(): Creates a savepoint
     - rollback(): Rolls back to a savepoint
     - observe(): Queries configured tables
+
+    Rich Observations:
+    - Basic: Table row counts (configure via observe_tables)
+    - Custom: Add custom queries via add_observation_query()
+    - State flags: Track boolean state like "has_users", "order_pending"
     """
 
     def __init__(
         self,
         connection_string: str,
         observe_tables: list[str] | None = None,
+        observe_queries: dict[str, str] | None = None,
     ) -> None:
+        """Initialize PostgreSQL adapter.
+
+        Args:
+            connection_string: PostgreSQL connection string.
+            observe_tables: Tables to count rows for observation.
+            observe_queries: Custom SQL queries for observation.
+                Key = observation field name
+                Value = SQL query (must return single value)
+        """
         self.connection_string = connection_string
         self.observe_tables = observe_tables or []
+        self._observe_queries = observe_queries or {}
+        self._custom_observers: list[ObservationQuery] = []
         self._conn: Any = None
         self._savepoint_counter = 0
 
