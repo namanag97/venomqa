@@ -356,7 +356,6 @@ def main():
     print("=" * 70)
     print(f"\nTarget: {API_URL}")
     print(f"Database: {DB_URL}")
-    print(f"Redis: {REDIS_URL}")
     print()
 
     # Create HTTP client
@@ -368,22 +367,14 @@ def main():
         observe_tables=["users", "items", "orders"],
     )
 
-    # Create Redis adapter
-    cache = RedisAdapter(
-        url=REDIS_URL,
-        track_patterns=["app-cache:*"],
-    )
-
     # Connect adapters
     db.connect()
-    cache.connect()
 
     # Create World with all systems
     world = World(
         api=api,
         systems={
             "db": db,
-            "cache": cache,
         },
     )
 
