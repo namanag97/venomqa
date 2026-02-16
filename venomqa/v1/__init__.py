@@ -184,6 +184,12 @@ __all__ = [
     "compile_journey",
     # Adapters
     "HttpClient",
+    # Validation
+    "SchemaValidator",
+    "validate_response",
+    "has_fields",
+    "is_list",
+    "matches_type",
     # Observation helpers
     "has_rows",
     "latest_row",
