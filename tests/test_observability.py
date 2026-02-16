@@ -277,7 +277,7 @@ class TestLogging:
 
         mock_client.set_responses([MockHTTPResponse(status_code=500, json_data={})])
 
-        with patch("venomqa.runner.logger") as mock_logger:
+        with patch("venomqa.runner.formatter.logger") as mock_logger:
             runner = JourneyRunner(client=mock_client)
             runner.run(journey)
 
@@ -291,7 +291,7 @@ class TestLogging:
 
         mock_client.set_responses([MockHTTPResponse(status_code=500, json_data={})])
 
-        with patch("venomqa.runner.logger") as mock_logger:
+        with patch("venomqa.runner.formatter.logger") as mock_logger:
             runner = JourneyRunner(client=mock_client)
             runner.run(journey)
 
