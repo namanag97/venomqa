@@ -156,8 +156,12 @@ class Step(BaseModel):
             return v
         raise ValueError("Action must be a callable or string reference")
 
-    def get_action_callable(self) -> ActionCallable:
+    def get_action_callable(self, resolver: Any = None) -> ActionCallable:
         """Resolve action to callable, handling string references.
+
+        Args:
+            resolver: Optional ActionResolver to use for string references.
+                     If not provided, falls back to the global registry.
 
         Returns:
             The resolved callable for this step's action.
@@ -167,6 +171,11 @@ class Step(BaseModel):
         """
         if callable(self.action):
             return self.action
+
+        # Use provided resolver or fall back to global registry
+        if resolver is not None:
+            return resolver.resolve(self.action)
+
         from venomqa.plugins.registry import get_registry
 
         registry = get_registry()
