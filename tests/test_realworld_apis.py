@@ -124,9 +124,11 @@ class TestJSONPlaceholderAPI:
         issues = journey.validate()
         assert issues == [], f"Journey validation failed: {issues}"
 
-        # Execute
+        # Execute with mock state manager (required for checkpoints/branches)
         try:
-            result = journey(client)
+            state_manager = MockStateManager()
+            runner = JourneyRunner(client=client, state_manager=state_manager)
+            result = runner.run(journey)
             # Note: JSONPlaceholder is fake so all operations should succeed
             assert result.passed_steps >= 2
             assert result.total_paths == 2
