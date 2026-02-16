@@ -165,6 +165,14 @@ __all__ = [
     "compile_journey",
     # Adapters
     "HttpClient",
+    # Observation helpers
+    "has_rows",
+    "latest_row",
+    "row_with_status",
+    "column_value",
+    "aggregate",
+    "combine_observers",
+    "COMMON_QUERIES",
     # Convenience
     "explore",
     # Type aliases
