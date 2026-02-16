@@ -125,6 +125,7 @@ from venomqa.context import (
 from venomqa.core.context import ExecutionContext
 from venomqa.core.graph import (
     Edge,
+    ExplorationNode,
     ExplorationResult,
     Invariant,
     StateGraph,
