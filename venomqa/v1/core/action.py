@@ -157,6 +157,28 @@ class Action:
         """Check if all preconditions are satisfied."""
         return all(p(state) for p in self.preconditions)
 
+    def validate_result(self, result: ActionResult) -> tuple[bool, str]:
+        """Validate the action result against assertions.
+
+        Returns:
+            (passed, message) tuple.
+        """
+        # Use explicit response_assertion if provided
+        if self.response_assertion is not None:
+            return self.response_assertion.validate(result)
+
+        # Build assertion from shorthand properties
+        if self.expected_status is not None or self.expect_failure:
+            from venomqa.v1.core.invariant import ResponseAssertion
+            assertion = ResponseAssertion(
+                expected_status=self.expected_status,
+                expect_failure=self.expect_failure,
+            )
+            return assertion.validate(result)
+
+        # No assertions - always pass
+        return True, ""
+
     def __hash__(self) -> int:
         return hash(self.name)
 
