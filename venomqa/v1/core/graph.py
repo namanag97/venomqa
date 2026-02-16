@@ -24,6 +24,7 @@ class Graph:
         self._transitions: list[Transition] = []
         self._actions: dict[str, Action] = {a.name: a for a in (actions or [])}
         self._explored: set[tuple[str, str]] = set()  # (state_id, action_name)
+        self._transition_keys: set[tuple[str, str, str]] = set()  # (from_id, action, to_id)
         self._initial_state_id: str | None = None
 
     @property
