@@ -131,6 +131,7 @@ __all__ = [
     # Core
     "State",
     "Observation",
+    "Context",
     "Action",
     "ActionResult",
     "HTTPRequest",
