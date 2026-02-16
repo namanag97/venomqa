@@ -36,6 +36,15 @@ from venomqa.v1.dsl.compiler import compile as compile_journey
 
 from venomqa.v1.adapters.http import HttpClient
 
+# Validation
+from venomqa.v1.validation import (
+    SchemaValidator,
+    validate_response,
+    has_fields,
+    is_list,
+    matches_type,
+)
+
 # Observation helpers
 from venomqa.v1.core.observers import (
     has_rows,
