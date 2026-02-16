@@ -1,7 +1,136 @@
-"""Graph class.
+"""Graph class for state space exploration."""
 
-Graph holds all states, transitions, and actions during exploration.
-Provides methods for traversal, querying unexplored pairs, and path finding.
-"""
+from __future__ import annotations
 
-# TODO: Implement in Task #5
+from collections import deque
+from typing import Iterator
+
+from venomqa.v1.core.state import State
+from venomqa.v1.core.action import Action
+from venomqa.v1.core.transition import Transition
+
+
+class Graph:
+    """Holds all states and transitions during exploration.
+
+    The graph tracks:
+    - All visited states
+    - All transitions between states
+    - Which (state, action) pairs have been explored
+    """
+
+    def __init__(self, actions: list[Action] | None = None) -> None:
+        self._states: dict[str, State] = {}
+        self._transitions: list[Transition] = []
+        self._actions: dict[str, Action] = {a.name: a for a in (actions or [])}
+        self._explored: set[tuple[str, str]] = set()  # (state_id, action_name)
+        self._initial_state_id: str | None = None
+
+    @property
+    def states(self) -> dict[str, State]:
+        return self._states
+
+    @property
+    def transitions(self) -> list[Transition]:
+        return self._transitions
+
+    @property
+    def actions(self) -> dict[str, Action]:
+        return self._actions
+
+    @property
+    def initial_state_id(self) -> str | None:
+        return self._initial_state_id
+
+    def add_state(self, state: State) -> None:
+        """Add a state to the graph."""
+        if self._initial_state_id is None:
+            self._initial_state_id = state.id
+        self._states[state.id] = state
+
+    def add_transition(self, transition: Transition) -> None:
+        """Add a transition and mark as explored."""
+        self._transitions.append(transition)
+        self._explored.add((transition.from_state_id, transition.action_name))
+
+    def add_action(self, action: Action) -> None:
+        """Register an action."""
+        self._actions[action.name] = action
+
+    def get_state(self, state_id: str) -> State | None:
+        """Get a state by ID."""
+        return self._states.get(state_id)
+
+    def get_action(self, action_name: str) -> Action | None:
+        """Get an action by name."""
+        return self._actions.get(action_name)
+
+    def is_explored(self, state_id: str, action_name: str) -> bool:
+        """Check if a (state, action) pair has been explored."""
+        return (state_id, action_name) in self._explored
+
+    def get_valid_actions(self, state: State) -> list[Action]:
+        """Get actions whose preconditions are satisfied in this state."""
+        return [a for a in self._actions.values() if a.can_execute(state)]
+
+    def get_unexplored(self) -> list[tuple[State, Action]]:
+        """Get all unexplored (state, action) pairs."""
+        result = []
+        for state in self._states.values():
+            for action in self.get_valid_actions(state):
+                if not self.is_explored(state.id, action.name):
+                    result.append((state, action))
+        return result
+
+    def get_path_to(self, state_id: str) -> list[Transition]:
+        """Get the path from initial state to the given state."""
+        if self._initial_state_id is None:
+            return []
+
+        if state_id == self._initial_state_id:
+            return []
+
+        # BFS to find shortest path
+        visited = {self._initial_state_id}
+        queue: deque[tuple[str, list[Transition]]] = deque([(self._initial_state_id, [])])
+
+        # Build adjacency from transitions
+        outgoing: dict[str, list[Transition]] = {}
+        for t in self._transitions:
+            outgoing.setdefault(t.from_state_id, []).append(t)
+
+        while queue:
+            current_id, path = queue.popleft()
+            if current_id == state_id:
+                return path
+
+            for t in outgoing.get(current_id, []):
+                if t.to_state_id not in visited:
+                    visited.add(t.to_state_id)
+                    queue.append((t.to_state_id, path + [t]))
+
+        return []
+
+    def iter_states(self) -> Iterator[State]:
+        """Iterate over all states."""
+        return iter(self._states.values())
+
+    def iter_transitions(self) -> Iterator[Transition]:
+        """Iterate over all transitions."""
+        return iter(self._transitions)
+
+    @property
+    def state_count(self) -> int:
+        return len(self._states)
+
+    @property
+    def transition_count(self) -> int:
+        return len(self._transitions)
+
+    @property
+    def action_count(self) -> int:
+        return len(self._actions)
+
+    @property
+    def explored_count(self) -> int:
+        return len(self._explored)
