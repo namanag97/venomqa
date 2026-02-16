@@ -122,7 +122,7 @@ class World:
         return cp.id
 
     def rollback(self, checkpoint_id: str) -> None:
-        """Roll back all systems to a checkpoint.
+        """Roll back all systems and context to a checkpoint.
 
         Args:
             checkpoint_id: The checkpoint to rollback to.
@@ -134,10 +134,16 @@ class World:
         if cp is None:
             raise ValueError(f"Unknown checkpoint: {checkpoint_id}")
 
+        # Rollback systems
         for system_name, system in self.systems.items():
             system_cp = cp.get_system_checkpoint(system_name)
             if system_cp is not None:
                 system.rollback(system_cp)
+
+        # Rollback context
+        context_cp = self._context_checkpoints.get(checkpoint_id)
+        if context_cp is not None:
+            self.context.restore(context_cp)
 
     def get_checkpoint(self, checkpoint_id: str) -> Checkpoint | None:
         """Get a checkpoint by ID."""
