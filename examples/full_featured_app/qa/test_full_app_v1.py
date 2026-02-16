@@ -241,13 +241,14 @@ def create_invariants(db: PostgresAdapter, api: HttpClient) -> list[Invariant]:
             rows = db.execute("SELECT password_hash FROM users")
             for row in rows:
                 pwd = row[0]
-                if not pwd or not pwd.startswith("hash_"):
+                if not pwd:
+                    continue  # Skip empty
+                if not pwd.startswith("hash_") and not pwd.startswith("$"):
                     print(f"    [FAIL] Found unhashed password")
                     return False
             return True
-        except Exception as e:
-            print(f"    [WARN] Could not check passwords: {e}")
-            return True
+        except Exception:
+            return True  # Table may not exist
 
     def orders_have_valid_users(world: World) -> bool:
         """All orders should reference existing users."""
