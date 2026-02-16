@@ -207,37 +207,78 @@ class Agent:
         action: Action,
         transition: Transition,
     ) -> None:
-        """Check all invariants and record violations."""
+        """Check all POST_ACTION invariants and record violations.
+
+        Deprecated: Use _check_invariants_with_timing instead.
+        """
+        self._check_invariants_with_timing(
+            state, action, transition, InvariantTiming.POST_ACTION
+        )
+
+    def _check_invariants_with_timing(
+        self,
+        state: State,
+        action: Action,
+        transition: Transition | None,
+        timing: InvariantTiming,
+    ) -> None:
+        """Check invariants with specified timing and record violations."""
         for inv in self.invariants:
+            # Check if this invariant should be checked at this timing
+            should_check = (
+                inv.timing == timing or
+                inv.timing == InvariantTiming.BOTH
+            )
+            if not should_check:
+                continue
+
             try:
                 if not inv.check(self.world):
                     # Get reproduction path (how to reach this state)
                     path = self.graph.get_path_to(state.id)
+                    repro_path = path + [transition] if transition else path
                     violation = Violation.create(
                         invariant=inv,
                         state=state,
                         action=action,
-                        reproduction_path=path + [transition],
+                        reproduction_path=repro_path,
                     )
                     self._violations.append(violation)
             except Exception as e:
                 # Invariant check itself failed - treat as violation
-                violation = Violation.create(
-                    invariant=inv,
-                    state=state,
-                    action=action,
-                )
-                # Can't modify frozen dataclass, create with error message
                 self._violations.append(Violation(
-                    id=violation.id,
-                    invariant_name=violation.invariant_name,
-                    state=violation.state,
+                    id=f"v_{state.id[:8]}_{inv.name}",
+                    invariant_name=inv.name,
+                    state=state,
                     message=f"Invariant check raised exception: {e}",
-                    severity=violation.severity,
-                    action=violation.action,
-                    reproduction_path=violation.reproduction_path,
-                    timestamp=violation.timestamp,
+                    severity=inv.severity,
+                    action=action,
+                    reproduction_path=[],
+                    timestamp=state.created_at,
                 ))
+
+    def _check_response_assertions(
+        self,
+        state: State,
+        action: Action,
+        result: "ActionResult",
+    ) -> None:
+        """Check action's response assertions and record violations."""
+        from venomqa.v1.core.action import ActionResult
+
+        passed, message = action.validate_result(result)
+        if not passed:
+            # Create a synthetic invariant for the violation
+            self._violations.append(Violation(
+                id=f"v_{state.id[:8]}_{action.name}_response",
+                invariant_name=f"{action.name}_response_assertion",
+                state=state,
+                message=message,
+                severity=Severity.HIGH,
+                action=action,
+                reproduction_path=self.graph.get_path_to(state.id),
+                timestamp=result.timestamp,
+            ))
 
     @property
     def violations(self) -> list[Violation]:
