@@ -11,24 +11,52 @@ from typing import Any
 
 @dataclass(frozen=True)
 class Observation:
-    """Data observed from one system at a point in time."""
+    """Data observed from one system at a point in time.
+
+    Observations have two types of data:
+    - state_data: The actual state (used for identity/deduplication)
+    - metadata: Additional info not part of state (timing, counters, etc.)
+
+    Only state_data is used when computing state identity. This allows
+    proper deduplication while still capturing useful metadata.
+    """
 
     system: str
-    data: dict[str, Any]
+    data: dict[str, Any]  # State data - used for identity
+    metadata: dict[str, Any] = field(default_factory=dict)  # Not used for identity
     observed_at: datetime = field(default_factory=datetime.now)
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a value from the observation data."""
+        """Get a value from the state data."""
         return self.data.get(key, default)
+
+    def get_meta(self, key: str, default: Any = None) -> Any:
+        """Get a value from metadata."""
+        return self.metadata.get(key, default)
 
     def __getitem__(self, key: str) -> Any:
         return self.data[key]
 
     def content_hash(self) -> str:
-        """Generate deterministic hash of observation content (excluding timestamp)."""
-        data = {"system": self.system, "data": self.data}
-        content = json.dumps(data, sort_keys=True, default=str)
-        return hashlib.sha256(content.encode()).hexdigest()
+        """Generate deterministic hash of state data (excluding metadata/timestamp)."""
+        content = {"system": self.system, "data": self.data}
+        return hashlib.sha256(
+            json.dumps(content, sort_keys=True, default=str).encode()
+        ).hexdigest()
+
+    @classmethod
+    def create(
+        cls,
+        system: str,
+        data: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+    ) -> "Observation":
+        """Create an observation with optional metadata."""
+        return cls(
+            system=system,
+            data=data,
+            metadata=metadata or {},
+        )
 
 
 @dataclass(frozen=True)
