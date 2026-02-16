@@ -115,8 +115,16 @@ class Agent:
         # CRITICAL: Roll back to the from_state before executing
         self._rollback_to(from_state)
 
+        # Check PRE-ACTION invariants
+        self._check_invariants_with_timing(
+            from_state, action, None, InvariantTiming.PRE_ACTION
+        )
+
         # Execute action
         action_result = self.world.act(action)
+
+        # Check response assertions
+        self._check_response_assertions(from_state, action, action_result)
 
         # Observe new state WITH checkpoint (enables future rollback to this state)
         checkpoint_name = f"after_{action.name}_{self._step_count}"
@@ -133,8 +141,10 @@ class Agent:
         )
         self.graph.add_transition(transition)
 
-        # Check invariants AFTER the action
-        self._check_invariants(to_state, action, transition)
+        # Check POST-ACTION invariants
+        self._check_invariants_with_timing(
+            to_state, action, transition, InvariantTiming.POST_ACTION
+        )
 
         # Tell strategy about the new state's valid actions
         valid_actions = self.graph.get_valid_actions(to_state)
