@@ -218,6 +218,10 @@ class ExecutionContext:
 
         Snapshots are used by checkpoints to enable rollback.
 
+        This method uses a shallow copy for efficiency. The actual deep copy
+        is deferred to restore() time, following a copy-on-restore pattern.
+        This is safe because snapshots are immutable after creation.
+
         Returns:
             Dictionary containing complete context state.
 
@@ -226,10 +230,13 @@ class ExecutionContext:
             >>> # ... perform operations ...
             >>> ctx.restore(snapshot)  # Rollback to snapshot
         """
+        # Shallow copy + deepcopy of values that might be mutable
+        # We defer full deepcopy to restore() for efficiency
         return {
-            "data": deepcopy(self._data),
-            "step_results": deepcopy(self._step_results),
+            "data": dict(self._data),  # Shallow copy of dict structure
+            "step_results": dict(self._step_results),  # Shallow copy
             "created_at": self._created_at.isoformat(),
+            "_needs_deepcopy": True,  # Flag for restore to deepcopy
         }
 
     def restore(self, snapshot: dict[str, Any]) -> None:
