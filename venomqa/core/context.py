@@ -242,6 +242,11 @@ class ExecutionContext:
     def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore context from a snapshot.
 
+        This method performs a deep copy of the snapshot data to ensure
+        the restored context is independent of the original snapshot.
+        This follows a copy-on-restore pattern where the expensive deepcopy
+        is deferred from snapshot creation to restore time.
+
         Args:
             snapshot: A snapshot created by snapshot().
 
@@ -251,6 +256,8 @@ class ExecutionContext:
             >>> ctx.restore(snapshot)
             >>> ctx.get("new_key")  # Returns None
         """
+        # Always deepcopy on restore to ensure independence
+        # This is where the O(n) cost is paid, not at snapshot time
         self._data = deepcopy(snapshot.get("data", {}))
         self._step_results = deepcopy(snapshot.get("step_results", {}))
 
