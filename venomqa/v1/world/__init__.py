@@ -55,8 +55,10 @@ class World:
 
         The action receives the API client and optionally the context.
         Actions can store/retrieve data via context for sharing.
+
+        Uses Action.invoke() which auto-detects if the action accepts context.
         """
-        return action.execute(self.api, self.context)
+        return action.invoke(self.api, self.context)
 
     def observe(self) -> State:
         """Get current state from all systems.
