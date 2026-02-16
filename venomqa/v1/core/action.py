@@ -84,13 +84,53 @@ Precondition = Callable[["State"], bool]
 
 @dataclass
 class Action:
-    """An action that changes the world state."""
+    """An action that changes the world state.
+
+    Actions can optionally receive a Context for sharing data:
+
+        # Simple action (no context)
+        def get_items(api):
+            return ActionResult.from_response(api.get("/items"))
+
+        # Action with context
+        def create_order(api, context):
+            user_id = context.get("user_id")
+            response = api.post("/orders", json={"user_id": user_id})
+            context.set("order_id", response.json()["id"])
+            return ActionResult.from_response(response)
+
+    The framework automatically detects whether your action accepts context.
+    """
 
     name: str
     execute: Callable[..., ActionResult]
     preconditions: list[Precondition] = field(default_factory=list)
     description: str = ""
     tags: list[str] = field(default_factory=list)
+    _accepts_context: bool | None = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        """Detect if execute function accepts context parameter."""
+        if self._accepts_context is None:
+            try:
+                sig = inspect.signature(self.execute)
+                params = list(sig.parameters.keys())
+                # Check if function has 2+ params or has 'context' param
+                self._accepts_context = len(params) >= 2 or "context" in params
+            except (ValueError, TypeError):
+                # Can't inspect (e.g., built-in), assume no context
+                self._accepts_context = False
+
+    def invoke(self, api: Any, context: "Context") -> ActionResult:
+        """Execute the action, passing context if accepted.
+
+        This is the preferred way to call an action from the framework.
+        It handles both context-aware and simple actions.
+        """
+        if self._accepts_context:
+            return self.execute(api, context)
+        else:
+            return self.execute(api)
 
     def can_execute(self, state: "State") -> bool:
         """Check if all preconditions are satisfied."""
