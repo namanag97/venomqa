@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from collections import deque
+from collections import deque, Counter
 from typing import Protocol, runtime_checkable
 
 from venomqa.v1.core.state import State
@@ -133,6 +133,7 @@ class Random(BaseStrategy):
     """Random exploration strategy.
 
     Picks randomly from unexplored (state, action) pairs.
+    Good for fuzzing and finding unexpected bugs.
     """
 
     def __init__(self, seed: int | None = None) -> None:
@@ -143,3 +144,89 @@ class Random(BaseStrategy):
         if not unexplored:
             return None
         return self._rng.choice(unexplored)
+
+
+class CoverageGuided(BaseStrategy):
+    """Coverage-guided exploration strategy.
+
+    Prioritizes actions that are least explored across all states.
+    The goal is to maximize action diversity - ensuring all actions
+    are tried from multiple states rather than focusing on a few.
+
+    This is useful for finding edge cases where an action behaves
+    differently depending on the state it's executed from.
+    """
+
+    def __init__(self) -> None:
+        self._action_counts: Counter[str] = Counter()
+
+    def pick(self, graph: Graph) -> tuple[State, Action] | None:
+        unexplored = graph.get_unexplored()
+        if not unexplored:
+            return None
+
+        # Count how many times each action has been explored
+        for transition in graph.iter_transitions():
+            self._action_counts[transition.action_name] += 1
+
+        # Sort unexplored pairs by action exploration count (ascending)
+        # This prioritizes least-explored actions
+        def score(pair: tuple[State, Action]) -> int:
+            return self._action_counts[pair[1].name]
+
+        unexplored.sort(key=score)
+        return unexplored[0]
+
+    def enqueue(self, state: State, actions: list[Action]) -> None:
+        """No-op for coverage guided (it recalculates each pick)."""
+        pass
+
+    def push(self, state: State, actions: list[Action]) -> None:
+        """No-op for coverage guided (it recalculates each pick)."""
+        pass
+
+
+class Weighted(BaseStrategy):
+    """Weighted random exploration strategy.
+
+    Allows assigning weights to actions to control exploration priority.
+    Higher weight = more likely to be picked.
+    """
+
+    def __init__(
+        self,
+        weights: dict[str, float] | None = None,
+        seed: int | None = None,
+    ) -> None:
+        self._weights = weights or {}
+        self._rng = random.Random(seed)
+        self._default_weight = 1.0
+
+    def set_weight(self, action_name: str, weight: float) -> None:
+        """Set the weight for an action."""
+        self._weights[action_name] = weight
+
+    def pick(self, graph: Graph) -> tuple[State, Action] | None:
+        unexplored = graph.get_unexplored()
+        if not unexplored:
+            return None
+
+        # Calculate weights
+        weights = [
+            self._weights.get(pair[1].name, self._default_weight)
+            for pair in unexplored
+        ]
+
+        # Weighted random selection
+        total = sum(weights)
+        if total == 0:
+            return self._rng.choice(unexplored)
+
+        r = self._rng.random() * total
+        cumulative = 0.0
+        for pair, weight in zip(unexplored, weights):
+            cumulative += weight
+            if r <= cumulative:
+                return pair
+
+        return unexplored[-1]  # Fallback
