@@ -121,7 +121,8 @@ class Agent:
         # Observe new state WITH checkpoint (enables future rollback to this state)
         checkpoint_name = f"after_{action.name}_{self._step_count}"
         to_state = self.world.observe_and_checkpoint(checkpoint_name)
-        self.graph.add_state(to_state)
+        # add_state returns canonical state (deduplicates if same observations)
+        to_state = self.graph.add_state(to_state)
 
         # Record transition
         transition = Transition.create(
