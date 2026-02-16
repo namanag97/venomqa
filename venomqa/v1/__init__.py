@@ -140,6 +140,9 @@ __all__ = [
     "BFS",
     "DFS",
     "Random",
+    "CoverageGuided",
+    "Weighted",
+    "Scheduler",
     # DSL
     "Journey",
     "Step",
