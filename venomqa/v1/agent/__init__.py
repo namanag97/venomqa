@@ -68,12 +68,17 @@ class Agent:
            e. Check invariants
            f. Record transition
         3. Return results with graph and violations
+
+        State deduplication: States with identical observations share the same ID.
+        This prevents exponential state explosion from exploring the same
+        logical state via different paths.
         """
         result = ExplorationResult(graph=self.graph)
 
         # Observe initial state WITH checkpoint (critical for rollback)
         initial_state = self.world.observe_and_checkpoint("initial")
-        self.graph.add_state(initial_state)
+        # add_state returns canonical state (may be deduplicated)
+        initial_state = self.graph.add_state(initial_state)
 
         # Initialize strategy with initial state's valid actions
         valid_actions = self.graph.get_valid_actions(initial_state)
