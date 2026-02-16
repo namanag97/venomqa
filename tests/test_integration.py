@@ -407,7 +407,8 @@ class TestJourneyResultProperties:
             ]
         )
 
-        runner = JourneyRunner(client=mock_client)
+        state_manager = MockStateManager()
+        runner = JourneyRunner(client=mock_client, state_manager=state_manager)
         result = runner.run(journey)
 
         assert result.total_steps == 1
