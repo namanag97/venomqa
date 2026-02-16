@@ -182,6 +182,141 @@ class PathResult:
     invariant_violations: list[InvariantViolation] = field(default_factory=list)
 
 
+@dataclass(slots=True)
+class ExplorationNode:
+    """A node in the exploration tree with parent pointer for structural sharing.
+
+    Instead of copying the full path and context at each branch point, we store
+    a pointer to the parent node. Path and context are reconstructed by walking
+    parent pointers when needed (typically only for failed paths in reports).
+
+    This reduces memory from O(B^D * D) to O(total_nodes) where B is branching
+    factor and D is depth.
+
+    Attributes:
+        state_id: The graph node ID this exploration node represents.
+        parent: Parent exploration node (None for root).
+        edge: The edge taken to reach this node (None for root).
+        response: Response from executing the edge action.
+        duration_ms: Time taken to execute the edge action.
+        error: Error message if edge execution failed.
+        depth: Depth in the exploration tree (0 for root).
+        invariant_violations: Violations found at this node.
+    """
+    state_id: str
+    parent: ExplorationNode | None
+    edge: Edge | None
+    response: Any
+    duration_ms: float
+    error: str | None
+    depth: int
+    invariant_violations: list[InvariantViolation] = field(default_factory=list)
+
+    def get_path(self) -> list[str]:
+        """Reconstruct the full path by walking parent pointers.
+
+        Returns:
+            List of node IDs from root to this node.
+
+        Complexity: O(depth)
+        """
+        path: list[str] = []
+        node: ExplorationNode | None = self
+        while node is not None:
+            path.append(node.state_id)
+            node = node.parent
+        path.reverse()
+        return path
+
+    def get_edges(self) -> list[Edge]:
+        """Reconstruct the list of edges taken by walking parent pointers.
+
+        Returns:
+            List of edges from root to this node.
+
+        Complexity: O(depth)
+        """
+        edges: list[Edge] = []
+        node: ExplorationNode | None = self
+        while node is not None:
+            if node.edge is not None:
+                edges.append(node.edge)
+            node = node.parent
+        edges.reverse()
+        return edges
+
+    def get_context(self) -> dict[str, Any]:
+        """Reconstruct context by walking parent pointers and collecting responses.
+
+        Returns:
+            Dict with all response data accumulated along the path.
+
+        Complexity: O(depth)
+        """
+        context: dict[str, Any] = {}
+        node: ExplorationNode | None = self
+        while node is not None:
+            if node.edge is not None and node.response is not None:
+                context[f"_response_{node.edge.name}"] = node.response
+                # Try to extract JSON if response has .json() method
+                if hasattr(node.response, "json"):
+                    try:
+                        context[f"_json_{node.edge.name}"] = node.response.json()
+                    except Exception:
+                        pass
+            node = node.parent
+        return context
+
+    def get_edge_results(self) -> list[EdgeResult]:
+        """Reconstruct EdgeResult list by walking parent pointers.
+
+        Returns:
+            List of EdgeResult objects for each edge in the path.
+
+        Complexity: O(depth)
+        """
+        results: list[EdgeResult] = []
+        node: ExplorationNode | None = self
+        while node is not None:
+            if node.edge is not None:
+                results.append(EdgeResult(
+                    edge=node.edge,
+                    success=node.error is None,
+                    response=node.response,
+                    duration_ms=node.duration_ms,
+                    error=node.error,
+                    invariant_violations=node.invariant_violations,
+                ))
+            node = node.parent
+        results.reverse()
+        return results
+
+    def to_path_result(self) -> PathResult:
+        """Convert this exploration node to a PathResult.
+
+        Reconstructs path, edges, and results by walking parent pointers.
+        Used when streaming results or building final ExplorationResult.
+
+        Returns:
+            PathResult with full path information.
+        """
+        # Collect all violations along the path
+        all_violations: list[InvariantViolation] = []
+        node: ExplorationNode | None = self
+        while node is not None:
+            all_violations.extend(node.invariant_violations)
+            node = node.parent
+        all_violations.reverse()
+
+        return PathResult(
+            path=self.get_path(),
+            edges_taken=self.get_edges(),
+            edge_results=self.get_edge_results(),
+            success=self.error is None and len(all_violations) == 0,
+            invariant_violations=all_violations,
+        )
+
+
 @dataclass
 class ExplorationResult:
     """Complete result of exploring the state graph."""
