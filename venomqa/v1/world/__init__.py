@@ -101,7 +101,7 @@ class World:
         return state
 
     def checkpoint(self, name: str) -> str:
-        """Create a checkpoint across all systems.
+        """Create a checkpoint across all systems and context.
 
         Args:
             name: Human-readable name for the checkpoint.
@@ -115,6 +115,10 @@ class World:
 
         cp = Checkpoint.create(name, system_checkpoints)
         self._checkpoints[cp.id] = cp
+
+        # Also checkpoint context
+        self._context_checkpoints[cp.id] = self.context.checkpoint()
+
         return cp.id
 
     def rollback(self, checkpoint_id: str) -> None:
