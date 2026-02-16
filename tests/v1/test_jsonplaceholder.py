@@ -121,7 +121,7 @@ class HttpApiClient(Rollbackable):
     # Rollbackable interface
     def checkpoint(self, name: str) -> SystemCheckpoint:
         """HTTP API is stateless from client perspective, just return empty checkpoint."""
-        return SystemCheckpoint(system="http_api", name=name, data={})
+        return {"name": name, "data": {}}
 
     def rollback(self, checkpoint: SystemCheckpoint) -> None:
         """HTTP API is stateless, nothing to rollback."""
