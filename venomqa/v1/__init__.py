@@ -147,6 +147,8 @@ __all__ = [
     "Invariant",
     "Violation",
     "Severity",
+    "InvariantTiming",
+    "ResponseAssertion",
     "ExplorationResult",
     # World
     "World",
