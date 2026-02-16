@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from venomqa.v1.core.state import State
+    from venomqa.v1.core.context import Context
 
 
 @dataclass
