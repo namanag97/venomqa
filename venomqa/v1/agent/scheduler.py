@@ -8,10 +8,12 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, TYPE_CHECKING
 
 from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.agent import Agent
+
+if TYPE_CHECKING:
+    from venomqa.v1.agent import Agent
 
 
 @dataclass
@@ -20,7 +22,7 @@ class ScheduledRun:
 
     id: str
     name: str
-    agent_factory: Callable[[], Agent]
+    agent_factory: Callable[[], "Agent"]
     schedule: str  # cron-like or "once"
     enabled: bool = True
     last_run: datetime | None = None
