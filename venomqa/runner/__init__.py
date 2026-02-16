@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import concurrent.futures
-import json
 import logging
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (
@@ -32,8 +31,6 @@ from venomqa.errors import (
     JourneyError,
     JourneyTimeoutError,
     VenomQAError,
-    create_debug_context,
-    format_error,
 )
 from venomqa.errors.debug import DebugLogger, StepThroughController
 from venomqa.errors import (
@@ -43,23 +40,55 @@ from venomqa.errors.retry import (
     JourneyTimeoutError as EnhancedJourneyTimeoutError,
     StepTimeoutError,
 )
+from venomqa.runner.cache import CacheManager
+from venomqa.runner.formatter import IssueFormatter
+from venomqa.runner.persistence import ResultsPersister
+from venomqa.runner.resolver import ActionResolver, RegistryActionResolver
 
 if TYPE_CHECKING:
     from venomqa.http import Client
     from venomqa.performance import ResponseCache
     from venomqa.performance.pool import ConnectionPool
+    from venomqa.ports.client import ClientPort
     from venomqa.state import StateManager
     from venomqa.storage import ResultsRepository
 
 logger = logging.getLogger(__name__)
 
 
+class MissingStateManagerError(VenomQAError):
+    """Raised when checkpoint/rollback is attempted without a StateManager."""
+
+    pass
+
+
+@runtime_checkable
+class ClientProtocol(Protocol):
+    """Protocol defining the minimal client interface needed by JourneyRunner."""
+
+    def clear_history(self) -> None: ...
+    def last_request(self) -> Any: ...
+
+    @property
+    def history(self) -> Any: ...
+
+
 class JourneyRunner:
-    """Executes journeys with state branching and rollback support."""
+    """Executes journeys with state branching and rollback support.
+
+    This class orchestrates journey execution by coordinating:
+    - Step execution with timeout and retry support
+    - Branch exploration with checkpoint/rollback
+    - Issue formatting and collection
+    - Response caching
+    - Results persistence
+
+    Dependencies can be injected for testability.
+    """
 
     def __init__(
         self,
-        client: Client,
+        client: Client | ClientPort | ClientProtocol,
         state_manager: StateManager | None = None,
         parallel_paths: int = 1,
         fail_fast: bool = False,
@@ -78,6 +107,11 @@ class JourneyRunner:
         results_metadata: dict[str, Any] | None = None,
         debug_logger: DebugLogger | None = None,
         step_controller: StepThroughController | None = None,
+        # New injectable dependencies
+        action_resolver: ActionResolver | None = None,
+        issue_formatter: IssueFormatter | None = None,
+        cache_manager: CacheManager | None = None,
+        results_persister: ResultsPersister | None = None,
     ) -> None:
         self.client = client
         self.state_manager = state_manager
@@ -85,21 +119,35 @@ class JourneyRunner:
         self.fail_fast = fail_fast
         self.capture_logs = capture_logs
         self.log_lines = log_lines
-        self._issues: list[Issue] = []
 
+        # Use injected components or create defaults
+        self._formatter = issue_formatter or IssueFormatter()
+        self._cache_manager = cache_manager or CacheManager(
+            cache=cache,
+            enabled=use_caching,
+            ttl=cache_ttl,
+            cacheable_methods=cacheable_methods,
+        )
+        self._persister = results_persister or ResultsPersister(
+            repository=results_repository,
+            enabled=persist_results,
+            tags=results_tags or [],
+            metadata=results_metadata or {},
+        )
+        self._action_resolver = action_resolver or RegistryActionResolver()
+
+        # Keep these for backward compatibility
         self.cache = cache
         self.db_pool = db_pool
         self.use_caching = use_caching and cache is not None
         self.cache_ttl = cache_ttl
         self.cacheable_methods = cacheable_methods or {"GET", "HEAD", "OPTIONS"}
 
-        self._cache_hits = 0
-        self._cache_misses = 0
         self.ports = ports or {}
         self.output = output
         self._step_counter = 0
 
-        # Results persistence
+        # Results persistence (for backward compat properties)
         self.results_repository = results_repository
         self.persist_results = persist_results or results_repository is not None
         self.results_tags = results_tags or []
@@ -127,7 +175,7 @@ class JourneyRunner:
                     logger.warning(f"  - {issue}")
 
         started_at = datetime.now()
-        self._issues = []
+        self._formatter.clear()
 
         if self.state_manager:
             self.state_manager.connect()
@@ -175,7 +223,7 @@ class JourneyRunner:
             _journey_err = e
             del _journey_err
             logger.exception(f"Journey {journey.name} failed with VenomQA error")
-            self._add_issue(
+            self._formatter.add_issue(
                 journey=journey.name,
                 path="main",
                 step="journey",
@@ -193,7 +241,7 @@ class JourneyRunner:
             )
             del _journey_error
             logger.exception(f"Journey {journey.name} failed with exception")
-            self._add_issue(
+            self._formatter.add_issue(
                 journey=journey.name,
                 path="main",
                 step="journey",
@@ -219,24 +267,40 @@ class JourneyRunner:
             finished_at=finished_at,
             step_results=step_results,
             branch_results=branch_results,
-            issues=self._issues.copy(),
+            issues=self._formatter.get_issues(),
             duration_ms=duration_ms,
         )
 
         # Persist results if configured
-        self._persist_result(result, journey)
+        self._persister.persist(
+            result,
+            journey,
+            extra_metadata={
+                "parallel_paths": self.parallel_paths,
+                "fail_fast": self.fail_fast,
+            },
+        )
 
         return result
 
     def _handle_checkpoint(self, checkpoint: Checkpoint) -> None:
-        """Create a database checkpoint."""
+        """Create a database checkpoint.
+
+        Raises:
+            MissingStateManagerError: If no StateManager is configured.
+        """
         if self.state_manager:
             self.state_manager.checkpoint(checkpoint.name)
             logger.debug(f"Created checkpoint: {checkpoint.name}")
         else:
-            logger.warning(
-                f"Checkpoint '{checkpoint.name}' created but no StateManager configured. "
-                "Checkpoint/rollback will not work. Configure a StateManager or remove checkpoints."
+            raise MissingStateManagerError(
+                message=f"Checkpoint '{checkpoint.name}' requires a StateManager but none is configured",
+                context=ErrorContext(
+                    extra={
+                        "checkpoint_name": checkpoint.name,
+                        "suggestion": "Pass a StateManager to JourneyRunner or remove checkpoints from the journey",
+                    },
+                ),
             )
         if self.output:
             self.output.checkpoint(checkpoint.name)
@@ -251,10 +315,15 @@ class JourneyRunner:
         logger.info(f"Exploring branch with {len(branch.paths)} paths")
 
         if not self.state_manager:
-            logger.warning(
-                f"Branch at checkpoint '{branch.checkpoint_name}' is being executed but no StateManager "
-                "configured. Rollback between paths will not work - each path will see state changes "
-                "from previous paths. Configure a StateManager for proper branch isolation."
+            raise MissingStateManagerError(
+                message=f"Branch at checkpoint '{branch.checkpoint_name}' requires a StateManager but none is configured",
+                context=ErrorContext(
+                    journey_name=journey_name,
+                    extra={
+                        "checkpoint_name": branch.checkpoint_name,
+                        "suggestion": "Pass a StateManager to JourneyRunner or remove branches from the journey",
+                    },
+                ),
             )
 
         if self.output:
@@ -446,20 +515,15 @@ class JourneyRunner:
         effective_timeout = step.timeout or journey_timeout
 
         try:
-            action = (
-                step.get_action_callable() if hasattr(step, "get_action_callable") else step.action
-            )
+            # Use action resolver for string actions
+            action = step.get_action_callable(self._action_resolver)
+
             if callable(action):
                 step_ports = {
                     k: v for k, v in self.ports.items() if k in (step.requires_ports or [])
                 }
                 step_args = getattr(step, "args", {})
                 merged_args = {**step_ports, **step_args}
-
-                # Log request details for debug mode
-                if self.debug_logger and self.client.history:
-                    # Log will be captured after request via history
-                    pass
 
                 # Execute with timeout if configured
                 if effective_timeout is not None:
@@ -575,7 +639,7 @@ class JourneyRunner:
 
         if not success:
             logs = self._capture_logs() if self.capture_logs else []
-            self._add_issue(
+            self._formatter.add_issue(
                 journey=journey_name,
                 path=path_name,
                 step=step.name,
@@ -588,7 +652,7 @@ class JourneyRunner:
                 self.output.step_fail(step.name, error or "Unknown error", duration_ms)
 
             # Always print request/response details on failure (TD-004)
-            error_output = self._format_step_failure(
+            error_output = self._formatter.format_step_failure(
                 step_name=step.name,
                 error=error or "Unknown error",
                 request=request,
@@ -676,180 +740,6 @@ class JourneyRunner:
                     operation_description=description or f"executing step '{step_name}'",
                 )
 
-    def _add_issue(
-        self,
-        journey: str,
-        path: str,
-        step: str,
-        error: str,
-        severity: Severity = Severity.HIGH,
-        request: dict[str, Any] | None = None,
-        response: dict[str, Any] | None = None,
-        logs: list[str] | None = None,
-    ) -> None:
-        """Add an issue to the issues list."""
-        issue = Issue(
-            journey=journey,
-            path=path,
-            step=step,
-            error=error,
-            severity=severity,
-            request=request,
-            response=response,
-            logs=logs or [],
-        )
-        self._issues.append(issue)
-        logger.warning(f"Issue captured: {journey}/{path}/{step} - {error}")
-
-    def _format_step_failure(
-        self,
-        step_name: str,
-        error: str,
-        request: dict[str, Any] | None = None,
-        response: dict[str, Any] | None = None,
-    ) -> str:
-        """Format step failure with full request/response details.
-
-        Always shows request and response information when a step fails,
-        regardless of debug mode setting (TD-004).
-
-        Args:
-            step_name: Name of the failed step.
-            error: Error message.
-            request: Request data (method, URL, headers, body).
-            response: Response data (status_code, headers, body).
-
-        Returns:
-            Formatted error string with request/response details.
-        """
-        lines: list[str] = []
-        lines.append("")
-        lines.append(f"Step '{step_name}' failed: {error}")
-        lines.append("")
-
-        # Format request details
-        if request:
-            lines.append("Request:")
-            method = request.get("method", "?")
-            url = request.get("url", "?")
-            lines.append(f"  {method} {url}")
-
-            # Show relevant headers (Content-Type is most important)
-            headers = request.get("headers", {})
-            if headers:
-                content_type = headers.get("Content-Type") or headers.get("content-type")
-                if content_type:
-                    lines.append(f"  Content-Type: {content_type}")
-
-            # Show request body
-            body = request.get("body")
-            if body:
-                body_str = self._format_body_for_display(body)
-                lines.append(f"  {body_str}")
-            lines.append("")
-
-        # Format response details
-        if response:
-            status_code = response.get("status_code", "?")
-            lines.append(f"Response ({status_code}):")
-
-            # Show response body
-            body = response.get("body")
-            if body:
-                body_str = self._format_body_for_display(body)
-                lines.append(f"  {body_str}")
-            lines.append("")
-
-        # Add suggestion based on error type
-        suggestion = self._get_error_suggestion(error, response)
-        if suggestion:
-            lines.append(f"Suggestion: {suggestion}")
-            lines.append("")
-
-        return "\n".join(lines)
-
-    def _format_body_for_display(self, body: Any) -> str:
-        """Format request/response body for display.
-
-        Args:
-            body: Body data (string, dict, or other).
-
-        Returns:
-            Formatted body string.
-        """
-        if body is None:
-            return "(empty)"
-
-        if isinstance(body, str):
-            # Try to parse as JSON for pretty formatting
-            try:
-                parsed = json.loads(body)
-                return json.dumps(parsed, indent=2)
-            except (json.JSONDecodeError, TypeError):
-                # Truncate long strings
-                if len(body) > 500:
-                    return body[:500] + "... [truncated]"
-                return body
-
-        if isinstance(body, (dict, list)):
-            try:
-                formatted = json.dumps(body, indent=2, default=str)
-                if len(formatted) > 500:
-                    return formatted[:500] + "... [truncated]"
-                return formatted
-            except (TypeError, ValueError):
-                return str(body)
-
-        return str(body)
-
-    def _get_error_suggestion(
-        self,
-        error: str,
-        response: dict[str, Any] | None = None,
-    ) -> str:
-        """Get a helpful suggestion based on the error.
-
-        Args:
-            error: Error message.
-            response: Response data if available.
-
-        Returns:
-            Suggestion string or empty string.
-        """
-        error_lower = error.lower()
-        status_code = response.get("status_code") if response else None
-
-        # Status code based suggestions
-        if status_code:
-            status_suggestions = {
-                400: "Check request body format and required fields",
-                401: "Check authentication token or credentials",
-                403: "Check user permissions for this action",
-                404: "Check endpoint path and resource ID",
-                405: "Check HTTP method (GET/POST/PUT/DELETE)",
-                409: "Check for duplicate entries or state conflicts",
-                422: "Check request body validation rules",
-                429: "Rate limit exceeded - add delays between requests",
-                500: "Check backend logs for exception details",
-                502: "Check if upstream services are running",
-                503: "Service unavailable - check if service is healthy",
-                504: "Gateway timeout - check service performance",
-            }
-            if status_code in status_suggestions:
-                return status_suggestions[status_code]
-
-        # Error pattern based suggestions
-        if "connection refused" in error_lower:
-            return "Is the service running? Check with `docker ps` or service status"
-        if "timeout" in error_lower:
-            return "Service may be slow - try increasing timeout"
-        if "validation" in error_lower:
-            return "Check input data matches expected format"
-        if "not found" in error_lower:
-            return "Resource may not exist - check if it was created first"
-
-        return ""
-
     def _capture_logs(self) -> list[str]:
         """Capture recent logs from infrastructure."""
         return []
@@ -867,82 +757,11 @@ class JourneyRunner:
 
     def get_issues(self) -> list[Issue]:
         """Get all captured issues."""
-        return self._issues.copy()
+        return self._formatter.get_issues()
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Get caching statistics."""
-        if not self.cache:
-            return {"enabled": False}
-        stats = self.cache.get_stats()
-        return {
-            "enabled": True,
-            "runner_hits": self._cache_hits,
-            "runner_misses": self._cache_misses,
-            **stats.to_dict(),
-        }
-
-    def _try_get_cached_response(
-        self,
-        method: str,
-        url: str,
-        headers: dict[str, str] | None,
-        body: Any,
-    ) -> Any | None:
-        """Try to get a cached response for the request."""
-        if not self.use_caching or not self.cache:
-            return None
-
-        if method.upper() not in self.cacheable_methods:
-            return None
-
-        key = self.cache.compute_key(method, url, headers, body)
-        cached = self.cache.get(key)
-
-        if cached is not None:
-            self._cache_hits += 1
-            logger.debug(f"Cache hit for {method} {url}")
-            from venomqa.performance.cache import CachedResponse
-
-            if isinstance(cached, dict):
-                return CachedResponse(
-                    status_code=cached.get("status_code", 200),
-                    headers=cached.get("headers", {}),
-                    body=cached.get("body"),
-                    from_cache=True,
-                )
-            return cached
-
-        self._cache_misses += 1
-        return None
-
-    def _cache_response(
-        self,
-        method: str,
-        url: str,
-        headers: dict[str, str] | None,
-        body: Any,
-        response: Any,
-    ) -> None:
-        """Cache a response if caching is enabled and method is cacheable."""
-        if not self.use_caching or not self.cache:
-            return
-
-        if method.upper() not in self.cacheable_methods:
-            return
-
-        if hasattr(response, "status_code") and response.status_code >= 400:
-            return
-
-        key = self.cache.compute_key(method, url, headers, body)
-
-        cached_data = {
-            "status_code": getattr(response, "status_code", 200),
-            "headers": dict(getattr(response, "headers", {})),
-            "body": self._safe_json(response),
-        }
-
-        self.cache.set(key, cached_data, ttl=self.cache_ttl)
-        logger.debug(f"Cached response for {method} {url}")
+        return self._cache_manager.get_stats()
 
     def _get_pooled_db_connection(self, timeout: float | None = None):
         """Get a database connection from the pool if available."""
@@ -950,55 +769,25 @@ class JourneyRunner:
             return self.db_pool.acquire(timeout)
         return None
 
-    def _persist_result(self, result: JourneyResult, journey: Journey) -> str | None:
-        """Persist journey result to storage if configured.
-
-        Args:
-            result: The JourneyResult to persist.
-            journey: The Journey that was executed.
-
-        Returns:
-            The run ID if persisted, None otherwise.
-        """
-        if not self.persist_results:
-            return None
-
-        try:
-            # Lazy import to avoid circular imports
-            if self.results_repository is None:
-                from venomqa.storage import ResultsRepository
-                self.results_repository = ResultsRepository()
-                self.results_repository.initialize()
-
-            # Merge journey tags with configured tags
-            tags = list(set(self.results_tags + getattr(journey, "tags", [])))
-
-            # Add journey metadata
-            metadata = {
-                **self.results_metadata,
-                "journey_description": getattr(journey, "description", ""),
-                "parallel_paths": self.parallel_paths,
-                "fail_fast": self.fail_fast,
-            }
-
-            run_id = self.results_repository.save_journey_result(
-                result,
-                tags=tags,
-                metadata=metadata,
-            )
-
-            logger.info(f"Persisted journey result: {result.journey_name} (run_id: {run_id})")
-            return run_id
-
-        except Exception as e:
-            logger.warning(f"Failed to persist journey result: {e}")
-            return None
-
     def close(self) -> None:
         """Clean up resources."""
         if self.db_pool:
             self.db_pool.close()
-        if self.cache:
-            self.cache.clear()
-        if self.results_repository:
-            self.results_repository.close()
+        self._cache_manager.clear()
+        self._persister.close()
+
+    # Backward compatibility properties
+    @property
+    def _issues(self) -> list[Issue]:
+        """Backward compatibility: access issues from formatter."""
+        return self._formatter.get_issues()
+
+    @property
+    def _cache_hits(self) -> int:
+        """Backward compatibility: access cache hits from cache manager."""
+        return self._cache_manager._hits
+
+    @property
+    def _cache_misses(self) -> int:
+        """Backward compatibility: access cache misses from cache manager."""
+        return self._cache_manager._misses
