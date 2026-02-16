@@ -30,13 +30,12 @@ from venomqa.v1 import (
     Severity,
 )
 from venomqa.v1.world import World
-from venomqa.v1.adapters import HttpClient, PostgresAdapter, RedisAdapter
+from venomqa.v1.adapters import HttpClient, PostgresAdapter
 
 
 # Configuration
 API_URL = "http://localhost:8000"
 DB_URL = "postgresql://appuser:apppass@localhost:5432/appdb"
-REDIS_URL = "redis://localhost:6379/0"
 
 
 def create_actions(api: HttpClient) -> list[Action]:
