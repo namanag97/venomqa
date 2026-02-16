@@ -547,9 +547,7 @@ class StateGraph:
         context: dict[str, Any],
     ) -> tuple[Any, float, str | None]:
         """Execute an edge action and return (response, duration_ms, error)."""
-        import time
-
-        start = time.time()
+        start = time.perf_counter()
         error = None
         response = None
 
@@ -559,8 +557,121 @@ class StateGraph:
             error = str(e)
             logger.error(f"Edge {edge.name} failed: {e}")
 
-        duration_ms = (time.time() - start) * 1000
+        duration_ms = (time.perf_counter() - start) * 1000
         return response, duration_ms, error
+
+    def explore_iter(
+        self,
+        client: Any,
+        db: Any = None,
+        max_depth: int = 10,
+        stop_on_violation: bool = False,
+        reset_state: Callable[[], None] | None = None,
+    ) -> Iterator[PathResult]:
+        """Explore all paths through the state graph, yielding results as they complete.
+
+        This is the memory-efficient streaming version of explore(). Instead of
+        accumulating all results in memory, it yields each PathResult as soon as
+        a path completes (reaches a leaf or max depth).
+
+        Uses DFS with explicit stack and parent-pointer tree structure:
+        - Memory: O(depth) for stack, O(total_nodes) for exploration tree
+        - Paths share structure via parent pointers
+        - Context reconstructed on-demand by walking parents
+
+        Args:
+            client: HTTP client for making requests.
+            db: Database connection for invariant checks.
+            max_depth: Maximum path length to explore.
+            stop_on_violation: Stop exploration on first invariant violation.
+            reset_state: Function to reset app state between paths.
+
+        Yields:
+            PathResult for each completed path.
+
+        Example:
+            >>> for result in graph.explore_iter(client, db):
+            ...     if not result.success:
+            ...         print(f"FAIL: {result.path}")
+            ...         for v in result.invariant_violations:
+            ...             print(f"  - {v.invariant.name}")
+        """
+        if not self._initial_node:
+            raise ValueError("No initial node set. Call set_initial_node() first.")
+
+        # Create root exploration node
+        root = ExplorationNode(
+            state_id=self._initial_node,
+            parent=None,
+            edge=None,
+            response=None,
+            duration_ms=0.0,
+            error=None,
+            depth=0,
+            invariant_violations=[],
+        )
+
+        # DFS with explicit stack - O(depth) memory
+        stack: list[ExplorationNode] = [root]
+
+        while stack:
+            current = stack.pop()
+            current_node = self.nodes[current.state_id]
+
+            # Reconstruct context for invariant checking
+            # This is O(depth) but only done once per node visit
+            context = current.get_context()
+
+            # Check invariants at current node
+            violations = self._check_invariants(
+                client, db, context, current_node,
+                current.edge
+            )
+
+            if violations:
+                current.invariant_violations = violations
+                if stop_on_violation:
+                    yield current.to_path_result()
+                    continue
+
+            # Get outgoing edges
+            outgoing = self.get_edges_from(current.state_id)
+
+            # Check if this is a leaf (end of path)
+            if not outgoing or current.depth >= max_depth:
+                yield current.to_path_result()
+                continue
+
+            # Explore each outgoing edge - push children to stack
+            for edge in outgoing:
+                # Reset state if provided (for clean exploration at root)
+                if reset_state and current.depth == 0:
+                    try:
+                        reset_state()
+                    except Exception as e:
+                        logger.warning(f"Reset state failed: {e}")
+
+                # Execute the edge action
+                response, duration_ms, error = self._execute_edge(edge, client, context)
+
+                # Create child node with parent pointer (O(1) - no copying!)
+                child = ExplorationNode(
+                    state_id=edge.to_node,
+                    parent=current,
+                    edge=edge,
+                    response=response,
+                    duration_ms=duration_ms,
+                    error=error,
+                    depth=current.depth + 1,
+                    invariant_violations=[],
+                )
+
+                if error:
+                    # Edge failed - this path ends here
+                    yield child.to_path_result()
+                else:
+                    # Continue exploration from this child
+                    stack.append(child)
 
     def explore(
         self,
@@ -572,114 +683,44 @@ class StateGraph:
     ) -> ExplorationResult:
         """Explore all paths through the state graph.
 
+        This method uses DFS with parent-pointer trees internally for memory
+        efficiency, then accumulates results into an ExplorationResult.
+
+        For very large state spaces where memory is a concern, use explore_iter()
+        to stream results without accumulation.
+
         Args:
-            client: HTTP client for making requests
-            db: Database connection for invariant checks
-            max_depth: Maximum path length to explore
-            stop_on_violation: Stop exploration on first invariant violation
-            reset_state: Function to reset app state between paths
+            client: HTTP client for making requests.
+            db: Database connection for invariant checks.
+            max_depth: Maximum path length to explore.
+            stop_on_violation: Stop exploration on first invariant violation.
+            reset_state: Function to reset app state between paths.
 
         Returns:
-            ExplorationResult with all findings
+            ExplorationResult with all findings.
         """
-        if not self._initial_node:
-            raise ValueError("No initial node set. Call set_initial_node() first.")
-
         started_at = datetime.now()
         all_paths: list[PathResult] = []
         all_violations: list[InvariantViolation] = []
         nodes_visited: set[str] = set()
         edges_executed: set[str] = set()
 
-        # BFS exploration of all paths
-        # Each queue item: (current_node_id, path_so_far, edges_so_far, context)
-        queue: list[tuple[str, list[str], list[Edge], dict[str, Any]]] = [
-            (self._initial_node, [self._initial_node], [], {})
-        ]
+        # Use the streaming iterator internally
+        for path_result in self.explore_iter(
+            client=client,
+            db=db,
+            max_depth=max_depth,
+            stop_on_violation=stop_on_violation,
+            reset_state=reset_state,
+        ):
+            all_paths.append(path_result)
+            all_violations.extend(path_result.invariant_violations)
 
-        while queue:
-            current_node_id, path, edges_taken, context = queue.pop(0)
-            nodes_visited.add(current_node_id)
-            current_node = self.nodes[current_node_id]
-
-            # Check invariants at current node
-            violations = self._check_invariants(
-                client, db, context, current_node,
-                edges_taken[-1] if edges_taken else None
-            )
-
-            if violations:
-                all_violations.extend(violations)
-                if stop_on_violation:
-                    all_paths.append(PathResult(
-                        path=path,
-                        edges_taken=edges_taken,
-                        edge_results=[],
-                        success=False,
-                        invariant_violations=violations,
-                    ))
-                    continue
-
-            # Get outgoing edges
-            outgoing = self.get_edges_from(current_node_id)
-
-            if not outgoing or len(path) >= max_depth:
-                # End of path
-                all_paths.append(PathResult(
-                    path=path,
-                    edges_taken=edges_taken,
-                    edge_results=[],
-                    success=len(violations) == 0,
-                    invariant_violations=violations,
-                ))
-                continue
-
-            # Explore each outgoing edge
-            for edge in outgoing:
+            # Track visited nodes and executed edges
+            for node_id in path_result.path:
+                nodes_visited.add(node_id)
+            for edge in path_result.edges_taken:
                 edges_executed.add(edge.name)
-
-                # Reset state if provided (for clean exploration)
-                if reset_state and len(edges_taken) == 0:
-                    try:
-                        reset_state()
-                    except Exception as e:
-                        logger.warning(f"Reset state failed: {e}")
-
-                # Execute the edge
-                new_context = dict(context)
-                response, duration_ms, error = self._execute_edge(edge, client, new_context)
-
-                if error:
-                    # Edge failed, record and don't continue this path
-                    all_paths.append(PathResult(
-                        path=path + [edge.to_node],
-                        edges_taken=edges_taken + [edge],
-                        edge_results=[EdgeResult(
-                            edge=edge,
-                            success=False,
-                            response=response,
-                            duration_ms=duration_ms,
-                            error=error,
-                        )],
-                        success=False,
-                    ))
-                    continue
-
-                # Store response in context for next steps
-                new_context[f"_response_{edge.name}"] = response
-                if hasattr(response, "json"):
-                    try:
-                        new_context[f"_json_{edge.name}"] = response.json()
-                    except Exception:
-                        pass
-
-                # Add to queue for further exploration
-                queue.append((
-                    edge.to_node,
-                    path + [edge.to_node],
-                    edges_taken + [edge],
-                    new_context,
-                ))
 
         finished_at = datetime.now()
 
