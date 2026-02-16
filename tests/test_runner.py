@@ -593,3 +593,144 @@ class TestIssueCapture:
         issues2 = runner.get_issues()
 
         assert issues1 is not issues2
+
+
+class TestStateManagerRequirement:
+    """Tests for StateManager requirement enforcement."""
+
+    def test_checkpoint_without_state_manager_raises_error(
+        self, mock_client: MockClient
+    ) -> None:
+        """Checkpoint without StateManager should raise MissingStateManagerError."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        journey = Journey(
+            name="checkpoint_test",
+            steps=[
+                Step(name="step1", action=action),
+                Checkpoint(name="midpoint"),
+            ],
+        )
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})])
+
+        runner = JourneyRunner(client=mock_client)  # No state_manager
+
+        with pytest.raises(MissingStateManagerError) as exc_info:
+            runner.run(journey)
+
+        assert "midpoint" in str(exc_info.value.message)
+        assert "StateManager" in str(exc_info.value.message)
+
+    def test_branch_without_state_manager_raises_error(
+        self, mock_client: MockClient
+    ) -> None:
+        """Branch without StateManager should raise MissingStateManagerError."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        checkpoint = Checkpoint(name="test_checkpoint")
+        branch = Branch(
+            checkpoint_name="test_checkpoint",
+            paths=[
+                Path(name="path1", steps=[Step(name="p1", action=action)]),
+            ],
+        )
+
+        journey = Journey(
+            name="branch_test",
+            steps=[
+                Step(name="setup", action=action),
+                checkpoint,
+                branch,
+            ],
+        )
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})])
+
+        runner = JourneyRunner(client=mock_client)  # No state_manager
+
+        with pytest.raises(MissingStateManagerError) as exc_info:
+            runner.run(journey)
+
+        # Error should mention the checkpoint or StateManager
+        assert "StateManager" in str(exc_info.value.message)
+
+    def test_checkpoint_with_state_manager_works(
+        self, mock_client: MockClient
+    ) -> None:
+        """Checkpoint with StateManager should work normally."""
+        def action(client, ctx):
+            return client.get("/test")
+
+        journey = Journey(
+            name="checkpoint_test",
+            steps=[
+                Step(name="step1", action=action),
+                Checkpoint(name="midpoint"),
+                Step(name="step2", action=action),
+            ],
+        )
+
+        mock_client.set_responses([
+            MockHTTPResponse(status_code=200, json_data={}),
+            MockHTTPResponse(status_code=200, json_data={}),
+        ])
+
+        state_manager = MockStateManager()
+        runner = JourneyRunner(client=mock_client, state_manager=state_manager)
+        result = runner.run(journey)
+
+        assert result.success is True
+        assert "midpoint" in state_manager._checkpoints
+
+
+class TestDependencyInjection:
+    """Tests for dependency injection in JourneyRunner."""
+
+    def test_custom_action_resolver(self, mock_client: MockClient) -> None:
+        """Custom ActionResolver should be used for resolving string actions."""
+        from venomqa.runner.resolver import DictActionResolver
+
+        def custom_action(client, ctx):
+            ctx.set("custom_called", True)
+            return client.get("/custom")
+
+        resolver = DictActionResolver({"my.action": custom_action})
+
+        journey = Journey(
+            name="resolver_test",
+            steps=[Step(name="custom_step", action="my.action")],
+        )
+
+        mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})])
+
+        runner = JourneyRunner(client=mock_client, action_resolver=resolver)
+        result = runner.run(journey)
+
+        assert result.success is True
+
+    def test_custom_issue_formatter(self, mock_client: MockClient) -> None:
+        """Custom IssueFormatter should be used for issue creation."""
+        from venomqa.runner.formatter import IssueFormatter
+
+        formatter = IssueFormatter()
+
+        def failing_action(client, ctx):
+            return client.get("/fail")
+
+        journey = Journey(
+            name="formatter_test",
+            steps=[Step(name="fail_step", action=failing_action)],
+        )
+
+        mock_client.set_responses([MockHTTPResponse(status_code=500, json_data={})])
+
+        runner = JourneyRunner(client=mock_client, issue_formatter=formatter)
+        result = runner.run(journey)
+
+        # Issues should be in both the result and the formatter
+        assert len(result.issues) == 1
+        assert len(formatter.get_issues()) == 1
+        assert result.issues[0].step == "fail_step"
