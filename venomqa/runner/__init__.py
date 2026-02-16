@@ -219,6 +219,8 @@ class JourneyRunner:
             raise
         except JourneyTimeoutError:
             raise
+        except MissingStateManagerError:
+            raise
         except VenomQAError as e:
             _journey_err = e
             del _journey_err
