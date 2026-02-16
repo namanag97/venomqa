@@ -112,6 +112,9 @@ Data Generation:
     CLI Usage: docs/cli.md
 """
 
+# v1 API - the new, simplified interface
+from venomqa import v1
+
 from venomqa.adapters import get_adapter, list_adapters, register_adapter, register_adapter_class
 from venomqa.http import Client, SecureCredentials
 from venomqa.config import QAConfig
