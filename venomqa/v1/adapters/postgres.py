@@ -85,22 +85,82 @@ class PostgresAdapter:
         with self._conn.cursor() as cur:
             cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
 
+    def add_observation_query(self, name: str, query: str) -> None:
+        """Add a custom observation query.
+
+        Args:
+            name: Field name in observation data.
+            query: SQL query that returns a single value.
+
+        Example:
+            adapter.add_observation_query(
+                "has_pending_orders",
+                "SELECT EXISTS(SELECT 1 FROM orders WHERE status = 'pending')"
+            )
+        """
+        self._observe_queries[name] = query
+
+    def add_custom_observer(self, observer: ObservationQuery) -> None:
+        """Add a custom observation function.
+
+        Args:
+            observer: Function that receives this adapter and returns
+                     dict of observation data.
+
+        Example:
+            def observe_user_state(adapter):
+                result = adapter.execute("SELECT id, email FROM users LIMIT 1")
+                return {"current_user_id": result[0][0] if result else None}
+
+            adapter.add_custom_observer(observe_user_state)
+        """
+        self._custom_observers.append(observer)
+
     def observe(self) -> Observation:
-        """Query tables and return observation."""
+        """Query tables and return observation.
+
+        Returns rich observation with:
+        - Table counts (from observe_tables)
+        - Custom query results (from observe_queries)
+        - Custom observer results
+        - Metadata (savepoint counter, not used for state identity)
+        """
         if not self._conn:
             self.connect()
 
         data: dict[str, Any] = {}
+        metadata: dict[str, Any] = {
+            "savepoint_counter": self._savepoint_counter,
+        }
+
         with self._conn.cursor() as cur:
+            # Table counts
             for table in self.observe_tables:
                 cur.execute(f"SELECT COUNT(*) FROM {table}")
                 count = cur.fetchone()[0]
                 data[f"{table}_count"] = count
 
-        return Observation(
+            # Custom queries
+            for name, query in self._observe_queries.items():
+                try:
+                    cur.execute(query)
+                    result = cur.fetchone()
+                    data[name] = result[0] if result else None
+                except Exception as e:
+                    data[name] = f"ERROR: {e}"
+
+        # Custom observers
+        for observer in self._custom_observers:
+            try:
+                result = observer(self)
+                data.update(result)
+            except Exception as e:
+                data[f"observer_error"] = str(e)
+
+        return Observation.create(
             system="db",
             data=data,
-            observed_at=datetime.now(),
+            metadata=metadata,
         )
 
     def execute(self, query: str, params: tuple[Any, ...] | None = None) -> list[tuple[Any, ...]]:
