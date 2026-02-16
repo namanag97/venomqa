@@ -466,6 +466,7 @@ __all__ = [
     "StateNode",
     "Edge",
     "Invariant",
+    "ExplorationNode",
     "ExplorationResult",
     "JourneyRunner",
     "Client",
