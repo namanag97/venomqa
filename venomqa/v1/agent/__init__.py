@@ -10,7 +10,8 @@ from venomqa.v1.core.transition import Transition
 from venomqa.v1.core.graph import Graph
 from venomqa.v1.core.invariant import Invariant, Violation
 from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.agent.strategies import Strategy, BFS, DFS, Random
+from venomqa.v1.agent.strategies import Strategy, BFS, DFS, Random, CoverageGuided, Weighted
+from venomqa.v1.agent.scheduler import Scheduler, ScheduledRun, RunResult
 
 if TYPE_CHECKING:
     from venomqa.v1.world import World
