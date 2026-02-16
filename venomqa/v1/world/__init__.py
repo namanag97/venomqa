@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from venomqa.v1.core.state import State, Observation
 from venomqa.v1.core.action import Action, ActionResult
+from venomqa.v1.core.context import Context
 from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
 from venomqa.v1.world.checkpoint import Checkpoint
 
@@ -22,20 +23,27 @@ class World:
     - Observes state from all registered systems
     - Creates checkpoints across all systems
     - Rolls back all systems to a checkpoint
+    - Maintains shared context between actions
 
     The key insight: checkpoint and rollback are ATOMIC across all systems.
     When you checkpoint, every system saves its state at the same logical moment.
     When you rollback, every system restores together.
+
+    Context: The World maintains a Context object that actions can use to
+    share data. Context is checkpointed/restored along with system state.
     """
 
     def __init__(
         self,
         api: "HttpClient",
         systems: dict[str, Rollbackable] | None = None,
+        context: Context | None = None,
     ) -> None:
         self.api = api
         self.systems: dict[str, Rollbackable] = systems or {}
+        self.context = context or Context()
         self._checkpoints: dict[str, Checkpoint] = {}
+        self._context_checkpoints: dict[str, dict[str, Any]] = {}
         self._current_state_id: str | None = None
 
     def register_system(self, name: str, system: Rollbackable) -> None:
