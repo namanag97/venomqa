@@ -42,11 +42,34 @@ class Graph:
     def initial_state_id(self) -> str | None:
         return self._initial_state_id
 
-    def add_state(self, state: State) -> None:
-        """Add a state to the graph."""
+    def add_state(self, state: State) -> State:
+        """Add a state to the graph, deduplicating by content.
+
+        If a state with the same ID (same observation content) already exists:
+        - Return the existing state
+        - Update checkpoint_id if the new state has one and existing doesn't
+
+        This is key to preventing exponential state explosion.
+
+        Returns:
+            The canonical state (existing or newly added).
+        """
         if self._initial_state_id is None:
             self._initial_state_id = state.id
+
+        if state.id in self._states:
+            existing = self._states[state.id]
+            # If new state has checkpoint but existing doesn't, update
+            if state.checkpoint_id and not existing.checkpoint_id:
+                # Create updated state with checkpoint (frozen dataclass)
+                from dataclasses import replace
+                updated = replace(existing, checkpoint_id=state.checkpoint_id)
+                self._states[state.id] = updated
+                return updated
+            return existing
+
         self._states[state.id] = state
+        return state
 
     def add_transition(self, transition: Transition) -> None:
         """Add a transition and mark as explored."""
