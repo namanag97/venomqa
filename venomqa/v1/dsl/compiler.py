@@ -1,4 +1,40 @@
-"""Journey compiler - converts DSL to core objects."""
+"""Journey compiler - converts DSL to core objects.
+
+IMPORTANT: Understanding DSL vs Exploration
+───────────────────────────────────────────
+
+The Journey DSL is for ORGANIZING test scenarios, not for CONTROLLING exploration.
+
+What the DSL provides:
+- Action definitions (what can be done)
+- Checkpoint markers (for rollback points)
+- Invariants (what to check)
+- Human-readable structure
+
+What the Agent does:
+- Explores ALL valid (state, action) pairs
+- Uses BFS/DFS/Random strategy
+- Ignores DSL ordering (explores exhaustively)
+
+If you want to RESTRICT which actions can run from which states,
+use ACTION PRECONDITIONS, not DSL structure:
+
+    # This doesn't restrict exploration:
+    Journey(
+        steps=[
+            Step("login", login),
+            Checkpoint("logged_in"),
+            Branch(from_checkpoint="logged_in", paths=[...])  # Agent ignores this!
+        ]
+    )
+
+    # This DOES restrict exploration:
+    Action(
+        name="create_order",
+        execute=create_order,
+        preconditions=[lambda s: s.observations["db"].get("logged_in")]
+    )
+"""
 
 from __future__ import annotations
 
@@ -9,7 +45,12 @@ from venomqa.v1.dsl.journey import Journey, Step, Checkpoint, Branch, Path
 
 
 class CompiledJourney:
-    """Result of compiling a Journey."""
+    """Result of compiling a Journey.
+
+    Note: The DSL structure (Branch, Path, checkpoint ordering) is for
+    human organization. The Agent will explore all valid actions from
+    all states regardless of DSL structure. Use preconditions to restrict.
+    """
 
     def __init__(
         self,
@@ -29,13 +70,14 @@ class CompiledJourney:
 def compile(journey: Journey) -> CompiledJourney:
     """Compile a Journey DSL into core objects.
 
-    This flattens the journey structure into:
+    This extracts:
     - A list of Actions (from Steps)
     - A list of Invariants
     - A list of checkpoint names
 
-    The branching structure is preserved in the action preconditions,
-    which are set based on which checkpoint they follow.
+    NOTE: The Branch/Path structure is for human organization only.
+    The Agent explores ALL valid (state, action) pairs regardless
+    of DSL structure. Use action preconditions to control flow.
 
     Args:
         journey: The Journey to compile.
