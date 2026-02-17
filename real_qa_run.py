@@ -15,7 +15,7 @@ import time
 import httpx
 from pathlib import Path
 
-from venomqa.v1 import (
+from venomqa import (
     Agent, BFS, World,
     Action, ActionResult, HTTPRequest, HTTPResponse,
     Invariant, Severity,
@@ -23,9 +23,9 @@ from venomqa.v1 import (
     DimensionCoverageReporter, DimensionNoveltyStrategy,
     Hypergraph,
 )
-from venomqa.v1.core.state import Observation
-from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
-from venomqa.v1.recording import RequestRecorder, generate_journey_code
+from venomqa.core.state import Observation
+from venomqa.world.rollbackable import Rollbackable, SystemCheckpoint
+from venomqa.recording import RequestRecorder, generate_journey_code
 
 BASE_URL = "https://jsonplaceholder.typicode.com"
 SEP = "=" * 65
@@ -235,7 +235,7 @@ def main():
         print("  (no dimension_coverage — hypergraph may not have detected dimensions)")
         print(f"  Hypergraph node count: {hg.node_count}")
         print(f"  Dimensions seen: {hg.all_dimensions()}")
-        raw_cov = __import__('venomqa.v1.core.coverage', fromlist=['DimensionCoverage']).DimensionCoverage.from_hypergraph(hg)
+        raw_cov = __import__('venomqa.core.coverage', fromlist=['DimensionCoverage']).DimensionCoverage.from_hypergraph(hg)
         DimensionCoverageReporter().report(raw_cov)
 
     # ── SECTION 5: RequestRecorder + Journey codegen (live traffic)
