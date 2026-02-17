@@ -403,6 +403,81 @@ Or regenerate it any time:
 venomqa llm-docs -o llm-context.md
 ```
 
+## How State Traversal Works
+
+VenomQA explores your API by trying every possible sequence of actions,
+using checkpoints to branch and rollback between paths:
+
+```
+                    [Initial State]
+                          |
+         +----------------+----------------+
+         |                |                |
+     create_user      list_items      delete_item
+         |                |                |
+    [Checkpoint]     [Checkpoint]    (no-op: nothing to delete)
+         |                |
+    +----+----+      +----+----+
+    |         |      |         |
+create_repo  login  create   list
+    |         |     _item    _items
+   ...       ...     |         |
+                [Checkpoint]   ...
+                    |
+              +-----+-----+
+              |           |
+          delete_item  update_item
+              |           |
+             ...         ...
+```
+
+**Key concepts:**
+
+1. **BFS (Breadth-First Search)**: Explores all 1-action sequences, then all
+   2-action sequences, etc. Finds shallow bugs fast.
+
+2. **Checkpoints**: Before branching, VenomQA saves the current state (database
+   snapshot, context values, etc.)
+
+3. **Rollback**: After exploring one branch, VenomQA rolls back to the checkpoint
+   and tries the next action — so each path starts from the same state.
+
+4. **Invariants**: Checked after EVERY action. If any invariant returns False,
+   VenomQA records a **violation** with the exact reproduction path.
+
+**Example exploration:**
+```
+Step 1: create_user                     → check invariants
+Step 2: create_user → create_repo       → check invariants
+Step 3: create_user → login             → check invariants
+Step 4: create_user → create_repo → ... → check invariants
+```
+
+## Understanding Violations
+
+When a violation is found, VenomQA shows:
+
+```
+[CRITICAL] refund_cannot_exceed_payment
+  Message: Refunded amount exceeds original payment. Billing bug!
+
+  Reproduction Path:
+    -> create_customer
+    -> create_payment_intent
+    -> confirm_payment
+    -> create_refund            ← violation triggered here
+
+  Request: POST http://localhost:8000/refunds
+  Response: 200
+  Body: {{"amount": 2000, ...}}
+```
+
+**Severity levels:**
+- `CRITICAL`: Data corruption, security breach, money issues
+- `HIGH`: Major feature broken
+- `MEDIUM`: Partial functionality loss
+- `LOW`: Minor issues
+
 ## Common mistakes
 
 | Wrong | Correct |
