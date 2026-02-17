@@ -120,14 +120,14 @@ venomqa = "venomqa.cli:main"
 postgresql = "venomqa.state.postgres:PostgreSQLStateManager"
 mysql = "venomqa.state.mysql:MySQLStateManager"
 sqlite = "venomqa.state.sqlite:SQLiteStateManager"
-memory = "venomqa.state.memory:MemoryStateManager"
+memory = "venomqa.state.memory:InMemoryStateManager"
 
 [project.entry-points."venomqa.reporters"]
 markdown = "venomqa.reporters.markdown:MarkdownReporter"
 json = "venomqa.reporters.json_report:JSONReporter"
 junit = "venomqa.reporters.junit:JUnitReporter"
 html = "venomqa.reporters.html:HTMLReporter"
-sarif = "venomqa.reporters.sarif:SarifReporter"
+sarif = "venomqa.reporters.sarif:SARIFReporter"
 slack = "venomqa.reporters.slack:SlackReporter"
 discord = "venomqa.reporters.discord:DiscordReporter"
 
@@ -141,11 +141,11 @@ datadog-metrics = "venomqa.plugins.examples.datadog_metrics:DataDogMetricsPlugin
 
 [project.entry-points."venomqa.adapters"]
 # Adapters for dependency injection
-postgres = "venomqa.adapters.storage:PostgresAdapter"
-redis = "venomqa.adapters.cache:RedisAdapter"
-time = "venomqa.adapters.time:ControllableTimeAdapter"
+redis = "venomqa.adapters.redis_cache:RedisCacheAdapter"
+time = "venomqa.adapters.controllable_time:ControllableTimeAdapter"
 mail = "venomqa.adapters.mail:MockMailAdapter"
 queue = "venomqa.adapters.queue:MockQueueAdapter"
+cache = "venomqa.adapters.cache:MockCacheAdapter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/venomqa"]

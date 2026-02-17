@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -140,7 +140,8 @@ class Scheduler:
                     future = executor.submit(self._execute_run, run)
                     futures[future] = run.id
 
-            for future in futures:
+            # Use as_completed to process results as they finish (avoids blocking on slow runs)
+            for future in as_completed(futures):
                 try:
                     result = future.result()
                     results.append(result)

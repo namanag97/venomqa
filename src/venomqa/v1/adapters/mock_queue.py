@@ -72,12 +72,16 @@ class MockQueue:
         self._messages.clear()
 
     def checkpoint(self, name: str) -> SystemCheckpoint:
-        """Save current queue state."""
-        return copy.deepcopy(self._messages)
+        """Save current queue state (including counter for deterministic IDs)."""
+        return {
+            "messages": copy.deepcopy(self._messages),
+            "counter": self._message_counter,
+        }
 
     def rollback(self, checkpoint: SystemCheckpoint) -> None:
-        """Restore queue state."""
-        self._messages = copy.deepcopy(checkpoint)
+        """Restore queue state (including counter for deterministic IDs)."""
+        self._messages = copy.deepcopy(checkpoint["messages"])
+        self._message_counter = checkpoint["counter"]
 
     def observe(self) -> Observation:
         """Get current queue state."""

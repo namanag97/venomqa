@@ -13,6 +13,16 @@ from venomqa.v1.core.state import Observation
 from venomqa.v1.world.rollbackable import SystemCheckpoint
 
 
+def _quote_identifier(name: str) -> str:
+    """Safely quote a SQLite identifier using double quotes.
+
+    Prevents SQL injection by escaping any double quotes in the name.
+    """
+    # Escape any existing double quotes by doubling them
+    escaped = name.replace('"', '""')
+    return f'"{escaped}"'
+
+
 class SQLiteAdapter:
     """SQLite adapter using file copy for checkpoint/rollback.
 
@@ -68,8 +78,10 @@ class SQLiteAdapter:
         if self._is_memory:
             # Backup in-memory database to file
             backup_conn = sqlite3.connect(str(checkpoint_path))
-            self.connection.backup(backup_conn)
-            backup_conn.close()
+            try:
+                self.connection.backup(backup_conn)
+            finally:
+                backup_conn.close()
         else:
             # Copy the database file
             # First, ensure all changes are written
@@ -92,8 +104,10 @@ class SQLiteAdapter:
             new_conn = sqlite3.connect(":memory:")
             new_conn.row_factory = sqlite3.Row
             backup_conn = sqlite3.connect(str(checkpoint_path))
-            backup_conn.backup(new_conn)
-            backup_conn.close()
+            try:
+                backup_conn.backup(new_conn)
+            finally:
+                backup_conn.close()
             # Swap connections: close old, use new
             if self._conn is not None:
                 self._conn.close()
@@ -109,7 +123,9 @@ class SQLiteAdapter:
         data: dict[str, Any] = {}
 
         for table in self.observe_tables:
-            cursor = self.connection.execute(f"SELECT COUNT(*) FROM {table}")
+            # Use _quote_identifier to prevent SQL injection
+            safe_table = _quote_identifier(table)
+            cursor = self.connection.execute(f"SELECT COUNT(*) FROM {safe_table}")
             count = cursor.fetchone()[0]
             data[f"{table}_count"] = count
 
@@ -159,4 +175,8 @@ class SQLiteAdapter:
 
     def __exit__(self, *args: Any) -> None:
         self.close()
+        self.cleanup()
+
+    def __del__(self) -> None:
+        """Ensure temp directory is cleaned up even if context manager isn't used."""
         self.cleanup()

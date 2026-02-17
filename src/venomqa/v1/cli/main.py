@@ -9,9 +9,32 @@ from pathlib import Path
 from typing import Any
 
 from venomqa.v1.reporters.console import ConsoleReporter
+from venomqa.v1.reporters.html_trace import HTMLTraceReporter
 from venomqa.v1.reporters.json import JSONReporter
 from venomqa.v1.reporters.junit import JUnitReporter
 from venomqa.v1.reporters.markdown import MarkdownReporter
+
+
+def _validate_coverage_target(value: str) -> float:
+    """Validate coverage target is between 0.0 and 1.0."""
+    try:
+        f = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid float value: {value!r}")
+    if not 0.0 <= f <= 1.0:
+        raise argparse.ArgumentTypeError(f"coverage-target must be between 0.0 and 1.0, got {f}")
+    return f
+
+
+def _validate_max_steps(value: str) -> int:
+    """Validate max steps is positive."""
+    try:
+        i = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid int value: {value!r}")
+    if i <= 0:
+        raise argparse.ArgumentTypeError(f"max-steps must be positive, got {i}")
+    return i
 
 
 def main(args: list[str] | None = None) -> int:
@@ -42,10 +65,10 @@ def main(args: list[str] | None = None) -> int:
             "dimension (hypergraph novelty, explores unseen dimension combos)"
         ),
     )
-    explore_parser.add_argument("--max-steps", type=int, default=1000)
+    explore_parser.add_argument("--max-steps", type=_validate_max_steps, default=1000)
     explore_parser.add_argument(
         "--coverage-target",
-        type=float,
+        type=_validate_coverage_target,
         default=None,
         metavar="0.0-1.0",
         help="Stop exploration once action coverage reaches this fraction (e.g. 0.8 = 80%%)",
@@ -56,7 +79,7 @@ def main(args: list[str] | None = None) -> int:
         default=False,
         help="Print progress every 100 steps (step count, states, coverage, violations)",
     )
-    explore_parser.add_argument("--format", "-f", choices=["console", "json", "markdown", "junit"], default="console")
+    explore_parser.add_argument("--format", "-f", choices=["console", "json", "markdown", "junit", "html"], default="console")
     explore_parser.add_argument("--output", "-o", help="Output file (default: stdout)")
 
     # validate command
@@ -176,8 +199,16 @@ def cmd_explore(args: Any) -> int:
 
     # Format output
     if args.format == "console":
-        reporter = ConsoleReporter()
-        reporter.report(result)
+        if args.output:
+            # Write console output to file
+            import io
+            buffer = io.StringIO()
+            reporter = ConsoleReporter(file=buffer, color=False)
+            reporter.report(result)
+            _write_output(buffer.getvalue(), args.output)
+        else:
+            reporter = ConsoleReporter()
+            reporter.report(result)
     elif args.format == "json":
         reporter = JSONReporter()
         output = reporter.report(result)
@@ -188,6 +219,10 @@ def cmd_explore(args: Any) -> int:
         _write_output(output, args.output)
     elif args.format == "junit":
         reporter = JUnitReporter()
+        output = reporter.report(result)
+        _write_output(output, args.output)
+    elif args.format == "html":
+        reporter = HTMLTraceReporter()
         output = reporter.report(result)
         _write_output(output, args.output)
 
@@ -462,9 +497,23 @@ def load_journey(path: str) -> Any:
 
 
 def _write_output(content: str, path: str | None) -> None:
-    """Write content to file or stdout."""
+    """Write content to file or stdout.
+
+    Auto-creates parent directories if they don't exist.
+    Prints errors to stderr instead of raising exceptions.
+    """
     if path:
-        Path(path).write_text(content)
+        try:
+            output_path = Path(path)
+            # Create parent directories if needed
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(content)
+        except PermissionError:
+            print(f"Error: Permission denied writing to {path}", file=sys.stderr)
+        except IsADirectoryError:
+            print(f"Error: {path} is a directory, not a file", file=sys.stderr)
+        except OSError as e:
+            print(f"Error writing to {path}: {e}", file=sys.stderr)
     else:
         print(content)
 

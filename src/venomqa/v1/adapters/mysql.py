@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
 
 from venomqa.v1.core.state import Observation
 from venomqa.v1.world.rollbackable import SystemCheckpoint
+
+
+def _quote_identifier(name: str) -> str:
+    """Safely quote a MySQL identifier using backticks.
+
+    Prevents SQL injection by escaping any backticks in the name.
+    """
+    # Escape any existing backticks by doubling them
+    escaped = name.replace("`", "``")
+    return f"`{escaped}`"
 
 
 class MySQLAdapter:
@@ -102,7 +113,9 @@ class MySQLAdapter:
         cursor = self.connection.cursor()
 
         for table in self.observe_tables:
-            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            # Use _quote_identifier to prevent SQL injection
+            safe_table = _quote_identifier(table)
+            cursor.execute(f"SELECT COUNT(*) FROM {safe_table}")
             count = cursor.fetchone()[0]
             data[f"{table}_count"] = count
 

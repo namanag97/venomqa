@@ -79,12 +79,16 @@ class MockMail:
         self._sent.clear()
 
     def checkpoint(self, name: str) -> SystemCheckpoint:
-        """Save current mail state."""
-        return copy.deepcopy(self._sent)
+        """Save current mail state (including counter for deterministic IDs)."""
+        return {
+            "sent": copy.deepcopy(self._sent),
+            "counter": self._email_counter,
+        }
 
     def rollback(self, checkpoint: SystemCheckpoint) -> None:
-        """Restore mail state."""
-        self._sent = copy.deepcopy(checkpoint)
+        """Restore mail state (including counter for deterministic IDs)."""
+        self._sent = copy.deepcopy(checkpoint["sent"])
+        self._email_counter = checkpoint["counter"]
 
     def observe(self) -> Observation:
         """Get current mail state."""

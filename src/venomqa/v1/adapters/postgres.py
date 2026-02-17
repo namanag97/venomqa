@@ -5,6 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+try:
+    from psycopg import sql
+except ImportError:
+    sql = None  # type: ignore[assignment]
+
 from venomqa.v1.core.state import Observation
 from venomqa.v1.world.rollbackable import SystemCheckpoint
 
@@ -133,9 +138,10 @@ class PostgresAdapter:
         }
 
         with self._conn.cursor() as cur:
-            # Table counts
+            # Table counts (use sql.Identifier to prevent SQL injection)
             for table in self.observe_tables:
-                cur.execute(f"SELECT COUNT(*) FROM {table}")
+                query = sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table))
+                cur.execute(query)
                 count = cur.fetchone()[0]
                 data[f"{table}_count"] = count
 
