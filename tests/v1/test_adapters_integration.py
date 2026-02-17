@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import pytest
 
 from venomqa.v1 import (
@@ -46,9 +47,15 @@ def make_actions(queue: MockQueue, mail: MockMail, storage: MockStorage, clock: 
     """Return a list of actions that exercise every mock adapter."""
 
     def place_order(api):
-        order_id = f"order-{clock.now().isoformat()}"
+        # clock.now is a property (not a method)
+        order_id = f"order-{clock.now.isoformat()}"
         queue.push({"order_id": order_id, "status": "pending"})
-        storage.put(f"orders/{order_id}.json", {"id": order_id, "status": "pending"})
+        # MockStorage.put() requires str/bytes content — use JSON
+        storage.put(
+            f"orders/{order_id}.json",
+            json.dumps({"id": order_id, "status": "pending"}),
+            content_type="application/json",
+        )
         mail.send(
             to="customer@example.com",
             subject="Order placed",
@@ -61,25 +68,28 @@ def make_actions(queue: MockQueue, mail: MockMail, storage: MockStorage, clock: 
         if msg is None:
             return _fail("POST", "/orders/process", 422)
         order_id = msg.payload["order_id"]
-        storage.put(f"orders/{order_id}.json", {"id": order_id, "status": "processed"})
+        storage.put(
+            f"orders/{order_id}.json",
+            json.dumps({"id": order_id, "status": "processed"}),
+            content_type="application/json",
+        )
         mail.send(
             to="customer@example.com",
             subject="Order processed",
             body=f"Order {order_id} has been processed.",
         )
-        clock.advance(seconds=60)
         return _ok("POST", f"/orders/{order_id}/process")
 
     def advance_time(api):
+        # Must freeze before advancing
+        if not clock._frozen:
+            clock.freeze()
         clock.advance(hours=1)
         return _ok("POST", "/time/advance")
 
     def list_orders(api):
-        orders = [
-            v for k, v in storage.list_files().items()
-            if k.startswith("orders/")
-        ]
-        return _ok("GET", "/orders", orders)
+        paths = storage.list("orders/")
+        return _ok("GET", "/orders", paths)
 
     return [
         Action(name="place_order", execute=place_order),
@@ -114,13 +124,15 @@ class TestAllMockAdaptersTogether:
         self.actions = make_actions(self.queue, self.mail, self.storage, self.clock)
 
     def test_initial_state_all_adapters_empty(self):
+        """State observations are keyed by the system name in World.systems."""
         state = self.world.observe()
-        assert state.get_observation("queue:orders") is not None
+        # State.observations keys match World.systems keys
+        assert state.get_observation("queue") is not None
         assert state.get_observation("mail") is not None
         assert state.get_observation("storage") is not None
         assert state.get_observation("clock") is not None
 
-        q_obs = state.get_observation("queue:orders")
+        q_obs = state.get_observation("queue")
         assert q_obs.get("pending") == 0
         assert q_obs.get("total") == 0
 
@@ -135,8 +147,8 @@ class TestAllMockAdaptersTogether:
         action.execute(None)
 
         assert self.queue.pending_count == 1
-        assert len(self.mail.sent) == 1
-        assert self.mail.sent[0].subject == "Order placed"
+        assert self.mail.sent_count == 1
+        assert self.mail.get_sent()[0].subject == "Order placed"
         assert self.storage.file_count == 1
 
     def test_process_order_consumes_queue_and_sends_email(self):
@@ -149,7 +161,7 @@ class TestAllMockAdaptersTogether:
         assert result.response.ok
         assert self.queue.pending_count == 0
         assert self.queue.processed_count == 1
-        assert len(self.mail.sent) == 2  # placed + processed
+        assert self.mail.sent_count == 2  # placed + processed
 
     def test_rollback_restores_all_adapters(self):
         # Checkpoint before placing any order
@@ -160,32 +172,33 @@ class TestAllMockAdaptersTogether:
 
         assert self.queue.pending_count == 1
         assert self.storage.file_count == 1
-        assert len(self.mail.sent) == 1
+        assert self.mail.sent_count == 1
 
         # Rollback — everything should be restored
-        self.world.rollback(cp.id)
+        self.world.rollback(cp)
 
         assert self.queue.pending_count == 0
         assert self.storage.file_count == 0
-        assert len(self.mail.sent) == 0
+        assert self.mail.sent_count == 0
 
     def test_clock_advances_and_rolls_back(self):
-        t0 = self.clock.now()
+        self.clock.freeze()
+        t0 = self.clock.now
         cp = self.world.checkpoint("t0")
 
         adv = next(a for a in self.actions if a.name == "advance_time")
         adv.execute(None)
 
-        assert self.clock.now() > t0
+        assert self.clock.now > t0
 
-        self.world.rollback(cp.id)
-        assert self.clock.now() == t0
+        self.world.rollback(cp)
+        assert self.clock.now == t0
 
     def test_full_exploration_no_violations(self):
         """Agent explores the combined system and finds no violations."""
 
         def queue_consistency(world):
-            q_obs = world.observe().get_observation("queue:orders")
+            q_obs = world.observe().get_observation("queue")
             if q_obs is None:
                 return True
             return q_obs.get("total", 0) >= q_obs.get("processed", 0)
@@ -209,14 +222,13 @@ class TestAllMockAdaptersTogether:
         assert result.success, f"Violations: {[v.invariant_name for v in result.violations]}"
 
     def test_exploration_with_all_adapters_observes_each_system(self):
-        """After exploration each system's observation appears in states."""
+        """After exploration each state has observations from all 4 systems."""
         agent = Agent(world=self.world, actions=self.actions, max_steps=10)
         result = agent.explore()
 
         for state in result.graph.states.values():
-            # Every state must have observations from all 4 systems
             obs_systems = set(state.observations.keys())
-            assert "queue:orders" in obs_systems
+            assert "queue" in obs_systems
             assert "mail" in obs_systems
             assert "storage" in obs_systems
             assert "clock" in obs_systems
@@ -241,17 +253,17 @@ class TestAllMockAdaptersTogether:
         cp2 = self.world.checkpoint("processed")
 
         # Roll back to one_pending
-        self.world.rollback(cp1.id)
+        self.world.rollback(cp1)
         assert self.queue.pending_count == 1
         assert self.queue.processed_count == 0
 
         # Roll forward to empty
-        self.world.rollback(cp0.id)
+        self.world.rollback(cp0)
         assert self.queue.pending_count == 0
         assert self.queue.processed_count == 0
 
         # Roll to processed
-        self.world.rollback(cp2.id)
+        self.world.rollback(cp2)
         assert self.queue.pending_count == 0
         assert self.queue.processed_count == 1
 
@@ -263,13 +275,14 @@ class TestAllMockAdaptersTogether:
         place.execute(None)
         process.execute(None)
 
-        # After process, order file has status=processed
-        files = self.storage.list_files()
-        assert len(files) == 1
-        order_file = next(iter(files.values()))
-        assert order_file["status"] == "processed"
+        # After process, a file exists
+        paths = self.storage.list("orders/")
+        assert len(paths) == 1
+        file_obj = self.storage.get(paths[0])
+        content = json.loads(file_obj.content)
+        assert content["status"] == "processed"
 
-        self.world.rollback(cp0.id)
+        self.world.rollback(cp0)
         assert self.storage.file_count == 0
 
     def test_mail_inbox_rolled_back(self):
@@ -277,10 +290,10 @@ class TestAllMockAdaptersTogether:
 
         cp = self.world.checkpoint("no_mail")
         place.execute(None)
-        assert len(self.mail.sent) == 1
+        assert self.mail.sent_count == 1
 
-        self.world.rollback(cp.id)
-        assert len(self.mail.sent) == 0
+        self.world.rollback(cp)
+        assert self.mail.sent_count == 0
 
     def test_invariant_detects_queue_inconsistency(self):
         """An invariant that intentionally fails is caught by the agent."""
