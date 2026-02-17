@@ -183,6 +183,7 @@ class TestConcurrentBranchExecution:
     def test_high_concurrency_branches(self) -> None:
         mock_client = MockClient()
         mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})] * 100)
+        mock_state_manager = MockStateManager()
 
         checkpoint = Checkpoint(name="start")
         branch = Branch(
@@ -198,7 +199,7 @@ class TestConcurrentBranchExecution:
 
         journey = Journey(name="high_concurrency", steps=[checkpoint, branch])
 
-        runner = JourneyRunner(client=mock_client, parallel_paths=10)
+        runner = JourneyRunner(client=mock_client, state_manager=mock_state_manager, parallel_paths=10)
         result = runner.run(journey)
 
         assert result.success is True
