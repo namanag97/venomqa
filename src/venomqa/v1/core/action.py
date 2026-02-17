@@ -114,7 +114,7 @@ class ActionResult:
         Allows actions to be used naturally: resp = api.get("/x"); resp.json()
         """
         if self.response is None:
-            raise AttributeError("ActionResult has no response (request errored)")
+            raise ValueError("Cannot get JSON: request failed with no response")
         return self.response.json()
 
     @property
