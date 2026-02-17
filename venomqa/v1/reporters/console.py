@@ -43,6 +43,13 @@ class ConsoleReporter:
         total = result.actions_total
         self._kv("Actions used", f"{used}/{total} ({result.action_coverage_percent:.0f}%)")
         self._kv("Duration", f"{result.duration_ms:.0f}ms")
+        if result.truncated_by_max_steps:
+            self._line(
+                self._c(
+                    f"  ⚠ Exploration truncated at {result.transitions_taken} steps (max_steps limit)",
+                    self.YELLOW,
+                )
+            )
         self._newline()
 
         # Violations
