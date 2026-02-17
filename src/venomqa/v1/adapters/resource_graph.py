@@ -13,7 +13,7 @@ from venomqa.v1.core.state import Observation
 from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
 
 if TYPE_CHECKING:
-    from venomqa.v1.core.context import Context
+    pass
 
 
 @dataclass
@@ -126,7 +126,7 @@ class ResourceGraph(Rollbackable):
         if resource:
             resource.alive = False
             # Cascade to children
-            for key, child in self._resources.items():
+            for _, child in self._resources.items():
                 if child.parent is resource and child.alive:
                     self.destroy(child.type, child.id)
 
