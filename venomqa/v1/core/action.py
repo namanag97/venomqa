@@ -78,6 +78,39 @@ class ActionResult:
             error=error,
         )
 
+    # ── Convenience proxies — so actions can treat ActionResult like a response ──
+
+    @property
+    def status_code(self) -> int:
+        """HTTP status code of the response (proxy for result.response.status_code)."""
+        if self.response is None:
+            raise AttributeError("ActionResult has no response (request errored)")
+        return self.response.status_code
+
+    @property
+    def ok(self) -> bool:
+        """True if response status is 2xx/3xx (proxy for result.response.ok)."""
+        if self.response is None:
+            return False
+        return self.response.ok
+
+    def json(self) -> Any:
+        """Return response body as parsed JSON (proxy for result.response.json()).
+
+        Allows actions to be used naturally: resp = api.get("/x"); resp.json()
+        """
+        if self.response is None:
+            raise AttributeError("ActionResult has no response (request errored)")
+        return self.response.json()
+
+    @property
+    def text(self) -> str:
+        """Response body as string (proxy for str(result.response.body))."""
+        if self.response is None:
+            return ""
+        body = self.response.body
+        return body if isinstance(body, str) else str(body) if body is not None else ""
+
 
 # Type alias for action preconditions
 Precondition = Callable[["State"], bool]
