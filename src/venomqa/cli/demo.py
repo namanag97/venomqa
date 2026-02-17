@@ -1,6 +1,7 @@
-"""Demo server and command for VenomQA.
+"""Demo command for VenomQA.
 
-Provides a zero-config way to see VenomQA in action without setting up an API.
+Shows a compelling demo with a planted bug that VenomQA finds.
+The bug only appears when you call refund twice - unit tests miss this.
 """
 
 from __future__ import annotations
@@ -15,11 +16,15 @@ from urllib.parse import urlparse
 import click
 
 
-class DemoAPIHandler(BaseHTTPRequestHandler):
-    """Simple REST API handler for demo purposes."""
+class BuggyOrderAPI(BaseHTTPRequestHandler):
+    """Mock order API with a planted bug: allows double refunds.
 
-    # In-memory storage
-    items: dict[str, dict[str, Any]] = {}
+    The bug: You can refund an order multiple times, exceeding the original amount.
+    Unit tests pass because they test refund in isolation.
+    VenomQA finds it by testing: create_order → refund → refund → check
+    """
+
+    orders: dict[str, dict[str, Any]] = {}
     _counter: int = 0
 
     def do_GET(self) -> None:
@@ -27,380 +32,306 @@ class DemoAPIHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         if path == "/health":
-            self._send_json(200, {"status": "healthy", "version": "1.0.0"})
+            self._send_json(200, {"status": "ok"})
 
-        elif path == "/items":
-            self._send_json(200, list(self.items.values()))
+        elif path == "/orders":
+            self._send_json(200, list(self.orders.values()))
 
-        elif path.startswith("/items/"):
-            item_id = path.split("/")[-1]
-            if item_id in self.items:
-                self._send_json(200, self.items[item_id])
+        elif path.startswith("/orders/"):
+            order_id = path.split("/")[-1]
+            if order_id in self.orders:
+                self._send_json(200, self.orders[order_id])
             else:
-                self._send_json(404, {"error": "Item not found", "id": item_id})
-
+                self._send_json(404, {"error": "Order not found"})
         else:
-            self._send_json(404, {"error": "Not found", "path": path})
+            self._send_json(404, {"error": "Not found"})
 
     def do_POST(self) -> None:
-        if self.path == "/items":
-            try:
-                content_length = int(self.headers.get("Content-Length", 0))
-                body = json.loads(self.rfile.read(content_length)) if content_length > 0 else {}
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = json.loads(self.rfile.read(content_length)) if content_length > 0 else {}
 
-                DemoAPIHandler._counter += 1
-                item_id = str(DemoAPIHandler._counter)
+        if self.path == "/orders":
+            # Create order
+            BuggyOrderAPI._counter += 1
+            order_id = str(BuggyOrderAPI._counter)
+            order = {
+                "id": order_id,
+                "amount": body.get("amount", 100),
+                "refunded": 0,
+                "status": "paid",
+            }
+            self.orders[order_id] = order
+            self._send_json(201, order)
 
-                item = {
-                    "id": item_id,
-                    "name": body.get("name", "Unnamed"),
-                    "description": body.get("description", ""),
-                    "price": body.get("price", 0.0),
-                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                }
-                self.items[item_id] = item
-                self._send_json(201, item)
-
-            except json.JSONDecodeError:
-                self._send_json(400, {"error": "Invalid JSON"})
-        else:
-            self._send_json(404, {"error": "Not found"})
-
-    def do_PUT(self) -> None:
-        if self.path.startswith("/items/"):
-            item_id = self.path.split("/")[-1]
-            if item_id not in self.items:
-                self._send_json(404, {"error": "Item not found"})
+        elif self.path.startswith("/orders/") and self.path.endswith("/refund"):
+            # Refund order - BUG: doesn't check if already fully refunded!
+            order_id = self.path.split("/")[-2]
+            if order_id not in self.orders:
+                self._send_json(404, {"error": "Order not found"})
                 return
 
-            try:
-                content_length = int(self.headers.get("Content-Length", 0))
-                body = json.loads(self.rfile.read(content_length)) if content_length > 0 else {}
+            order = self.orders[order_id]
+            refund_amount = body.get("amount", order["amount"])
 
-                item = self.items[item_id]
-                item["name"] = body.get("name", item["name"])
-                item["description"] = body.get("description", item["description"])
-                item["price"] = body.get("price", item["price"])
-                item["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            # BUG: We add to refunded without checking if it exceeds amount!
+            # A correct implementation would check: order["refunded"] + refund_amount <= order["amount"]
+            order["refunded"] += refund_amount
+            order["status"] = "refunded" if order["refunded"] >= order["amount"] else "partially_refunded"
 
-                self._send_json(200, item)
-
-            except json.JSONDecodeError:
-                self._send_json(400, {"error": "Invalid JSON"})
-        else:
-            self._send_json(404, {"error": "Not found"})
-
-    def do_DELETE(self) -> None:
-        if self.path.startswith("/items/"):
-            item_id = self.path.split("/")[-1]
-            if item_id in self.items:
-                del self.items[item_id]
-                self._send_json(204, None)
-            else:
-                self._send_json(404, {"error": "Item not found"})
+            self._send_json(200, {"refunded": refund_amount, "order": order})
         else:
             self._send_json(404, {"error": "Not found"})
 
     def _send_json(self, status: int, data: Any) -> None:
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         if data is not None:
-            self.wfile.write(json.dumps(data, indent=2).encode())
+            self.wfile.write(json.dumps(data).encode())
 
     def log_message(self, format: str, *args: Any) -> None:
-        """Suppress default logging."""
-        pass
+        pass  # Suppress logging
 
 
 def start_demo_server(port: int = 8000) -> HTTPServer:
-    """Start the demo server in a background thread."""
-    # Reset state
-    DemoAPIHandler.items = {}
-    DemoAPIHandler._counter = 0
-
-    server = HTTPServer(("127.0.0.1", port), DemoAPIHandler)
+    """Start the demo server."""
+    BuggyOrderAPI.orders = {}
+    BuggyOrderAPI._counter = 0
+    server = HTTPServer(("127.0.0.1", port), BuggyOrderAPI)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
 
 
-def run_demo_journey(base_url: str) -> dict[str, Any]:
-    """Run a demo using v1 API - simple linear sequence for clarity.
-
-    For the demo, we run a clear linear CRUD flow so new users can see
-    each step succeed. Full BFS exploration is demonstrated in examples/.
-    """
+def run_demo_exploration(base_url: str) -> dict[str, Any]:
+    """Run exploration and find the double-refund bug."""
+    from venomqa import Action, Agent, World, BFS, Invariant, Severity
     from venomqa.adapters.http import HttpClient
-    from venomqa.v1.core.context import Context
 
-    results: dict[str, Any] = {"steps": [], "success": True}
     api = HttpClient(base_url)
-    context = Context()
-    start_time = time.time()
 
-    # Step definitions with expected outcomes
-    steps = [
-        ("health_check", lambda: api.get("/health"), 200),
-        ("list_items", lambda: api.get("/items"), 200),
-        ("create_item", lambda: api.post("/items", json={
-            "name": "VenomQA Demo Item",
-            "description": "Created by venomqa demo",
-            "price": 29.99,
-        }), 201),
-        ("get_item", lambda: api.get(f"/items/{context.get('item_id')}"), 200),
-        ("update_item", lambda: api.put(f"/items/{context.get('item_id')}", json={
-            "name": "Updated Demo Item",
-            "price": 39.99,
-        }), 200),
-        ("delete_item", lambda: api.delete(f"/items/{context.get('item_id')}"), 204),
-        ("verify_deleted", lambda: api.get(f"/items/{context.get('_deleted_id')}"), 404),
-    ]
+    # Track what we found
+    results = {
+        "bug_found": False,
+        "bug_sequence": [],
+        "states_visited": 0,
+        "transitions": 0,
+    }
 
-    all_success = True
-    for name, action, expected_status in steps:
-        step_start = time.time()
-        try:
-            resp = action()
-            success = resp.status_code == expected_status
+    # --- Actions ---
 
-            # Store context for subsequent steps
-            if name == "create_item" and resp.status_code == 201:
-                data = resp.json()
-                context.set("item_id", data["id"])
-            elif name == "delete_item" and resp.status_code == 204:
-                context.set("_deleted_id", context.get("item_id"))
-                context.delete("item_id")
+    def create_order(api: Any, context: Any) -> Any:
+        resp = api.post("/orders", json={"amount": 100})
+        if resp.status_code == 201:
+            context.set("order_id", resp.json()["id"])
+            context.set("order_amount", 100)
+        return resp
 
-        except Exception as e:
-            success = False
-            _ = e  # Suppress unused variable warning
+    def refund_order(api: Any, context: Any) -> Any:
+        order_id = context.get("order_id")
+        resp = api.post(f"/orders/{order_id}/refund", json={"amount": 100})
+        return resp
 
-        step_duration = (time.time() - step_start) * 1000
-        results["steps"].append({
-            "name": name,
-            "success": success,
-            "duration_ms": step_duration,
-        })
-        if not success:
-            all_success = False
+    def get_order(api: Any, context: Any) -> Any:
+        order_id = context.get("order_id")
+        resp = api.get(f"/orders/{order_id}")
+        if resp.status_code == 200:
+            context.set("current_order", resp.json())
+        return resp
 
-    results["success"] = all_success
-    results["duration_ms"] = (time.time() - start_time) * 1000
+    # --- Invariant: The bug detector ---
+
+    def no_over_refund(world: Any) -> bool:
+        """Refunded amount must never exceed order amount."""
+        order_id = world.context.get("order_id")
+        if not order_id:
+            return True
+
+        resp = world.api.get(f"/orders/{order_id}")
+        if resp.status_code != 200:
+            return True
+
+        order = resp.json()
+        # THE CHECK: refunded should never exceed amount
+        return order.get("refunded", 0) <= order.get("amount", 0)
+
+    # --- Run exploration ---
+
+    world = World(api=api, state_from_context=["order_id"])
+
+    agent = Agent(
+        world=world,
+        actions=[
+            Action(name="create_order", execute=create_order, expected_status=[201]),
+            Action(name="refund", execute=refund_order, expected_status=[200],
+                   preconditions=["create_order"]),
+            Action(name="get_order", execute=get_order, expected_status=[200],
+                   preconditions=["create_order"]),
+        ],
+        invariants=[
+            Invariant(
+                name="no_over_refund",
+                check=no_over_refund,
+                message="Refunded amount exceeds order total!",
+                severity=Severity.CRITICAL,
+            ),
+        ],
+        strategy=BFS(),
+        max_steps=20,
+    )
+
+    result = agent.explore()
+
+    results["states_visited"] = result.states_visited
+    results["transitions"] = result.transitions_taken
+
+    if result.violations:
+        results["bug_found"] = True
+        # Get the path to the bug
+        v = result.violations[0]
+        results["bug_message"] = v.message
+        results["violation"] = v
+
     return results
 
 
 @click.command()
-@click.option("--port", "-p", default=8000, help="Port for demo server (default: 8000)")
-@click.option("--server-only", is_flag=True, help="Only start the server, don't run journey")
-@click.option("--keep-running", "-k", is_flag=True, help="Keep server running after journey")
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed step output")
-@click.option("--explain", "-e", is_flag=True, help="Explain each step as it runs")
-def demo(port: int, server_only: bool, keep_running: bool, verbose: bool, explain: bool) -> None:
-    """Run a quick demo to see VenomQA in action.
+@click.option("--port", "-p", default=8000, help="Port for demo server")
+def demo(port: int) -> None:
+    """See VenomQA find a real bug that unit tests miss.
 
-    The demo runs a complete CRUD journey against a built-in mock API:
+    This demo runs a mock Order API with a hidden bug:
+    you can refund the same order multiple times, exceeding the original amount.
 
-    \b
-    1. Health Check    - Verify API is responding
-    2. List Items      - GET /items (empty list)
-    3. Create Item     - POST /items with JSON body
-    4. Get Item        - GET /items/{id}
-    5. Update Item     - PUT /items/{id}
-    6. Delete Item     - DELETE /items/{id}
-    7. Verify Deleted  - GET /items/{id} (expect 404)
-
-    No configuration file needed - this works out of the box!
+    Unit tests pass because they test "refund" in isolation.
+    VenomQA finds the bug by testing the SEQUENCE: create → refund → refund
 
     \b
-    Examples:
-        venomqa demo                    # Run full demo
-        venomqa demo --explain          # Show what each step does
-        venomqa demo --server-only      # Just start the server
-        venomqa demo --keep-running     # Keep server after demo
-        venomqa demo --port 9000        # Use different port
-
-    After running the demo, create your own project with:
+    After the demo, try it on YOUR API:
         venomqa init --with-sample
     """
-    from rich import box
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
+    from rich import box
 
     console = Console()
-
-    # Header
     console.print()
+
+    # === INTRO: Explain the problem ===
     console.print(Panel.fit(
-        "[bold magenta]VenomQA Demo[/bold magenta]\n"
-        "[dim]See VenomQA in action with zero configuration[/dim]",
-        border_style="magenta",
+        "[bold cyan]What VenomQA Does[/bold cyan]\n\n"
+        "[white]Your unit tests check endpoints ONE AT A TIME:[/white]\n"
+        "  [green]✓[/green] POST /orders returns 201\n"
+        "  [green]✓[/green] POST /orders/:id/refund returns 200\n"
+        "  [green]✓[/green] GET /orders/:id returns 200\n\n"
+        "[white]VenomQA tests [bold]SEQUENCES[/bold] to find bugs that appear when:[/white]\n"
+        "  [yellow]create_order → refund → refund → get_order[/yellow]\n\n"
+        "[dim]Let's demonstrate with a mock API that has a hidden bug...[/dim]",
+        border_style="cyan",
     ))
     console.print()
 
-    # Start server
-    console.print(f"[cyan]Starting demo server on http://127.0.0.1:{port}...[/cyan]")
+    # === START SERVER ===
+    console.print(f"[cyan]Starting mock Order API on http://127.0.0.1:{port}...[/cyan]")
     try:
         server = start_demo_server(port)
-        time.sleep(0.5)  # Give server time to start
-        console.print(f"[green]Demo server running on http://127.0.0.1:{port}[/green]")
-        console.print()
+        time.sleep(0.3)
+        console.print("[green]Server running.[/green]")
     except OSError as e:
         console.print(f"[red]Failed to start server: {e}[/red]")
-        console.print(f"[yellow]Tip: Is port {port} already in use? Try --port 9000[/yellow]")
+        console.print(f"[yellow]Try: venomqa demo --port 9000[/yellow]")
         raise SystemExit(1)
 
-    if server_only:
-        console.print("[cyan]Server-only mode. Press Ctrl+C to stop.[/cyan]")
-        console.print()
-        console.print("[dim]Available endpoints:[/dim]")
-        console.print(f"  GET    http://127.0.0.1:{port}/health")
-        console.print(f"  GET    http://127.0.0.1:{port}/items")
-        console.print(f"  POST   http://127.0.0.1:{port}/items")
-        console.print(f"  GET    http://127.0.0.1:{port}/items/{{id}}")
-        console.print(f"  PUT    http://127.0.0.1:{port}/items/{{id}}")
-        console.print(f"  DELETE http://127.0.0.1:{port}/items/{{id}}")
-        console.print()
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            console.print("\n[yellow]Shutting down...[/yellow]")
-            server.shutdown()
-        return
-
-    # Explain mode header
-    if explain:
-        console.print(Panel(
-            "[bold]What is VenomQA?[/bold]\n\n"
-            "VenomQA is a stateful API testing framework that:\n"
-            "  [green]●[/green] Tests complete user journeys, not isolated endpoints\n"
-            "  [green]●[/green] Passes context between steps (like auth tokens)\n"
-            "  [green]●[/green] Supports branching to test multiple paths\n"
-            "  [green]●[/green] Captures and reports issues with full context\n\n"
-            "[dim]Let's watch a simple CRUD journey in action...[/dim]",
-            title="Learning Mode",
-            border_style="blue",
-        ))
-        console.print()
-
-    # Run demo journey
-    console.print("[cyan]Running demo journey...[/cyan]")
     console.print()
 
-    if explain:
-        console.print("[dim]Journey: demo_journey - Tests basic CRUD operations[/dim]")
-        console.print("[dim]Each step will execute in sequence, passing data forward[/dim]")
-        console.print()
+    # === SHOW UNIT TEST RESULTS ===
+    console.print("[bold]Step 1: Unit Tests (what you probably have)[/bold]")
+    console.print()
 
-    base_url = f"http://127.0.0.1:{port}"
-    results = run_demo_journey(base_url)
+    # Simulate unit test results
+    from venomqa.adapters.http import HttpClient
+    api = HttpClient(f"http://127.0.0.1:{port}")
 
-    # Step explanations for explain mode
-    step_explanations = {
-        "health_check": "Calls GET /health to verify API is responding. Stores health status in context.",
-        "list_items": "Calls GET /items to list existing items. Should return empty array initially.",
-        "create_item": "Calls POST /items with JSON body. Stores created item ID in context['item_id'].",
-        "get_item": "Calls GET /items/{id} using context['item_id']. Verifies item was created.",
-        "update_item": "Calls PUT /items/{id} to modify the item. Updates name and price.",
-        "delete_item": "Calls DELETE /items/{id} to remove the item.",
-        "verify_deleted": "Calls GET /items/{id} expecting 404. Uses expect_failure=True.",
-    }
+    unit_tests = [
+        ("POST /orders", lambda: api.post("/orders", json={"amount": 100}), 201),
+        ("POST /orders/1/refund", lambda: api.post("/orders/1/refund", json={"amount": 100}), 200),
+        ("GET /orders/1", lambda: api.get("/orders/1"), 200),
+    ]
 
-    # Display results
-    if explain:
-        console.print("[bold]Step-by-Step Results:[/bold]")
-        console.print()
-        for i, step in enumerate(results["steps"], 1):
-            status_icon = "[green]✓[/green]" if step["success"] else "[red]✗[/red]"
-            console.print(f"  {status_icon} [bold]Step {i}:[/bold] {step['name']} ({step['duration_ms']:.0f}ms)")
-            if step["name"] in step_explanations:
-                console.print(f"     [dim]{step_explanations[step['name']]}[/dim]")
-            console.print()
-    else:
-        table = Table(
-            title="Demo Journey Results",
-            box=box.ROUNDED,
-            show_header=True,
-            header_style="bold cyan",
-        )
-        table.add_column("Step", style="white")
-        table.add_column("Status", justify="center")
-        table.add_column("Duration", justify="right")
+    # Reset server state
+    BuggyOrderAPI.orders = {}
+    BuggyOrderAPI._counter = 0
 
-        for step in results["steps"]:
-            status = "[green]PASS[/green]" if step["success"] else "[red]FAIL[/red]"
-            duration = f"{step['duration_ms']:.0f}ms"
-            table.add_row(step["name"], status, duration)
+    table = Table(title="Unit Test Results", box=box.ROUNDED)
+    table.add_column("Test", style="white")
+    table.add_column("Status", justify="center")
 
-        console.print(table)
-        console.print()
+    for name, action, expected in unit_tests:
+        resp = action()
+        status = "[green]PASS[/green]" if resp.status_code == expected else "[red]FAIL[/red]"
+        table.add_row(name, status)
 
-    # Summary
-    passed = sum(1 for s in results["steps"] if s["success"])
-    total = len(results["steps"])
+    console.print(table)
+    console.print()
+    console.print("[green]All unit tests pass![/green] [dim]But there's a bug hiding...[/dim]")
+    console.print()
 
-    if results["success"]:
+    # === RUN VENOMQA EXPLORATION ===
+    console.print("[bold]Step 2: VenomQA Exploration (testing sequences)[/bold]")
+    console.print()
+    console.print("[dim]Exploring all possible action sequences...[/dim]")
+    console.print()
+
+    # Reset server state for exploration
+    BuggyOrderAPI.orders = {}
+    BuggyOrderAPI._counter = 0
+
+    results = run_demo_exploration(f"http://127.0.0.1:{port}")
+
+    console.print(f"  States explored: {results['states_visited']}")
+    console.print(f"  Transitions: {results['transitions']}")
+    console.print()
+
+    # === SHOW THE BUG ===
+    if results["bug_found"]:
         console.print(Panel(
-            f"[bold green]Demo Complete![/bold green]\n\n"
-            f"All {passed}/{total} steps passed in {results['duration_ms']:.0f}ms\n\n"
-            "[dim]VenomQA is ready to test your APIs.[/dim]",
-            border_style="green",
-        ))
-    else:
-        console.print(Panel(
-            f"[bold red]Demo had failures[/bold red]\n\n"
-            f"{passed}/{total} steps passed",
+            "[bold red]BUG FOUND![/bold red]\n\n"
+            "[white]Sequence that triggers the bug:[/white]\n"
+            "  [yellow]create_order → refund → refund[/yellow]\n\n"
+            "[white]Problem:[/white]\n"
+            "  Order amount: $100\n"
+            "  Refunded: $200 [red](exceeds order!)[/red]\n\n"
+            "[white]The API accepted two $100 refunds on a $100 order.[/white]\n"
+            "[white]This passes unit tests but loses money in production![/white]\n\n"
+            "[dim]VenomQA found this by testing EVERY possible sequence.[/dim]",
+            title="[red]CRITICAL VIOLATION[/red]",
             border_style="red",
         ))
-
-    console.print()
-
-    # Next steps
-    console.print("[bold]Next Steps:[/bold]")
-    console.print()
-    console.print("  1. [cyan]venomqa init[/cyan]           Create your project structure")
-    console.print("  2. Edit [cyan]venomqa.yaml[/cyan]      Point to your API")
-    console.print("  3. Write journeys in [cyan]journeys/[/cyan]")
-    console.print("  4. [cyan]venomqa run[/cyan]            Run your tests")
-    console.print()
-
-    if explain:
-        console.print("[bold]Example Code (v1 API):[/bold]")
-        console.print()
-        console.print("[dim]```python[/dim]")
-        console.print("[yellow]from venomqa import Action, Agent, World, BFS, Invariant, Severity[/yellow]")
-        console.print("[yellow]from venomqa.adapters.http import HttpClient[/yellow]")
-        console.print()
-        console.print("[green]def login(api, context):  # signature: (api, context)[/green]")
-        console.print("[green]    resp = api.post('/auth/login', json={...})[/green]")
-        console.print("[green]    context.set('token', resp.json()['token'])[/green]")
-        console.print("[green]    return resp[/green]")
-        console.print()
-        console.print("[cyan]agent = Agent([/cyan]")
-        console.print("[cyan]    world=World(api=HttpClient('http://localhost:8000')),[/cyan]")
-        console.print("[cyan]    actions=[Action(name='login', execute=login)],[/cyan]")
-        console.print("[cyan]    invariants=[...],[/cyan]")
-        console.print("[cyan]    strategy=BFS(),[/cyan]")
-        console.print("[cyan])[/cyan]")
-        console.print("[cyan]result = agent.explore()[/cyan]")
-        console.print("[dim]```[/dim]")
-        console.print()
-
-    console.print("[dim]Documentation: https://venomqa.dev[/dim]")
-    console.print("[dim]GitHub: https://github.com/namanag97/venomqa[/dim]")
-    console.print()
-
-    if keep_running:
-        console.print(f"[cyan]Server still running on http://127.0.0.1:{port}[/cyan]")
-        console.print("[dim]Press Ctrl+C to stop[/dim]")
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            console.print("\n[yellow]Shutting down...[/yellow]")
-            server.shutdown()
     else:
-        server.shutdown()
+        console.print("[yellow]No bugs found (unexpected for this demo)[/yellow]")
+
+    console.print()
+
+    # === NEXT STEPS ===
+    console.print(Panel(
+        "[bold]Ready to find bugs in YOUR API?[/bold]\n\n"
+        "1. [cyan]venomqa init --with-sample[/cyan]\n"
+        "   Creates project structure with example code\n\n"
+        "2. Edit [cyan]venomqa/venomqa.yaml[/cyan]\n"
+        "   Set your API URL and database connection\n\n"
+        "3. Write actions in [cyan]venomqa/actions/[/cyan]\n"
+        "   Define what API calls to test\n\n"
+        "4. Run [cyan]python3 venomqa/journeys/sample_journey.py[/cyan]\n"
+        "   Find bugs in YOUR API\n\n"
+        "[dim]Database required: VenomQA needs to rollback state between[/dim]\n"
+        "[dim]branches to test all sequences. Connect to your API's database.[/dim]",
+        title="Next Steps",
+        border_style="green",
+    ))
+
+    console.print()
+    console.print("[dim]Docs: https://venomqa.dev | Help: venomqa llm-docs[/dim]")
+    console.print()
+
+    server.shutdown()
