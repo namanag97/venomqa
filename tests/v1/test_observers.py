@@ -1,12 +1,10 @@
-"""Unit tests for venomqa.v1.core.observers helper functions."""
+"""Unit tests for venomqa.core.observers helper functions."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
-from venomqa.v1.core.observers import (
+from venomqa.core.observers import (
     COMMON_QUERIES,
     aggregate,
     column_value,
