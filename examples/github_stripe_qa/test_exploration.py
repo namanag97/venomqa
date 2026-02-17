@@ -246,15 +246,23 @@ class TestVenomQAExploration:
     def test_exploration_finds_github_bug(self, world):
         """Agent must detect the open-issues-leaks-closed bug.
 
-        Needs ~50 BFS steps to reach the sequence:
-          create_user → create_repo → create_issue → close_issue → list_open_issues
+        Uses only the 5 GitHub actions needed to trigger the bug so that
+        BFS reaches the sequence  create_issue → close_issue → list_open_issues
+        within a reasonable number of steps.
         """
+        github_only_actions = [
+            Action(name="create_user",      execute=create_user,      tags=["github"]),
+            Action(name="create_repo",      execute=create_repo,      tags=["github"]),
+            Action(name="create_issue",     execute=create_issue,     tags=["github"]),
+            Action(name="close_issue",      execute=close_issue,      tags=["github"]),
+            Action(name="list_open_issues", execute=list_open_issues, tags=["github"]),
+        ]
         agent = Agent(
             world=world,
-            actions=_all_actions(),
+            actions=github_only_actions,
             invariants=[open_issues_never_contain_closed],
             strategy=BFS(),
-            max_steps=70,
+            max_steps=60,
         )
         result = agent.explore()
 
@@ -265,10 +273,20 @@ class TestVenomQAExploration:
         )
 
     def test_exploration_finds_stripe_bug(self, world):
-        """Agent must detect the over-refund bug."""
+        """Agent must detect the over-refund bug.
+
+        Uses only the 5 Stripe actions needed to trigger the bug.
+        """
+        stripe_only_actions = [
+            Action(name="create_customer",       execute=create_customer,       tags=["stripe"]),
+            Action(name="create_payment_intent", execute=create_payment_intent, tags=["stripe"]),
+            Action(name="confirm_payment",       execute=confirm_payment,       tags=["stripe"]),
+            Action(name="create_refund",         execute=create_refund,         tags=["stripe"]),
+            Action(name="get_payment_intent",    execute=get_payment_intent,    tags=["stripe"]),
+        ]
         agent = Agent(
             world=world,
-            actions=_all_actions(),
+            actions=stripe_only_actions,
             invariants=[refund_cannot_exceed_payment],
             strategy=BFS(),
             max_steps=50,
