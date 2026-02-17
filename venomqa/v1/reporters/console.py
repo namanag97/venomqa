@@ -5,8 +5,8 @@ from __future__ import annotations
 import sys
 from typing import TextIO
 
-from venomqa.v1.core.result import ExplorationResult
 from venomqa.v1.core.invariant import Severity
+from venomqa.v1.core.result import ExplorationResult
 
 
 class ConsoleReporter:
@@ -39,8 +39,9 @@ class ConsoleReporter:
         self._section("Summary")
         self._kv("States visited", str(result.states_visited))
         self._kv("Transitions taken", str(result.transitions_taken))
-        self._kv("Actions available", str(result.actions_total))
-        self._kv("Coverage", f"{result.coverage_percent:.1f}%")
+        used = result.graph.used_action_count
+        total = result.actions_total
+        self._kv("Actions used", f"{used}/{total} ({result.action_coverage_percent:.0f}%)")
         self._kv("Duration", f"{result.duration_ms:.0f}ms")
         self._newline()
 
