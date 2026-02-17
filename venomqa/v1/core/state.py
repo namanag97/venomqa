@@ -6,7 +6,10 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from venomqa.v1.core.hyperedge import Hyperedge
 
 
 @dataclass(frozen=True)
