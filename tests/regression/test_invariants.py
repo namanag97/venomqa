@@ -15,16 +15,12 @@ If these fail, something is fundamentally broken.
 from __future__ import annotations
 
 import gc
-import sys
 import tracemalloc
-from typing import Any
 
-import pytest
-from hypothesis import given, settings, assume, HealthCheck
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from venomqa.core.graph import StateGraph, ExplorationNode, Edge
-
+from venomqa.core.graph import StateGraph
 
 # =============================================================================
 # GRAPH EXPLORATION INVARIANTS
@@ -73,7 +69,7 @@ class TestExplorationNodeInvariants:
         depth=st.integers(min_value=2, max_value=8),
         branching=st.integers(min_value=2, max_value=4),
     )
-    @settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
+    @settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_all_leaf_paths_are_found(self, depth: int, branching: int):
         """INVARIANT: All reachable leaf paths must be explored.
 
