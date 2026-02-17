@@ -45,43 +45,30 @@ class DimensionNoveltyStrategy:
 
     def pick(self, graph: "Graph") -> "tuple[State, Action] | None":
         """Pick the next (state, action) pair to explore."""
-        # Collect all unexplored pairs from the graph
-        unexplored = list(graph.unexplored_pairs())
+        # get_unexplored() returns (State, Action) tuples for unexplored pairs
+        unexplored = graph.get_unexplored()
         if not unexplored:
             return None
 
         if self._hypergraph is None or self._hypergraph.node_count == 0:
-            # Fallback: BFS order
-            state_id, action_name = unexplored[0]
-            state = graph.get_state(state_id)
-            action = graph.get_action(action_name)
-            if state and action:
-                graph.mark_explored(state, action)
-                return state, action
-            return None
+            # Fallback: BFS order — return the first unexplored pair
+            return unexplored[0]
 
         # Score each candidate by novelty (Hamming distance to centroid)
-        best: tuple[int, str, str] | None = None
-        for state_id, action_name in unexplored:
-            edge = self._hypergraph.get_hyperedge(state_id)
+        best_score = -1
+        best_pair: "tuple[State, Action] | None" = None
+        for state, action in unexplored:
+            edge = self._hypergraph.get_hyperedge(state.id)
             if edge is None:
                 score = 0  # Unknown → treat as low novelty
             else:
                 score = self._novelty_score(edge)
 
-            if best is None or score > best[0]:
-                best = (score, state_id, action_name)
+            if score > best_score:
+                best_score = score
+                best_pair = (state, action)
 
-        if best is None:
-            return None
-
-        _, state_id, action_name = best
-        state = graph.get_state(state_id)
-        action = graph.get_action(action_name)
-        if state and action:
-            graph.mark_explored(state, action)
-            return state, action
-        return None
+        return best_pair
 
     def enqueue(self, state: "State", actions: list["Action"]) -> None:
         """Called by the Agent when a new state is discovered (BFS hook)."""
