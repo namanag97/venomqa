@@ -124,7 +124,7 @@ Actions are plain functions with signature (api, context).
   - context  : Context     -- use .get(key) / .set(key, val) -- NOT context[key]
 
 Example:
-    from venomqa.v1 import Action
+    from venomqa import Action
 
     def add_to_cart(api, context):
         product_id = context.get("product_id")
@@ -161,8 +161,8 @@ Define actions and invariants, then run Agent.explore() to exhaustively
 test every reachable state sequence -- no linear test scripts needed.
 
 Example:
-    from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
-    from venomqa.v1.adapters.http import HttpClient
+    from venomqa import Action, Invariant, Agent, World, BFS, Severity
+    from venomqa.adapters.http import HttpClient
 
     def create_item(api, context):
         resp = api.post("/items", json={"name": "test"})
@@ -360,7 +360,7 @@ def get_user(api, context):
 Invariants should make LIVE API calls to verify server state, not just check context.
 
 ```python
-from venomqa.v1 import Invariant, Severity
+from venomqa import Invariant, Severity
 
 def users_list_is_valid(world):
     # GOOD: Make a live API call to verify server state
@@ -393,9 +393,9 @@ Without it, VenomQA can only test ONE linear path.
 
 ```python
 import os
-from venomqa.v1 import Action, Invariant, Agent, World, DFS, Severity
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.postgres import PostgresAdapter  # or SQLiteAdapter
+from venomqa import Action, Invariant, Agent, World, DFS, Severity
+from venomqa.adapters.http import HttpClient
+from venomqa.adapters.postgres import PostgresAdapter  # or SQLiteAdapter
 from actions.my_actions import create_user, get_user
 
 # Connect to the SAME database your API writes to
@@ -523,14 +523,18 @@ actions and checks the invariants after each step.
 CRITICAL: VenomQA needs database rollback to explore state graphs.
 Without it, VenomQA can only test ONE linear path. See options below.
 
-Run with: python3 sample_journey.py
+Run with: python3 journeys/sample_journey.py
 """
 
 import os
 import sys
+from pathlib import Path
 
-from venomqa.v1 import Action, Invariant, Agent, World, BFS, DFS, Severity
-from venomqa.v1.adapters.http import HttpClient
+# Add parent directory to path so 'from actions...' imports work when running directly
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from venomqa import Action, Invariant, Agent, World, BFS, DFS, Severity
+from venomqa.adapters.http import HttpClient
 
 from actions.sample_actions import (
     health_check, list_items, create_item, get_item, delete_item
@@ -596,7 +600,7 @@ def deleted_item_not_retrievable(world):
 
 def setup_with_postgres():
     """Option 1: PostgreSQL (most common for production APIs)"""
-    from venomqa.v1.adapters.postgres import PostgresAdapter
+    from venomqa.adapters.postgres import PostgresAdapter
 
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -613,7 +617,7 @@ def setup_with_postgres():
 
 def setup_with_sqlite():
     """Option 2: SQLite (simpler, works with BFS)"""
-    from venomqa.v1.adapters.sqlite import SQLiteAdapter
+    from venomqa.adapters.sqlite import SQLiteAdapter
 
     db_path = os.environ.get("SQLITE_PATH", "/path/to/your/api.db")
 
