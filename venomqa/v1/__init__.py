@@ -36,6 +36,9 @@ from venomqa.v1.dsl.compiler import compile as compile_journey
 
 from venomqa.v1.adapters.http import HttpClient
 
+# Recording
+from venomqa.v1.recording import RequestRecorder, RecordedRequest, generate_journey_code
+
 # Reporters
 from venomqa.v1.reporters.console import ConsoleReporter
 from venomqa.v1.reporters.markdown import MarkdownReporter
