@@ -153,16 +153,33 @@ result = agent.explore()
 #   Reproduction path: create_order → refund_order → refund_order → list_orders
 ```
 
-### No Database? Limited Mode
+### No Database? Context-Based Mode
 
 If your API is stateless or you can't access the database:
 
 ```python
-# WARNING: Limited exploration - only context values distinguish states
+# Context-based exploration - VenomQA tracks these keys to distinguish states
 world = World(
     api=api,
-    state_from_context=["order_id", "orders"],  # These values define state identity
+    state_from_context=["order_id", "order_count", "user_id"],
 )
+```
+
+---
+
+## Validation Helpers
+
+Use `expect_*` helpers in actions — VenomQA catches AssertionError as violations:
+
+```python
+resp.expect_status(201)              # raises if not 201
+resp.expect_status(200, 201, 204)    # raises if not any of these
+resp.expect_success()                # raises if not 2xx/3xx
+data = resp.expect_json()            # raises if not JSON
+data = resp.expect_json_field("id")  # raises if "id" missing, returns dict
+items = resp.expect_json_list()      # raises if not array
+resp.status_code                     # returns 0 on network error (safe)
+resp.headers                         # returns {} on network error (safe)
 ```
 
 ---
