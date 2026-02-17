@@ -383,10 +383,8 @@ class Agent:
             action_result=action_result,
         )
 
-        # Tell strategy about the new state's valid actions (context and action-dependency aware)
-        valid_actions = self.graph.get_valid_actions(
-            to_state, self.world.context, self.graph.used_action_names
-        )
+        # Tell strategy about the new state's valid actions (context, action-dependency, and resource-aware)
+        valid_actions = self._get_valid_actions(to_state)
         if hasattr(self.strategy, "enqueue"):
             self.strategy.enqueue(to_state, valid_actions)
         elif hasattr(self.strategy, "push"):
