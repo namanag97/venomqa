@@ -1,46 +1,42 @@
 # VenomQA product demo — generates demo.gif
-# Requirements: vhs, ffmpeg, ttyd
 
 Output demo.gif
 
 Set Shell "zsh"
-Set FontSize 15
+Set FontSize 14
 Set FontFamily "JetBrains Mono"
-Set Width 860
-Set Height 520
+Set Width 900
+Set Height 550
 Set Theme "Catppuccin Mocha"
 Set Padding 20
-Set TypingSpeed 40ms
+Set TypingSpeed 35ms
 Set PlaybackSpeed 1.0
 Set CursorBlink false
 
-# ── Opening: show what the tool does ─────────────────────────────────────────
-
-Sleep 400ms
-Type "# VenomQA finds bugs that unit tests miss"
-Sleep 1.2s
-Enter
-
+# ── Navigate to project and set env ──────────────────────────────────────────
 Sleep 300ms
-Type "# Works by exploring every sequence of API calls"
+
+Type "cd ~/venomQA && export PYTHONPATH=src"
+Enter
+Sleep 500ms
+
+# ── Comments to set the scene ─────────────────────────────────────────────────
+Type "# VenomQA: finds bugs that unit tests miss"
+Enter
+Sleep 800ms
+
+Type "# Explores every sequence of API calls, checks invariants after each step"
+Enter
+Sleep 800ms
+
+Type "# Demo: mock GitHub + Stripe APIs with 2 planted bugs"
+Enter
 Sleep 1s
-Enter
 
-Sleep 300ms
-Type "# Let's demo it against a mock GitHub + Stripe API"
-Sleep 1.2s
-Enter
-Sleep 400ms
-
-# ── Run the demo ──────────────────────────────────────────────────────────────
-
+# ── Run ───────────────────────────────────────────────────────────────────────
 Type "python3 demo.py"
-Sleep 300ms
+Sleep 400ms
 Enter
 
-# Wait for server startup + exploration
-Sleep 7s
-
-# ── Pause on the result ───────────────────────────────────────────────────────
-
-Sleep 4s
+# Wait for servers to start + full exploration to complete (~8s)
+Sleep 12s
