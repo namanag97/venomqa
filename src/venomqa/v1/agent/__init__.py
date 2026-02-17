@@ -223,10 +223,7 @@ class Agent:
                     stacklevel=3,
                 )
 
-            if hasattr(self.strategy, "enqueue"):
-                self.strategy.enqueue(initial_state, valid_actions)
-            elif hasattr(self.strategy, "push"):
-                self.strategy.push(initial_state, valid_actions)
+            self.strategy.notify(initial_state, valid_actions)
 
             # Exploration loop
             self._step_count = 0
