@@ -122,7 +122,8 @@ def print_diagnosis(info: dict) -> None:
         print(f"venomqa cmd: {color('Not in PATH', DIM)}")
 
     if info["venomqa_importable"]:
-        print(f"venomqa pkg: {color(f'v{info.get(\"venomqa_version\", \"?\")}', GREEN)}")
+        version = info.get("venomqa_version", "?")
+        print(f"venomqa pkg: {color(f'v{version}', GREEN)}")
     else:
         print(f"venomqa pkg: {color('Not importable', YELLOW)}")
 
