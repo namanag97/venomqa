@@ -156,6 +156,17 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4"]
+ignore = [
+    "E402",   # Module level import not at top of file (needed for test fixtures)
+    "B027",   # Empty method in abstract base class (intentional for optional hooks)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "E501",   # Line too long (acceptable in tests for readability)
+    "B017",   # Blind exception assertions (acceptable in tests)
+    "N806",   # Variable in function should be lowercase (test mocks)
+]
 
 [tool.mypy]
 python_version = "3.10"
