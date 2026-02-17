@@ -153,6 +153,11 @@ VENOMQA_CONFIG_SCHEMA: dict[str, Any] = {
                     "default": True,
                     "description": "Include timestamp in report filename",
                 },
+                "include_request_response": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Include request/response data in reports (may contain sensitive data)",
+                },
             },
             "additionalProperties": False,
         },
