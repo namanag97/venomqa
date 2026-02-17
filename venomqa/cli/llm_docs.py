@@ -300,17 +300,57 @@ Headers / auth:
 ## Rollbackable adapters
 
 PostgreSQL (uses SAVEPOINT — entire run is one uncommitted transaction):
+    from venomqa.v1.adapters.postgres import PostgresAdapter
     PostgresAdapter("postgresql://user:pass@localhost/mydb")
 
 Redis (DUMP + FLUSHALL + RESTORE per rollback):
+    from venomqa.v1.adapters.redis import RedisAdapter
     RedisAdapter("redis://localhost:6379")
 
-In-memory mocks (queue, mail, storage) — import from venomqa.v1.adapters.*
+In-memory mocks (for unit testing without real services):
+    from venomqa.v1.adapters import MockQueue, MockMail, MockStorage, MockTime
+
+    queue   = MockQueue(name="tasks")
+    mail    = MockMail()
+    storage = MockStorage(bucket="uploads")
+    clock   = MockTime(start=datetime(2024, 1, 1))   # auto-frozen at start
+
+    # MockQueue
+    queue.push({"type": "job", "id": 1})   # enqueue item
+    queue.pending_count                    # int: items not yet consumed
+    queue.processed_count                  # int: items consumed via pop()
+    queue.pop()                            # removes and returns oldest item
+
+    # MockMail
+    mail.send("to@example.com", "Subject", "Body text")
+    mail.sent_count                        # int: total emails sent
+    mail.get_sent()                        # list of all sent messages
+
+    # MockStorage
+    storage.put("file.pdf", b"PDF content")   # content must be str or bytes
+    storage.get("file.pdf")                   # returns bytes or None
+    storage.file_count                        # int: number of files stored
+    storage.delete("file.pdf")
+
+    # MockTime
+    from datetime import datetime
+    clock = MockTime(start=datetime(2024, 1, 1))  # frozen — .now returns start
+    clock.now                   # datetime (property, NOT a method — no ())
+    clock.advance(days=1)       # only works when frozen
+    clock.freeze(at=datetime(2024, 6, 1))   # freeze at a specific time
+    clock.unfreeze()            # resume live wall-clock time
+    clock.set(datetime(2025, 1, 1))         # set + freeze
+
+    world = World(api=api, systems={"queue": queue, "mail": mail, "clock": clock})
+    # Observe in invariant: world.systems["queue"].pending_count
 
 Custom mock server: subclass MockHTTPServer, implement 3 methods:
-    get_state_snapshot() -> dict
-    rollback_from_snapshot(snapshot: dict) -> None
-    observe_from_state(state_snapshot: dict) -> Observation
+    from venomqa.v1.adapters.mock_http_server import MockHTTPServer
+
+    class MyMock(MockHTTPServer):
+        def get_state_snapshot(self) -> dict: ...
+        def rollback_from_snapshot(self, snapshot: dict) -> None: ...
+        def observe_from_state(self, state_snapshot: dict) -> Observation: ...
 
 ---
 
