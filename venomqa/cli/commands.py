@@ -530,28 +530,20 @@ def get_version() -> str:
         return "VenomQA (version unknown)"
 
 
-EPILOG = """
+EPILOG = """\b
 Examples:
-  venomqa init                    Create a new VenomQA project
-  venomqa run                     Run all test journeys
-  venomqa run checkout_flow       Run specific journey
-  venomqa run --debug             Run with detailed logging
-  venomqa run --fail-fast         Stop on first failure
+  venomqa init --with-sample      Create project + sample exploration
+  venomqa demo                    Run built-in demo (no setup needed)
+  venomqa llm-docs                Print AI assistant context doc
   venomqa doctor                  Check system dependencies
   venomqa smoke-test URL          Quick API health check
 
 Exit Codes:
-  0  All tests passed / operation successful
-  1  One or more tests failed
-  2  Configuration error (check venomqa.yaml)
+  0  Success
+  1  Test failures
+  2  Configuration error
 
-Environment:
-  VENOMQA_BASE_URL    Override base URL
-  VENOMQA_PROFILE     Use config profile (dev/staging/prod)
-  VENOMQA_VERBOSE     Enable verbose output
-  VENOMQA_TIMEOUT     HTTP timeout in seconds
-
-Documentation: https://venomqa.dev/docs
+Documentation: https://github.com/namanag97/venomqa
 """
 
 
@@ -2986,7 +2978,7 @@ def seed(
 
     # Get database from ports if database mode
     if mode in (SeedMode.DATABASE, SeedMode.HYBRID):
-        ports = _parse_ports(tuple(), config_obj)
+        ports = _parse_ports((), config_obj)
         database = ports.get("database")
 
     seed_manager = SeedManager(client=client, database=database, config=config)
@@ -3332,7 +3324,7 @@ def _generate_sarif_inline(result: Any) -> dict:
     rules: dict[str, Any] = {}
     results_list: list[dict[str, Any]] = []
 
-    for i, finding in enumerate(result.all_findings):
+    for _i, finding in enumerate(result.all_findings):
         rule_id = f"VENOM-{finding.vuln_type.value.upper().replace('_', '-')}"
 
         if rule_id not in rules:
@@ -3533,7 +3525,7 @@ def cleanup(
     )
 
     # Get database from ports
-    ports = _parse_ports(tuple(), config_obj)
+    ports = _parse_ports((), config_obj)
     database = ports.get("database")
 
     cleanup_manager = CleanupManager(client=client, database=database, config=config)
