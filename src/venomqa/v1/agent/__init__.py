@@ -633,7 +633,8 @@ class Agent:
         for inv in self.invariants:
             if inv.name == inv_name:
                 try:
-                    return not inv.check(self.world)
+                    result = inv.check(self.world)
+                    return result is False or isinstance(result, str)
                 except Exception:
                     return False
 
