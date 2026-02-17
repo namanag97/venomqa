@@ -773,7 +773,10 @@ def run(
     journeys = discover_journeys()
 
     if not journeys:
-        click.echo("No journeys found. Create journeys in the 'journeys/' directory.", err=True)
+        click.echo("\nNo project found. Run this first:", err=True)
+        click.echo("  venomqa init --with-sample\n", err=True)
+        click.echo("This creates a venomqa/ directory with example code.", err=True)
+        click.echo("Then run: python3 venomqa/journeys/sample_journey.py\n", err=True)
         sys.exit(1)
 
     to_run = list(journey_names) if journey_names else list(journeys.keys())
