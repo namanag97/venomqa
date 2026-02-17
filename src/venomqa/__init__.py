@@ -53,6 +53,7 @@ from venomqa.v1.world.rollbackable import Rollbackable
 from venomqa.v1.agent import Agent, Scheduler
 from venomqa.v1.agent.strategies import BFS, DFS, Random, CoverageGuided, Weighted, Strategy
 from venomqa.v1.adapters.http import HttpClient
+from venomqa.v1.adapters.sqlite import SQLiteAdapter  # Recommended for exploration
 from venomqa.v1.dsl import Journey, Step, Branch, Path
 from venomqa.v1.dsl.decorators import action, invariant
 from venomqa.v1.reporters.console import ConsoleReporter
