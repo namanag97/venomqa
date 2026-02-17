@@ -125,7 +125,8 @@ class TestStrategies:
     def test_bfs_strategy(self):
         """Test BFS exploration strategy."""
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        # Use state_from_context=[] to explicitly opt-in to context-only mode
+        world = World(api=api, state_from_context=[])
 
         actions = [
             Action(name=f"action_{i}", execute=lambda api, i=i: api.get(f"/action/{i}"))
@@ -140,7 +141,8 @@ class TestStrategies:
     def test_dfs_strategy(self):
         """Test DFS exploration strategy."""
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        # Use state_from_context=[] to explicitly opt-in to context-only mode
+        world = World(api=api, state_from_context=[])
 
         actions = [
             Action(name=f"action_{i}", execute=lambda api, i=i: api.get(f"/action/{i}"))
@@ -155,7 +157,8 @@ class TestStrategies:
     def test_random_strategy(self):
         """Test random exploration strategy."""
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        # Use state_from_context=[] to explicitly opt-in to context-only mode
+        world = World(api=api, state_from_context=[])
 
         actions = [
             Action(name=f"action_{i}", execute=lambda api, i=i: api.get(f"/action/{i}"))
