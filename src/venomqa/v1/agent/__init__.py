@@ -75,8 +75,8 @@ class Agent:
         self._use_hypergraph = hypergraph
         self._hypergraph: Hypergraph | None = None
         if hypergraph:
-            from venomqa.v1.core.hypergraph import Hypergraph as HG
-            self._hypergraph = HG()
+            from venomqa.v1.core.hypergraph import Hypergraph
+            self._hypergraph = Hypergraph()
 
     def _check_strategy_adapter_compatibility(self) -> None:
         """Fail fast if PostgresAdapter is paired with a non-DFS strategy.
