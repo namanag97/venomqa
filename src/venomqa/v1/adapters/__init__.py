@@ -11,9 +11,19 @@ from venomqa.v1.adapters.redis import RedisAdapter
 from venomqa.v1.adapters.sqlite import SQLiteAdapter
 from venomqa.v1.adapters.wiremock import WireMockAdapter
 
+# Lazy import for ASGI adapter (requires starlette)
+def __getattr__(name: str):
+    if name in ("ASGIAdapter", "SharedPostgresAdapter", "ASGIResponse"):
+        from venomqa.v1.adapters.asgi import ASGIAdapter, SharedPostgresAdapter, ASGIResponse
+        return {"ASGIAdapter": ASGIAdapter, "SharedPostgresAdapter": SharedPostgresAdapter, "ASGIResponse": ASGIResponse}[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 __all__ = [
     # HTTP
     "HttpClient",
+    # ASGI (in-process, for shared DB connection)
+    "ASGIAdapter",
+    "SharedPostgresAdapter",
     # Databases
     "PostgresAdapter",
     "MySQLAdapter",
