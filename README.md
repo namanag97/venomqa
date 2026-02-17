@@ -6,7 +6,24 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://pypi.org/project/venomqa/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![VenomQA demo](demo.gif)
+## See It In Action (30 seconds)
+
+```bash
+pip install venomqa
+venomqa demo
+```
+
+```
+Unit Test Results: 3/3 PASS ✓
+
+VenomQA Exploration: 8 states, 20 transitions
+
+╭─────────────────── CRITICAL VIOLATION ───────────────────╮
+│ BUG FOUND!                                               │
+│ Sequence: create_order → refund → refund                 │
+│ Problem: Refunded $200 on a $100 order!                  │
+╰──────────────────────────────────────────────────────────╯
+```
 
 ---
 
@@ -91,9 +108,9 @@ pip install venomqa
 
 ```python
 import os
-from venomqa.v1 import Action, Invariant, Agent, World, DFS, Severity
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.postgres import PostgresAdapter
+from venomqa import Action, Invariant, Agent, World, DFS, Severity
+from venomqa.adapters.http import HttpClient
+from venomqa.adapters.postgres import PostgresAdapter
 
 # Connect to your API's database (same one the API writes to)
 api = HttpClient("http://localhost:8000")
@@ -258,8 +275,8 @@ world = World(
 ## Reporters
 
 ```python
-from venomqa.v1.reporters.console import ConsoleReporter
-from venomqa.v1.reporters.html_trace import HTMLTraceReporter
+from venomqa.reporters.console import ConsoleReporter
+from venomqa.reporters.html_trace import HTMLTraceReporter
 
 ConsoleReporter().report(result)           # colored terminal output
 
