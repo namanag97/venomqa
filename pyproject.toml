@@ -113,8 +113,8 @@ Repository = "https://github.com/namanag97/venomqa"
 Changelog = "https://github.com/namanag97/venomqa/blob/main/CHANGELOG.md"
 "Getting Started" = "https://github.com/namanag97/venomqa/blob/main/SETUP.md"
 
-[project.scripts]
-venomqa = "venomqa.cli:main"
+# Using shell script wrapper instead of console_scripts for better cross-environment compatibility
+# See scripts/bin/venomqa - it finds Python at runtime rather than hardcoding the path
 
 [project.entry-points."venomqa.state_backends"]
 postgresql = "venomqa.state.postgres:PostgreSQLStateManager"
