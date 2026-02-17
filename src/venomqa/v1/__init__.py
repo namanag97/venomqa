@@ -159,7 +159,7 @@ def explore(
         ExplorationResult with graph, violations, and statistics.
 
     Example:
-        from venomqa.v1 import Journey, Step, Checkpoint, explore
+        from venomqa import Journey, Step, explore
 
         journey = Journey(
             name="login_test",
