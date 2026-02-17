@@ -187,7 +187,7 @@ def _build_route_map(
 def _extract_schema(response_spec: dict[str, Any]) -> dict[str, Any] | None:
     """Extract the inline JSON schema from a response object (no $ref resolution)."""
     content = response_spec.get("content", {})
-    for media_type, media_obj in content.items():
+    for _, media_obj in content.items():
         if not isinstance(media_obj, dict):
             continue
         schema = media_obj.get("schema")
