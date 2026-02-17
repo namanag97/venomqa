@@ -47,6 +47,7 @@ class Agent:
         invariants: list[Invariant] | None = None,
         strategy: Strategy | None = None,
         max_steps: int = 1000,
+        hypergraph: bool = False,
     ) -> None:
         self.world = world
         self.graph = Graph(actions)
@@ -55,6 +56,13 @@ class Agent:
         self.max_steps = max_steps
         self._violations: list[Violation] = []
         self._step_count = 0
+
+        # Hypergraph support (opt-in)
+        self._use_hypergraph = hypergraph
+        self._hypergraph: "Hypergraph | None" = None
+        if hypergraph:
+            from venomqa.v1.core.hypergraph import Hypergraph as HG
+            self._hypergraph = HG()
 
     def explore(self) -> ExplorationResult:
         """Run full exploration and return results.
