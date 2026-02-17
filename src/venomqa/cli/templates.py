@@ -9,22 +9,21 @@ VENOMQA_YAML_TEMPLATE = """# VenomQA Configuration
 # Documentation: https://venomqa.dev/docs/configuration
 
 # ============================================================================
-# CRITICAL: VenomQA needs database rollback to explore state graphs
+# WHY DATABASE ACCESS IS REQUIRED
 # ============================================================================
 #
-# VenomQA explores your API by:
-#   1. Execute action -> checkpoint database state
-#   2. ROLLBACK database to checkpoint
-#   3. Execute different action from same state
-#   4. Repeat to explore ALL paths
+# Your API stores state in a database. When VenomQA explores different action
+# sequences, it needs to ROLLBACK that database between branches so each path
+# starts from the same state.
 #
-# Without db_url, VenomQA can only test ONE linear path.
+# Example: To test both "create -> update" AND "create -> delete", VenomQA:
+#   1. Runs create_user (database now has user row)
+#   2. Runs update_user, checks invariants
+#   3. ROLLBACK database (user row removed)
+#   4. Runs delete_user from same starting point
 #
-# Set up PostgreSQL:
-#   $ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:15
-#   $ export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/yourdb"
-#
-# Then uncomment db_url below and set it to your API's database.
+# Connect to the SAME database your API writes to:
+#   $ export DATABASE_URL="postgresql://user:pass@localhost:5432/yourdb"
 # ============================================================================
 
 # Target API configuration
