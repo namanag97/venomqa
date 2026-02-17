@@ -266,16 +266,20 @@ class OpenAPIParser:
             # heroes -> hero, potatoes -> potato
             return lower_word[:-2]
 
-        if lower_word.endswith("ses") and not lower_word.endswith("sses"):
-            # buses -> bus (but not classes -> class)
-            return lower_word[:-2]
-
+        # Handle -xes, -ches, -shes, -sses (must check before -ses)
         if lower_word.endswith("xes") or lower_word.endswith("ches") or \
            lower_word.endswith("shes") or lower_word.endswith("sses"):
             # boxes -> box, batches -> batch, dishes -> dish, classes -> class
             return lower_word[:-2]
 
-        if lower_word.endswith("s") and not lower_word.endswith("ss"):
+        # Handle -ses but NOT words ending in -sis (like analysis, basis)
+        if lower_word.endswith("ses") and not lower_word.endswith("sis"):
+            # buses -> bus (but not analysis)
+            return lower_word[:-2]
+
+        # Handle regular -s plurals, but not words ending in -ss or -sis
+        if lower_word.endswith("s") and not lower_word.endswith("ss") and \
+           not lower_word.endswith("sis"):
             # Regular plural: workspaces -> workspace
             return lower_word[:-1]
 
