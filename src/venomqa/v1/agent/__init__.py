@@ -501,9 +501,15 @@ class Agent:
                     self._seen_violations.add(dedup_key)
 
                     dynamic_message = check_result if isinstance(check_result, str) else ""
-                    # Get reproduction path (how to reach this state)
-                    path = self.graph.get_path_to(state.id)
-                    repro_path = path + [transition] if transition else path
+                    # Reproduction path = path to the state BEFORE the violating
+                    # action (from_state) + the violating transition itself.
+                    # Using from_state avoids duplicating the final transition,
+                    # giving a clean sequence like: create → complete → delete.
+                    if transition is not None:
+                        path = self.graph.get_path_to(transition.from_state_id)
+                        repro_path = path + [transition]
+                    else:
+                        repro_path = self.graph.get_path_to(state.id)
                     violation = Violation.create(
                         invariant=inv,
                         state=state,
