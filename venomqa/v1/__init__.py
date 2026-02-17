@@ -194,6 +194,10 @@ __all__ = [
     "compile_journey",
     # Adapters
     "HttpClient",
+    # Recording
+    "RequestRecorder",
+    "RecordedRequest",
+    "generate_journey_code",
     # Reporters
     "ConsoleReporter",
     "MarkdownReporter",
