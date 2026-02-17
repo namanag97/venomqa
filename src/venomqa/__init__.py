@@ -51,27 +51,6 @@ See: https://venomqa.dev for full documentation.
 # MAIN API - Import these directly: from venomqa import Action, State, ...
 # =============================================================================
 
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-from venomqa.v1.core.state import State, Observation
-from venomqa.v1.core.context import Context
-from venomqa.v1.core.invariant import Invariant, Violation, Severity, InvariantTiming
-from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.transition import Transition
-from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.world import World
-from venomqa.v1.world.checkpoint import Checkpoint
-from venomqa.v1.world.rollbackable import Rollbackable
-from venomqa.v1.agent import Agent, Scheduler
-from venomqa.v1.agent.strategies import BFS, DFS, Random, CoverageGuided, Weighted, Strategy
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.sqlite import SQLiteAdapter  # Recommended for exploration
-from venomqa.v1.dsl import Journey, Step, Branch, Path
-from venomqa.v1.dsl.decorators import action, invariant
-from venomqa.v1.reporters.console import ConsoleReporter
-
-# The main entry point
-from venomqa.v1 import explore
-
 # =============================================================================
 # LEGACY API - Still available for backwards compatibility
 # =============================================================================
@@ -105,21 +84,21 @@ from venomqa.core.context import ExecutionContext
 from venomqa.core.graph import (
     Edge,
     ExplorationNode,
-    ExplorationResult,
-    Invariant,
+    ExplorationResult as LegacyExplorationResult,
+    Invariant as LegacyInvariant,
     StateGraph,
     StateNode,
 )
 from venomqa.core.models import (
-    Branch,
-    Checkpoint,
+    Branch as LegacyBranch,
+    Checkpoint as LegacyCheckpoint,
     Issue,
-    Journey,
+    Journey as LegacyJourney,
     JourneyResult,
-    Path,
+    Path as LegacyPath,
     PathResult,
-    Severity,
-    Step,
+    Severity as LegacySeverity,
+    Step as LegacyStep,
     StepResult,
 )
 from venomqa.data import (
@@ -407,6 +386,26 @@ from venomqa.security import (
     SensitiveDataFilter,
     VaultBackend,
 )
+
+# The main entry point
+from venomqa.v1 import explore
+from venomqa.v1.adapters.http import HttpClient
+from venomqa.v1.adapters.sqlite import SQLiteAdapter  # Recommended for exploration
+from venomqa.v1.agent import Agent, Scheduler
+from venomqa.v1.agent.strategies import BFS, DFS, CoverageGuided, Random, Strategy, Weighted
+from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.v1.core.context import Context
+from venomqa.v1.core.graph import Graph
+from venomqa.v1.core.invariant import Invariant, InvariantTiming, Severity, Violation
+from venomqa.v1.core.result import ExplorationResult
+from venomqa.v1.core.state import Observation, State
+from venomqa.v1.core.transition import Transition
+from venomqa.v1.dsl import Branch, Journey, Path, Step
+from venomqa.v1.dsl.decorators import action, invariant
+from venomqa.v1.reporters.console import ConsoleReporter
+from venomqa.v1.world import World
+from venomqa.v1.world.checkpoint import Checkpoint
+from venomqa.v1.world.rollbackable import Rollbackable
 
 __version__ = "0.4.6"
 __author__ = "Naman Agarwal"
