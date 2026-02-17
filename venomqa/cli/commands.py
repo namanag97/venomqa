@@ -1625,7 +1625,7 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
 
     \b
     Creates:
-      qa/
+      venomqa/
       ├── venomqa.yaml        API URL and settings
       ├── llm-context.md      Paste into any AI assistant for help
       ├── actions/            Your action functions (api, context) -> response
@@ -1635,7 +1635,7 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
 
     \b
     Examples:
-      venomqa init                    Minimal scaffold
+      venomqa init                    Minimal scaffold (creates venomqa/)
       venomqa init --with-sample      Scaffold + working sample exploration
       venomqa init -p myproject       Use a different directory name
     """
