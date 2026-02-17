@@ -230,3 +230,17 @@ class Weighted(BaseStrategy):
                 return pair
 
         return unexplored[-1]  # Fallback
+
+
+# Import DimensionNoveltyStrategy so it is available from this module
+from venomqa.v1.agent.dimension_strategy import DimensionNoveltyStrategy  # noqa: E402
+
+__all__ = [
+    "Strategy",
+    "BFS",
+    "DFS",
+    "Random",
+    "CoverageGuided",
+    "Weighted",
+    "DimensionNoveltyStrategy",
+]
