@@ -52,6 +52,8 @@ def main(args: list[str] | None = None) -> int:
         return cmd_explore(parsed)
     elif parsed.command == "validate":
         return cmd_validate(parsed)
+    elif parsed.command == "record":
+        return cmd_record(parsed)
     else:
         parser.print_help()
         return 1
