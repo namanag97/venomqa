@@ -4,34 +4,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## App Goal
 
-VenomQA is an autonomous QA agent that explores APIs like an exhaustive human tester. Instead of writing linear test scripts, users define **Actions** (what can be done) and **Invariants** (what must always be true), and VenomQA explores every path through the application's state graph -- using DB savepoints/rollbacks to branch and reset state between paths.
+VenomQA is an autonomous QA agent that explores APIs like an exhaustive human tester. Instead of writing linear test scripts, users define **Actions** (what can be done) and **Invariants** (what must always be true), and VenomQA explores every path through the application's state graph — using DB savepoints/rollbacks to branch and reset state between paths.
 
-## Commands
+**Key insight**: Unit tests check endpoints one at a time. VenomQA tests *sequences* like `create → refund → refund` to find bugs that only appear in specific orderings.
+
+## Quick Start (for new users)
 
 ```bash
-# Development setup
+pip install venomqa
+venomqa              # Shows friendly intro
+venomqa demo         # See it find a bug in 30 seconds
+venomqa init --with-sample  # Set up a project
+```
+
+## Development Commands
+
+```bash
+# Setup
 pip install -e ".[dev]"
 
 # Testing
-make test                        # All tests
-make test-unit                   # Exclude integration/stress
-make test-integration            # Integration only
-make test-coverage               # With coverage (80% threshold)
-pytest tests/ -k "test_name"     # Single test
-pytest tests/ --run-slow         # Include slow tests
-pytest tests/ --run-integration  # Include integration tests
+pytest tests/v1/ --ignore=tests/v1/test_postgres.py  # Unit tests (421 tests)
+pytest tests/v1/ -k "test_name"                       # Single test
+make test                                             # All tests
+make ci                                               # lint + typecheck + test
 
 # Code quality
-make lint        # ruff check venomqa tests
-make typecheck   # mypy venomqa --strict
-make format      # black formatting
-make ci          # lint + typecheck + test-coverage
+ruff check src/ tests/    # Linting
+make typecheck            # mypy
 
 # CLI
 venomqa --help
-venomqa run      # Run explorations
-venomqa doctor   # System diagnostics
-venomqa watch    # Auto-rerun on file changes
+venomqa demo              # Demo with planted bug
+venomqa doctor            # System diagnostics
+venomqa init              # Create project
 ```
 
 ## Architecture
@@ -40,93 +46,62 @@ venomqa watch    # Auto-rerun on file changes
 
 All imports use the top-level `venomqa` package:
 ```python
-from venomqa import State, Action, World, Agent, Invariant, Journey, explore
+from venomqa import Action, Invariant, Agent, World, BFS, Severity
 from venomqa.adapters.http import HttpClient
 from venomqa.adapters.postgres import PostgresAdapter
-from venomqa.core.action import Action, ActionResult
 ```
+
+### Core Concepts
+
+| Concept | Description |
+|---------|-------------|
+| `Action` | Callable `(api, context) -> response` — one API operation |
+| `Invariant` | Rule `(world) -> bool` checked after every action |
+| `World` | Sandbox: HTTP client + rollbackable systems + context |
+| `Agent` | Orchestrates BFS/DFS exploration with checkpoints |
+| `Context` | Key-value store: `context.set()` / `context.get()` |
 
 ### Module Map
 
 | Module | Purpose |
 |--------|---------|
-| `core/` | `State`, `Action`, `ActionResult`, `Invariant`, `Violation`, `Graph`, `Transition` |
-| `world/` | `World` sandbox with `checkpoint()` / `rollback()` orchestration |
-| `agent/` | `Agent`, `Scheduler`, exploration strategies (BFS, DFS, Random, CoverageGuided, Weighted) |
-| `dsl/` | `Journey`, `Step`, `Branch` DSL + `@action`/`@invariant` decorators + compiler |
-| `adapters/` | `HttpClient`, `PostgresAdapter`, `RedisAdapter`, `MockQueue`, `MockMail`, etc. |
-| `reporters/` | `ConsoleReporter`, `HTMLTraceReporter`, `JSONReporter`, `JUnitReporter`, `MarkdownReporter` |
-| `generators/` | `generate_actions` from OpenAPI specs |
-| `recording/` | `RequestRecorder`, `generate_journey_code` |
-| `invariants/` | `OpenAPISchemaInvariant` |
-
-### Legacy Components (backwards compatible)
-
-| Module | Purpose |
-|--------|---------|
-| `explorer/engine.py` (69KB) | Core state-graph exploration algorithm |
-| `core/models.py` | `Journey`, `Step`, `Branch`, `Checkpoint`, `Path`, `Issue` |
-| `runner/` | `JourneyRunner` -- executes journeys, caches results |
-| `state/` | Pluggable DB backends: `postgres`, `mysql`, `sqlite`, `memory` via factory |
-| `ports/` | Abstract protocol interfaces (`DatabasePort`, `CachePort`, etc.) |
-| `http/` | REST, GraphQL, gRPC, WebSocket clients |
-| `cli/commands.py` (118KB) | All CLI subcommands |
-| `security/` | Security-specific test checks |
-| `preflight/` | Smoke tests before full exploration |
-| `plugins/` | Plugin system via `venomqa.plugins` entry point |
-
-### Internal Structure
-
-The main API is implemented in `src/venomqa/v1/` and re-exported at the top level.
-Internal v1 code uses `venomqa.v1.*` imports. External/user code should use `venomqa.*`.
+| `src/venomqa/v1/core/` | `Action`, `ActionResult`, `Invariant`, `Violation`, `State`, `Graph` |
+| `src/venomqa/v1/world/` | `World` sandbox with `checkpoint()` / `rollback()` |
+| `src/venomqa/v1/agent/` | `Agent`, strategies (BFS, DFS, CoverageGuided) |
+| `src/venomqa/v1/adapters/` | `HttpClient`, `PostgresAdapter`, `SQLiteAdapter`, `ResourceGraph` |
+| `src/venomqa/v1/reporters/` | `ConsoleReporter`, `HTMLTraceReporter`, `JSONReporter` |
+| `src/venomqa/v1/generators/` | `generate_actions` from OpenAPI specs |
+| `src/venomqa/cli/` | CLI commands including `demo`, `init`, `doctor` |
 
 ### Rollback Mechanism
 
 State exploration branches using per-system rollback:
-- **PostgreSQL**: `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` -- entire run is one uncommitted transaction
+- **PostgreSQL**: `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` — entire run is one uncommitted transaction
+- **SQLite**: Copy file / restore
 - **Redis**: `DUMP` all keys -> `FLUSHALL` + `RESTORE`
-- **Queues/Mail**: in-memory copy + restore
+- **Mock systems**: In-memory copy + restore
 
 ### Test Markers
 
 ```python
 @pytest.mark.slow         # skipped by default
 @pytest.mark.integration  # skipped by default (needs live services)
-@pytest.mark.stress
-@pytest.mark.branching
-@pytest.mark.concurrency
-@pytest.mark.performance
 ```
 
-### Configuration (`venomqa.yaml`)
+## Key Files
 
-```yaml
-base_url: "http://localhost:3000"
-timeout: 30
-retry: {max_attempts: 3, delay: 1, backoff_multiplier: 2}
-report: {formats: [html, json, junit], output_dir: "./reports"}
-parallel_paths: 4
-```
-
-### Entry Points (Plugin System)
-
-Registered in `pyproject.toml` -- extend via:
-- `venomqa.state_backends` -- custom DB backends
-- `venomqa.reporters` -- custom report formats
-- `venomqa.plugins` -- lifecycle hooks
-- `venomqa.adapters` -- injectable services
-
-## Key Files for Orientation
-
-- `venomqa/__init__.py` -- public API (clean, ~100 exports)
-- `venomqa/v1/` -- internal implementation
-- `venomqa/explorer/engine.py` -- core exploration loop
-- `tests/v1/` -- best examples of usage
-- `examples/` -- user-facing examples
+| File | Purpose |
+|------|---------|
+| `src/venomqa/__init__.py` | Public API (~100 exports) |
+| `src/venomqa/v1/agent/__init__.py` | Agent exploration engine |
+| `src/venomqa/cli/demo.py` | Demo command with planted bug |
+| `src/venomqa/cli/commands.py` | All CLI commands |
+| `tests/v1/` | Unit tests (best usage examples) |
+| `examples/github_stripe_qa/` | Full working example with 2 bugs |
 
 ## Tech Stack
 
 - Python 3.10+, pydantic v2, httpx, click, rich
-- pytest + pytest-asyncio (`asyncio_mode = "auto"`)
-- mypy (strict), ruff (line-length 100), black
+- pytest + pytest-asyncio
+- mypy (strict), ruff
 - psycopg3 for PostgreSQL
