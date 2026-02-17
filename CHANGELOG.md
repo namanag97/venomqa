@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-02-17
+
+### Added
+
+- **`Action(max_calls=N)`** — prevent test data explosion. CoverageGuided was creating 1000+ connections; now you can cap write actions:
+  ```python
+  Action(name="create_connection", execute=create_conn, max_calls=20)
+  Action(name="create_user", execute=create_user, max_calls=5)
+  ```
+  Once an action reaches its call limit, it's excluded from exploration.
+
+- **`resp.headers`** — proxy property on `ActionResult` to access response headers. Returns `{}` on network error. Useful for checking content-type:
+  ```python
+  if resp.headers.get("content-type", "").startswith("text/plain"):
+      # Handle Prometheus metrics endpoint, etc.
+  ```
+
+- **`venomqa init --update`** — update framework files (llm-context.md, README.md) without touching your actions/journeys. Creates backups of overwritten files.
+
+- **Validation helpers on ActionResult** — cleaner action code:
+  ```python
+  resp.expect_status(201)              # raises if not 201
+  resp.expect_status(200, 201, 204)    # raises if not any of these
+  resp.expect_success()                # raises if not 2xx/3xx
+  data = resp.expect_json()            # raises if not JSON
+  data = resp.expect_json_field("id")  # raises if "id" missing
+  items = resp.expect_json_list()      # raises if not array
+  ```
+
+- **`result.unused_actions`** — list of action names that were never executed. Useful for debugging coverage gaps.
+
+- **Coverage warning on truncation** — when exploration is truncated by `max_steps` and actions were never run, VenomQA now prints a loud warning:
+  ```
+  COVERAGE WARNING: 28/44 actions (64%) were NEVER run:
+    - get_quality_rule
+    - update_notification_target
+    ...
+  Possible fixes:
+    1. Use CoverageGuided() strategy instead of DFS()
+    2. Add state_from_context=['connection_id', ...] to World
+    3. Add preconditions to chain actions
+  ```
+
+### Changed
+
+- **`resp.status_code` returns 0 on network error** — previously threw `AttributeError` when `resp.response` was None (timeout, connection refused). Now returns 0 so `if resp.status_code == 500:` doesn't crash. Fixes 30+ manual patches users had to make.
+
+- **`state_from_context` promoted to Option 1** — error messages and `venomqa init` now show `state_from_context` as the easiest option (no DB required), with PostgreSQL as Option 2. This was the key unlock for most HTTP API testing.
+
+- **Improved error messages** — "no database/systems" error now shows all three options clearly:
+  1. `state_from_context` (easiest, no DB)
+  2. PostgreSQL (full DB rollback)
+  3. SQLite (simpler DB rollback)
+
+### Fixed
+
+- **DFS silent 36% coverage** — DFS could run 2000 steps, use only 16/44 actions, and report PASSED with zero warning. Now prints uncovered actions and suggests CoverageGuided or state_from_context.
+
+## [0.4.6] - 2026-02-17
+
+### Added
+
+- Minor documentation improvements and example updates.
+
 ## [0.4.5] - 2026-02-17
 
 ### Added
