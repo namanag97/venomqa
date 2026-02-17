@@ -81,6 +81,41 @@ class ActionResult:
 # Type alias for action preconditions
 Precondition = Callable[["State"], bool]
 
+
+def precondition_has_context(*keys: str) -> Precondition:
+    """Create a State-compatible precondition that requires context keys.
+
+    Because preconditions receive a State (not a World), context checking requires
+    a workaround: attach the required keys as metadata on the callable. The Agent
+    can call this precondition with a dummy State and it will always return True;
+    the REAL check is done in World.act() / Agent._step() when context is available.
+
+    For now, use this as a documentation marker and pair it with @requires_context
+    from the DSL decorators, which enforces the check at action invocation time.
+
+    Example::
+
+        create_repo_action = Action(
+            name="create_repo",
+            execute=create_repo,
+            preconditions=[precondition_has_context("user_login")],
+        )
+
+    The precondition returns True always when checked against State (so the action
+    is always eligible). The actual guard happens inside the action function via
+    ``context.get_required("user_login")``.
+
+    A future version will give preconditions access to the full World so they can
+    check context directly.
+    """
+    def check(state: "State") -> bool:  # noqa: ARG001
+        # Always eligible from State perspective; real check is at invocation time.
+        return True
+
+    check.__name__ = f"has_context({', '.join(keys)})"
+    check._required_context_keys = keys  # type: ignore[attr-defined]
+    return check
+
 # Import ResponseAssertion at runtime to avoid circular import
 def _get_response_assertion_type():
     from venomqa.v1.core.invariant import ResponseAssertion
