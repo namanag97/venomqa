@@ -268,40 +268,46 @@ Example:
 """
 '''
 
-SAMPLE_ACTION_PY = '''"""Sample actions for your QA tests.
+SAMPLE_ACTION_PY = '''"""Sample actions for your VenomQA tests (v1 API).
 
-Modify these actions or add new ones for your specific API.
+Each action has signature: (api, context)
+  - api      : HttpClient — .get() .post() .put() .patch() .delete()
+  - context  : Context   — .get(key) / .set(key, val)  ← NOT context[key]
+
+Modify these for your specific API, then register them in an Agent.
 """
 
-from typing import Any
 
-
-def health_check(client: Any, context: dict) -> Any:
+def health_check(api, context):
     """Check API health status."""
-    response = client.get("/health")
-    if response.status_code == 200:
-        context["api_healthy"] = True
-    return response
+    return api.get("/health")
 
 
-def get_items(client: Any, context: dict) -> Any:
-    """List all items."""
-    response = client.get("/api/items")
-    if response.status_code == 200:
-        context["items"] = response.json()
-    return response
+def list_items(api, context):
+    """List all items and store in context."""
+    resp = api.get("/api/items")
+    if resp.status_code == 200:
+        context.set("items", resp.json())
+    return resp
 
 
-def create_item(client: Any, context: dict, name: str = "Test Item", **kwargs) -> Any:
-    """Create a new item."""
-    payload = {
-        "name": name,
-        "description": kwargs.get("description", "Created by VenomQA"),
-    }
-    response = client.post("/api/items", json=payload)
-    if response.status_code in (200, 201):
-        context["created_item"] = response.json()
-    return response
+def create_item(api, context):
+    """Create a new item and store its ID in context."""
+    resp = api.post("/api/items", json={
+        "name": "VenomQA Test Item",
+        "description": "Created by VenomQA",
+    })
+    if resp.status_code in (200, 201):
+        context.set("item_id", resp.json().get("id"))
+    return resp
+
+
+def delete_item(api, context):
+    """Delete the item created by create_item."""
+    item_id = context.get("item_id")
+    if item_id is None:
+        return api.get("/api/items")   # no-op if nothing to delete
+    return api.delete(f"/api/items/{item_id}")
 '''
 
 def _get_readme_template(base_path: str) -> str:
