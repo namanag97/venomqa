@@ -2,7 +2,7 @@
 
 This document provides a comprehensive reference for all public classes and functions in VenomQA.
 
-> **Quick Start**: New to VenomQA? See the [Getting Started Guide](getting-started.md) first.
+> **Quick Start**: New to VenomQA? See the [Getting Started Guide](../getting-started/index.md) first.
 
 ## Table of Contents
 
@@ -44,12 +44,12 @@ This document provides a comprehensive reference for all public classes and func
 
 | Topic | Document |
 |-------|----------|
-| Writing Journeys | [journeys.md](journeys.md) |
+| Writing Journeys | [journeys.md](../concepts/journeys.md) |
 | Database Backends | [backends.md](backends.md) |
 | CLI Reference | [cli.md](cli.md) |
-| Ports & Adapters | [ports.md](ports.md) |
-| Advanced Usage | [advanced.md](advanced.md) |
-| FAQ | [FAQ.md](FAQ.md) |
+| Ports & Adapters | [ports.md](adapters.md) |
+| Advanced Usage | [advanced.md](../advanced.md) |
+| FAQ | [FAQ.md](../faq.md) |
 
 ---
 
@@ -818,7 +818,7 @@ infra.stop()
 
 ## Ports
 
-Ports are abstract interfaces that define contracts for external system interactions. See [Ports Documentation](ports.md) for detailed information.
+Ports are abstract interfaces that define contracts for external system interactions. See [Ports Documentation](adapters.md) for detailed information.
 
 ### Importing Ports
 

@@ -2,7 +2,7 @@
 
 This document provides detailed configuration and usage information for all available adapters in VenomQA.
 
-> **New to Ports & Adapters?** See the [Ports Documentation](ports.md) for the architecture overview.
+> **New to Ports & Adapters?** See the [Ports Documentation](adapters.md) for the architecture overview.
 
 ## Available Adapters
 

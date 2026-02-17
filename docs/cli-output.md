@@ -260,6 +260,6 @@ Planned features:
 
 ## See Also
 
-- [CLI Commands](cli.md) - Command-line interface
-- [Journeys](journeys.md) - Journey structure
-- [Reporters](../README.md#reporters) - Report formats
+- [CLI Commands](reference/cli.md) - Command-line interface
+- [Journeys](concepts/journeys.md) - Journey structure
+- [Reporters](reference/reporters.md) - Report formats

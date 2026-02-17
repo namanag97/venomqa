@@ -2,7 +2,7 @@
 
 VenomQA supports database state management for checkpoint and rollback functionality. This enables testing multiple execution paths from the same database state.
 
-> **New to state branching?** See [Getting Started - Using State Branching](getting-started.md#using-state-branching) for an introduction.
+> **New to state branching?** See [Getting Started - Using State Branching](../getting-started/index.md) for an introduction.
 
 ## Table of Contents
 
@@ -18,9 +18,9 @@ VenomQA supports database state management for checkpoint and rollback functiona
 | Topic | Document |
 |-------|----------|
 | API Reference | [api.md#state-management](api.md#state-management) |
-| Writing Journeys | [journeys.md#checkpoints-and-rollback](journeys.md#checkpoints-and-rollback) |
-| Advanced Usage | [advanced.md#custom-state-backends](advanced.md#custom-state-backends) |
-| FAQ | [FAQ.md#state-branching](FAQ.md#state-branching) |
+| Writing Journeys | [../concepts/journeys.md](../concepts/journeys.md) |
+| Advanced Usage | [../advanced/custom-backends.md](../advanced/custom-backends.md) |
+| FAQ | [FAQ.md#state-branching](../faq.md) |
 
 ---
 

@@ -2,7 +2,7 @@
 
 This page provides practical, real-world examples of using VenomQA.
 
-> **Looking for basics?** See the [Getting Started Guide](getting-started.md) for introductory examples.
+> **Looking for basics?** See the [Getting Started Guide](getting-started/index.md) for introductory examples.
 
 ## Table of Contents
 
@@ -19,9 +19,9 @@ This page provides practical, real-world examples of using VenomQA.
 
 | Topic | Document |
 |-------|----------|
-| Journey DSL | [journeys.md](journeys.md) |
-| Adapters | [adapters.md](adapters.md) |
-| Ports | [ports.md](ports.md) |
+| Journey DSL | [journeys.md](concepts/journeys.md) |
+| Adapters | [adapters.md](reference/adapters.md) |
+| Ports | [ports.md](reference/adapters.md) |
 | Advanced Patterns | [advanced.md](advanced.md) |
 
 ---

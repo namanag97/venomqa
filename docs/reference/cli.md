@@ -2,7 +2,7 @@
 
 VenomQA provides a command-line interface for running journeys, listing available tests, and generating reports.
 
-> **New here?** See [Getting Started](getting-started.md) for basic CLI usage.
+> **New here?** See [Getting Started](../getting-started/index.md) for basic CLI usage.
 
 ## Installation
 
@@ -18,7 +18,7 @@ The CLI is installed as the `venomqa` command.
 |-------|----------|
 | Configuration | [backends.md](backends.md#configuration) |
 | Reports | [api.md#reporters](api.md#reporters) |
-| FAQ | [FAQ.md](FAQ.md) |
+| FAQ | [FAQ.md](../faq.md) |
 
 ## Global Options
 

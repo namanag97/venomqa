@@ -2,7 +2,7 @@
 
 This guide covers advanced features and patterns in VenomQA.
 
-> **Prerequisites**: Familiarity with [Journeys](journeys.md) and [Configuration](backends.md).
+> **Prerequisites**: Familiarity with [Journeys](../concepts/journeys.md) and [Configuration](../reference/backends.md).
 
 ## Table of Contents
 
@@ -19,10 +19,10 @@ This guide covers advanced features and patterns in VenomQA.
 
 | Topic | Document |
 |-------|----------|
-| API Reference | [api.md](api.md) |
-| Adapters | [adapters.md](adapters.md) |
-| Examples | [examples.md](examples.md) |
-| FAQ | [FAQ.md](FAQ.md) |
+| API Reference | [api.md](../reference/api.md) |
+| Adapters | [adapters.md](../reference/adapters.md) |
+| Examples | [examples.md](../examples.md) |
+| FAQ | [FAQ.md](../faq.md) |
 
 ---
 
@@ -396,7 +396,7 @@ slack_reporter.send_to_slack([result1, result2])
 
 ## Custom State Backends
 
-See [Database Backends](backends.md#custom-backends) for implementing custom state backends.
+See [Database Backends](../reference/backends.md#custom-backends) for implementing custom state backends.
 
 ---
 
