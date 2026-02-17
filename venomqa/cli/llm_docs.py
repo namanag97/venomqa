@@ -234,11 +234,16 @@ Accessing context from outside actions/invariants:
 
 ## ExplorationResult — reading results
 
-    result.states_visited    # int — total distinct states reached
-    result.transitions_taken # int — total action executions
-    result.duration_ms       # float — wall-clock time
-    result.violations        # list[Violation]
-    result.graph             # Graph object with full transition history
+    result.states_visited          # int — total distinct states reached
+    result.transitions_taken       # int — total action executions
+    result.action_coverage_percent # float — % of actions tried at least once (primary metric)
+    result.coverage_percent        # float — % of (state × action) pairs tried (can never reach 100%)
+    result.truncated_by_max_steps  # bool — True if exploration hit max_steps limit early
+    result.duration_ms             # float — wall-clock time
+    result.violations              # list[Violation]
+    result.success                 # bool — True if no violations
+    result.graph                   # Graph object with full transition history
+    result.summary()               # dict with all metrics above
 
     for v in result.violations:
         v.invariant_name      # str
@@ -248,6 +253,11 @@ Accessing context from outside actions/invariants:
         v.reproduction_path   # list[Transition] — how to reach this state
         v.action              # Action that triggered the violation
         v.action_result       # ActionResult (request + response)
+
+NOTE: Use action_coverage_percent as the primary coverage metric.
+coverage_percent can never reach 100% in state-growing systems — each new state
+adds N new (state, action) pairs. action_coverage_percent answers the useful
+question: "have we tried every action at least once?"
 
 ---
 
