@@ -523,14 +523,16 @@ def run_health_checks(
     # Show critical reminder about database requirement
     console.print()
     console.print(Panel(
-        "[bold]VenomQA requires DATABASE ROLLBACK to explore state graphs.[/bold]\n\n"
-        "Without a database connection, VenomQA can only test ONE linear path.\n"
-        "You must connect to the [bold]SAME database your API writes to[/bold].\n\n"
+        "[bold]VenomQA needs access to your API's database.[/bold]\n\n"
+        "[white]Why?[/white] Your API stores state in a database. When VenomQA explores\n"
+        "different action sequences, it needs to ROLLBACK the database between\n"
+        "branches so each path starts from the same state.\n\n"
+        "[white]Connect to the SAME database your API writes to.[/white]\n\n"
         "[cyan]PostgreSQL setup:[/cyan]\n"
         "  docker run -d --name postgres -p 5432:5432 \\\n"
         "    -e POSTGRES_PASSWORD=postgres postgres:15\n"
         "  export DATABASE_URL='postgresql://postgres:postgres@localhost/mydb'",
-        title="[yellow]Critical: Database Required[/yellow]",
+        title="[yellow]Database Connection Required[/yellow]",
         border_style="yellow",
     ))
 
