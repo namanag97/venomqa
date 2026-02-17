@@ -37,8 +37,7 @@ import click
 
 # Note: watchdog is imported lazily in the watch command to avoid import errors
 # when watchdog is not installed
-
-from venomqa.config import ConfigLoadError, ConfigValidationError, QAConfig, load_config
+from venomqa.config import ConfigLoadError, ConfigValidationError, load_config
 from venomqa.errors.debug import (
     DebugLevel,
     DebugLogger,
@@ -561,6 +560,11 @@ from venomqa.cli.demo import demo
 
 cli.add_command(demo)
 
+# Register llm-docs command
+from venomqa.cli.llm_docs import llm_docs
+
+cli.add_command(llm_docs)
+
 
 @cli.command()
 @click.option(
@@ -994,7 +998,7 @@ def _run_benchmark_mode(
 ) -> None:
     """Run journeys in benchmark mode."""
     from venomqa import Client
-    from venomqa.performance.benchmark import Benchmarker, BenchmarkConfig, BenchmarkSuite
+    from venomqa.performance.benchmark import BenchmarkConfig, BenchmarkSuite
 
     suite = BenchmarkSuite(
         BenchmarkConfig(
@@ -1115,7 +1119,7 @@ def _run_parallel_mode(
 
         click.echo(json.dumps(results, indent=2, default=str))
     else:
-        output.console.print(f"\n[bold]Parallel Execution Results[/bold]")
+        output.console.print("\n[bold]Parallel Execution Results[/bold]")
         output.console.print(f"  Total: {result.total_journeys}")
         output.console.print(f"  Passed: [green]{result.passed}[/green]")
         output.console.print(f"  Failed: [red]{result.failed}[/red]")
@@ -1357,10 +1361,8 @@ def _send_notifications(
         output: CLI output handler.
     """
     from venomqa.notifications import (
-        NotificationConfig,
-        NotificationManager,
-        NotificationMessage,
         NotificationEvent,
+        NotificationMessage,
         create_notification_manager_from_config,
     )
 
@@ -1500,7 +1502,7 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
     if not skip_checks:
         console.print("\n[bold blue]Running preflight checks...[/bold blue]")
         try:
-            from venomqa.cli.doctor import run_health_checks, get_health_checks
+            from venomqa.cli.doctor import get_health_checks, run_health_checks
 
             checks = get_health_checks()
             # Only run essential checks
@@ -1573,13 +1575,13 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
     console.print(f"  4. Create journeys in [cyan]{base}/journeys/[/cyan]")
 
     if with_sample:
-        console.print(f"\n[bold]Run your first test:[/bold]")
+        console.print("\n[bold]Run your first test:[/bold]")
         console.print(f"  cd {base} && venomqa run sample_journey")
     else:
-        console.print(f"\n[bold]Or initialize with sample files:[/bold]")
+        console.print("\n[bold]Or initialize with sample files:[/bold]")
         console.print(f"  venomqa init --force --with-sample -p {base}")
 
-    console.print(f"\n[bold]Check system status:[/bold]")
+    console.print("\n[bold]Check system status:[/bold]")
     console.print("  venomqa doctor")
 
 
@@ -1636,8 +1638,8 @@ def validate(config_path: str | None, journey_name: str | None, output_json: boo
         1 - One or more validations failed
     """
     import json as json_module
+
     from rich.console import Console
-    from rich.table import Table
 
     console = Console()
     issues: list[dict[str, Any]] = []
@@ -2478,7 +2480,6 @@ def generate_graphql(
 
     try:
         from venomqa.graphql.codegen import generate_actions_from_schema
-        from venomqa.graphql.schema import load_schema_from_file, load_schema_from_introspection
 
         schema_source: str | Path | dict[str, Any]
 
@@ -2497,7 +2498,7 @@ def generate_graphql(
                     http_headers[name.strip()] = value.strip()
 
             # Use GraphQL client to introspect
-            from venomqa.http.graphql import GraphQLClient, INTROSPECTION_QUERY
+            from venomqa.http.graphql import INTROSPECTION_QUERY, GraphQLClient
 
             client = GraphQLClient(
                 endpoint=endpoint_url,
@@ -2535,13 +2536,13 @@ def generate_graphql(
         click.echo(f"  - {output_dir}/{module_name}.py")
         click.echo(f"  - {output_dir}/__init__.py")
 
-        click.echo(f"\nGenerated actions:")
+        click.echo("\nGenerated actions:")
         click.echo(f"  - Queries: {query_count}")
         click.echo(f"  - Mutations: {mutation_count}")
         click.echo(f"  - Subscriptions: {subscription_count}")
 
         click.echo("\nSuccessfully generated GraphQL actions!")
-        click.echo(f"\nUsage example:")
+        click.echo("\nUsage example:")
         click.echo(f"    from {output_dir.replace('/', '.')}.{module_name} import *")
 
     except FileNotFoundError as e:
@@ -2608,7 +2609,7 @@ def check_env(ctx: click.Context, environment_name: str, output_format: str) -> 
         output = CLIOutput(ProgressConfig())
         output.console.print(f"\n[bold]Environment: {environment_name}[/bold]")
         output.console.print(f"Status: [{status_color}]{status}[/{status_color}]")
-        output.console.print(f"\nHealth Checks:")
+        output.console.print("\nHealth Checks:")
 
         for check in health.checks:
             check_status = "PASS" if check.healthy else "FAIL"
@@ -2767,12 +2768,12 @@ def compare_envs(
 
         click.echo(json.dumps(comparison.to_dict(), indent=2, default=str))
     else:
-        output.console.print(f"\n[bold]Results:[/bold]")
+        output.console.print("\n[bold]Results:[/bold]")
         output.console.print(f"  Both passed: {'Yes' if comparison.both_passed else 'No'}")
         output.console.print(f"  Differences found: {len(comparison.differences)}")
 
         if comparison.differences:
-            output.console.print(f"\n[bold]Differences:[/bold]")
+            output.console.print("\n[bold]Differences:[/bold]")
             for diff in comparison.differences:
                 output.console.print(f"\n  [yellow]{diff.path}[/yellow]")
                 output.console.print(f"    Type: {diff.difference_type}")
@@ -3097,7 +3098,7 @@ def security_scan(
     """
     from venomqa import Client
     from venomqa.cli.output import CLIOutput, ProgressConfig
-    from venomqa.domains.security import SecurityScanner, ScanConfig
+    from venomqa.domains.security import ScanConfig, SecurityScanner
 
     output = CLIOutput(ProgressConfig())
 
