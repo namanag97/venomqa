@@ -338,6 +338,7 @@ __all__ = [
     "Random",
     "CoverageGuided",
     "Weighted",
+    "DimensionNoveltyStrategy",
     "Scheduler",
     "ScheduledRun",
     "RunResult",
