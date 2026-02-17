@@ -26,7 +26,23 @@ from venomqa.v1.world.rollbackable import Rollbackable
 from venomqa.v1.world.checkpoint import Checkpoint, SystemCheckpoint
 
 from venomqa.v1.agent import Agent, Scheduler
-from venomqa.v1.agent.strategies import Strategy, BFS, DFS, Random, CoverageGuided, Weighted
+from venomqa.v1.agent.strategies import (
+    Strategy, BFS, DFS, Random, CoverageGuided, Weighted, DimensionNoveltyStrategy
+)
+
+# Hypergraph / multi-dimensional state space
+from venomqa.v1.core.dimensions import (
+    AuthStatus, UserRole, EntityStatus, CountClass, UsageClass, PlanType,
+    BUILTIN_DIMENSIONS,
+)
+from venomqa.v1.core.hyperedge import Hyperedge
+from venomqa.v1.core.hypergraph import Hypergraph
+from venomqa.v1.core.constraints import (
+    StateConstraint, AnonHasNoRole, AuthHasRole, FreeCannotExceedUsage,
+    LambdaConstraint, constraint, DEFAULT_CONSTRAINTS,
+)
+from venomqa.v1.core.coverage import DimensionCoverage, DimensionAxisCoverage
+from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
 
 from venomqa.v1.dsl import Journey, Step
 from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
