@@ -93,9 +93,13 @@ def clean_state():
 def world(servers, clean_state):
     """Provide a freshly configured World with both API clients."""
     github_api = HttpClient(f"http://localhost:{GITHUB_PORT}")
+    # Stripe client stored in context: StripeProxy is still needed because
+    # HttpClient wraps httpx.Client (has threading.Lock) which can't be deepcopied.
     stripe_api = StripeProxy(f"http://localhost:{STRIPE_PORT}")
-    github_obs = GitHubObserver(f"http://localhost:{GITHUB_PORT}")
-    stripe_obs = StripeObserver(f"http://localhost:{STRIPE_PORT}")
+    # Observers now use MockHTTPServer — direct state dict access, no HTTP calls,
+    # real checkpoint/rollback enabled.
+    github_obs = GitHubObserver()
+    stripe_obs = StripeObserver()
 
     w = World(
         api=github_api,
@@ -107,8 +111,6 @@ def world(servers, clean_state):
 
     github_api.close()
     stripe_api.close()
-    github_obs.close()
-    stripe_obs.close()
 
 
 def _all_actions() -> list[Action]:
