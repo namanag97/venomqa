@@ -1,0 +1,35 @@
+{
+  "edges_executed": [
+    "go_left",
+    "go_right",
+    "left_finish",
+    "right_finish"
+  ],
+  "graph_name": "branching_golden",
+  "nodes_visited": [
+    "left",
+    "left_end",
+    "right",
+    "right_end",
+    "root"
+  ],
+  "paths": [
+    {
+      "path": [
+        "root",
+        "left",
+        "left_end"
+      ],
+      "success": true
+    },
+    {
+      "path": [
+        "root",
+        "right",
+        "right_end"
+      ],
+      "success": true
+    }
+  ],
+  "total_paths": 2
+}

@@ -4,10 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "venomqa"
-version = "0.3.0"
+version = "0.4.4"
 description = "Autonomous API QA agent — define actions and invariants, explore every state path automatically."
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
     { name = "Naman Agarwal", email = "naman@venomqa.dev" }
@@ -44,6 +45,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Framework :: Pytest",
     "Topic :: Software Development :: Testing",
     "Topic :: Software Development :: Testing :: Acceptance",
@@ -61,8 +63,6 @@ dependencies = [
     "psycopg[binary]>=3.1.0",
     "faker>=18.0.0",
     "watchdog>=3.0.0",
-    "mkdocstrings>=1.0.3",
-    "mkdocstrings-python>=2.0.2",
 ]
 
 [project.optional-dependencies]
@@ -148,7 +148,7 @@ mail = "venomqa.adapters.mail:MockMailAdapter"
 queue = "venomqa.adapters.queue:MockQueueAdapter"
 
 [tool.hatch.build.targets.wheel]
-packages = ["venomqa"]
+packages = ["src/venomqa"]
 
 [tool.ruff]
 line-length = 100

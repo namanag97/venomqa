@@ -1,0 +1,29 @@
+{
+  "edges_executed": [
+    "step1",
+    "step2"
+  ],
+  "failed_paths": 0,
+  "graph_name": "golden_test",
+  "nodes_visited": [
+    "end",
+    "middle",
+    "start"
+  ],
+  "paths": [
+    {
+      "edges_taken": [
+        "step1",
+        "step2"
+      ],
+      "path": [
+        "start",
+        "middle",
+        "end"
+      ],
+      "success": true
+    }
+  ],
+  "successful_paths": 1,
+  "total_paths": 1
+}
