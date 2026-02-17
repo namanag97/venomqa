@@ -27,6 +27,7 @@ class Graph:
         self._explored: set[tuple[str, str]] = set()  # (state_id, action_name)
         self._transition_keys: set[tuple[str, str, str]] = set()  # (from_id, action, to_id)
         self._initial_state_id: str | None = None
+        self._action_call_counts: dict[str, int] = {}  # action_name -> call count
 
     @property
     def states(self) -> dict[str, State]:
