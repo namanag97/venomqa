@@ -377,7 +377,23 @@ Custom mock server: subclass MockHTTPServer, implement 3 methods:
    BAD:  html.report(result, path="out.html")   → TypeError
    GOOD: open("out.html","w").write(html.report(result))
 
-6. Using python instead of python3 on macOS:
+6. MockTime.now called as a method:
+   BAD:  clock.now()   → TypeError (it's a property)
+   GOOD: clock.now
+
+7. MockTime not frozen — start= not provided:
+   BAD:  clock = MockTime(); clock.advance(days=1)  → RuntimeError: not frozen
+   GOOD: clock = MockTime(start=datetime(2024,1,1)); clock.advance(days=1)
+
+8. MockStorage.put() given a dict:
+   BAD:  storage.put("key", {"data": 1})   → TypeError
+   GOOD: import json; storage.put("key", json.dumps({"data": 1}))
+
+9. Accessing State.observations by Observation.system field:
+   BAD:  state.get_observation("queue:orders")   # 'queue:orders' is Observation.system metadata
+   GOOD: state.get_observation("queue")          # use the systems dict KEY you passed to World
+
+10. Using python instead of python3 on macOS:
    BAD:  python main.py
    GOOD: python3 main.py
 
