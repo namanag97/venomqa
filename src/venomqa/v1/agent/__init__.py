@@ -398,6 +398,9 @@ class Agent:
                         reproduction_path=repro_path,
                         action_result=action_result,
                     )
+                    # Optionally shrink the reproduction path to its minimum
+                    if self.shrink and len(repro_path) > 1:
+                        violation = self._shrink_violation(violation)
                     self._violations.append(violation)
             except Exception as e:
                 # Invariant check itself failed - treat as violation
