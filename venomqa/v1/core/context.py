@@ -61,6 +61,24 @@ class Context:
         value = self._data.get(key, default)
         return value if isinstance(value, type_) else default
 
+    def get_required(self, key: str) -> Any:
+        """Get a value that MUST exist, or raise ValueError.
+
+        Use in actions that have a precondition requiring this key — the action
+        will only run if the key is present, so this is a fast-fail assertion:
+
+            @requires_context("customer_id")
+            def create_payment_intent(api, context):
+                customer_id = context.get_required("customer_id")
+                ...
+        """
+        if key not in self._data:
+            raise ValueError(
+                f"Required context key '{key}' is missing. "
+                f"Available: {list(self._data.keys())}"
+            )
+        return self._data[key]
+
     def has(self, key: str) -> bool:
         """Check if a key exists in the context."""
         return key in self._data
