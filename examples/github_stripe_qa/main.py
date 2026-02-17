@@ -164,8 +164,9 @@ def run_exploration(max_steps: int = 50) -> bool:
     stripe_api = StripeProxy(f"http://localhost:{STRIPE_PORT}")
 
     # ---------------------------------------------------------------- world
-    github_obs = GitHubObserver(f"http://localhost:{GITHUB_PORT}")
-    stripe_obs = StripeObserver(f"http://localhost:{STRIPE_PORT}")
+    # Direct-state observers (MockHTTPServer): no HTTP calls, real rollback
+    github_obs = GitHubObserver()
+    stripe_obs = StripeObserver()
     world = World(
         api=github_api,
         systems={"github": github_obs, "stripe_obs": stripe_obs},
