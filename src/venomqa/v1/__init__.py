@@ -297,6 +297,7 @@ __all__ = [
     # Setup helpers
     "connect_to_app",
     "connect_to_api",
+    "connect_to_protocol",
     "setup_from_config",
     # Type aliases
     "StateID",
