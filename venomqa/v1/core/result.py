@@ -22,6 +22,7 @@ class ExplorationResult:
     started_at: datetime = field(default_factory=datetime.now)
     finished_at: datetime | None = None
     duration_ms: float = 0.0
+    truncated_by_max_steps: bool = False
     dimension_coverage: DimensionCoverage | None = None
 
     @property
