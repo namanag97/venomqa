@@ -3610,7 +3610,7 @@ def validate_v1(journey_file: str) -> None:
     """Validate V1 journey syntax without running it."""
     import types
 
-    from venomqa.v1.cli.main import cmd_validate
+    from venomqa.cli.main import cmd_validate
 
     args = types.SimpleNamespace(journey_file=journey_file)
     sys.exit(cmd_validate(args))
