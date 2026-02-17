@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-17
+
+### Added
+
+- **New `venomqa demo`** — Compelling demo that plants a bug (double-refund) and finds it. Shows unit tests passing while VenomQA catches the sequence bug. Demonstrates value in 30 seconds.
+
+- **Friendly CLI intro** — Running `venomqa` with no args now shows a helpful intro panel with 3 commands instead of a wall of 25+ commands.
+
+- **`Client` alias** — Added `Client` as an alias for `HttpClient` for backwards compatibility with legacy commands.
+
+- **ResourceGraph** — New adapter for tracking typed resources with parent-child relationships and auto-cascade deletes.
+
+- **OpenAPI action generation** — `generate_actions()` creates actions from OpenAPI specs with automatic resource type inference.
+
+### Fixed
+
+- **`venomqa init` sample imports** — Generated `sample_journey.py` now includes `sys.path` setup so it runs correctly from any directory.
+
+- **`venomqa run` error message** — Now shows "Run `venomqa init --with-sample` first" instead of confusing "No journeys found".
+
+- **`venomqa list` error message** — Same improvement as `run`.
+
+- **`venomqa cleanup` crash** — Fixed `ImportError: cannot import name 'Client'`.
+
+- **`venomqa explore --help`** — Now includes example and guidance for users without a journey file.
+
+- **47 lint errors** — Fixed all ruff warnings (unused imports, import ordering).
+
+### Changed
+
+- **Clean imports** — All public API now uses `from venomqa import X` pattern consistently.
+
 ## [0.4.7] - 2026-02-17
 
 ### Added
@@ -77,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`BearerTokenAuth`, `ApiKeyAuth`, `MultiRoleAuth`** — built-in auth helpers that eliminate the `_auth(context)` helper copy-pasted in every action file. Pass `auth=` to `World` and every request gets the token injected automatically:
   ```python
-  from venomqa.v1 import BearerTokenAuth, MultiRoleAuth, World
+  from venomqa import BearerTokenAuth, MultiRoleAuth, World
   world = World(api=api, auth=BearerTokenAuth(lambda ctx: ctx.get("token")))
   # In actions: api.get("/x")  ← no manual headers needed
 
@@ -96,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`OpenAPISchemaInvariant`** — validates every HTTP response against the OpenAPI spec automatically. No per-endpoint invariants needed — catches missing required fields, wrong types, and schema drift for free:
   ```python
-  from venomqa.v1.invariants import OpenAPISchemaInvariant
+  from venomqa.invariants import OpenAPISchemaInvariant
   invariants = [
       OpenAPISchemaInvariant(spec_url="http://localhost:8000/openapi.json"),
       # or: OpenAPISchemaInvariant(spec_path="api-spec.yaml")
