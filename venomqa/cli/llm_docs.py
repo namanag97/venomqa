@@ -334,10 +334,13 @@ In-memory mocks (for unit testing without real services):
     msg.id                                 # auto-generated "msg_1", "msg_2", …
     msg.processed                          # True after pop()
 
-    # MockMail
+    # MockMail — get_sent() returns list of Email objects (not dicts)
     mail.send("to@example.com", "Subject", "Body text")
     mail.sent_count                        # int: total emails sent
-    mail.get_sent()                        # list of all sent messages
+    emails = mail.get_sent()              # list[Email]
+    emails[0].subject                     # str
+    emails[0].to                          # str (recipient)
+    emails[0].body                        # str
 
     # MockStorage
     storage.put("file.pdf", b"PDF content")   # content must be str or bytes
