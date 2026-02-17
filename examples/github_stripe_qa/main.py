@@ -160,7 +160,7 @@ def run_exploration(max_steps: int = 50) -> bool:
 
     # ---------------------------------------------------------------- clients
     github_api = HttpClient(f"http://localhost:{GITHUB_PORT}")
-    stripe_api = HttpClient(f"http://localhost:{STRIPE_PORT}")
+    stripe_api = StripeProxy(f"http://localhost:{STRIPE_PORT}")
 
     # ---------------------------------------------------------------- world
     webhook_queue = MockQueue(name="github_webhooks")
