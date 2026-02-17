@@ -347,6 +347,7 @@ class Action:
     expected_status: list[int] | None = None
     expect_failure: bool = False
     response_assertion: Any = None  # ResponseAssertion, avoid circular import
+    max_calls: int | None = None  # Max times this action can be called (prevents data explosion)
     _accepts_context: bool | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
