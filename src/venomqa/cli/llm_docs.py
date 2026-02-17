@@ -185,7 +185,17 @@ Use the built-in validation helpers: expect_status(), expect_json_field(), etc.
         tags=["users", "write"],    # optional, for filtering
         expected_status=[201],      # optional, checks response status
         expect_failure=False,       # set True to expect 4xx/5xx
+        max_calls=10,               # optional, prevent data explosion (e.g., 1000 users)
     )
+
+### Preventing data explosion with max_calls
+
+    # Without max_calls, CoverageGuided might create 1000+ test records
+    Action(name="create_connection", execute=create_conn, max_calls=20)
+    Action(name="create_user", execute=create_user, max_calls=5)
+
+    # Read-only actions don't need max_calls
+    Action(name="list_connections", execute=list_conns)  # can run unlimited
 
 ---
 
