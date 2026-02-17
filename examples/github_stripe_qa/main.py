@@ -164,10 +164,11 @@ def run_exploration(max_steps: int = 50) -> bool:
     stripe_api = StripeProxy(f"http://localhost:{STRIPE_PORT}")
 
     # ---------------------------------------------------------------- world
-    webhook_queue = MockQueue(name="github_webhooks")
+    github_obs = GitHubObserver(f"http://localhost:{GITHUB_PORT}")
+    stripe_obs = StripeObserver(f"http://localhost:{STRIPE_PORT}")
     world = World(
         api=github_api,
-        systems={"webhooks": webhook_queue},
+        systems={"github": github_obs, "stripe_obs": stripe_obs},
     )
     # Pass Stripe client through context so Stripe actions can reach it
     world.context.set("stripe", stripe_api)
