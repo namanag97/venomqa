@@ -218,11 +218,19 @@ def _actions() -> list[Action]:
         resp = api.post("/todos", json={"title": "test task"})
         resp.expect_status(201)
         context.set("todo_id", resp.json()["id"])
+        context.set("todo_was_done", False)  # reset completion flag on new todo
         return resp
 
     def complete_todo(api: Any, context: Any) -> Any:
         todo_id = context.get("todo_id")
-        return api.patch(f"/todos/{todo_id}", json={"done": True})
+        resp = api.patch(f"/todos/{todo_id}", json={"done": True})
+        if resp.ok:
+            # Record in context so invariants and subsequent actions can see it.
+            # Context is checkpointed with state, so rollback to THIS state
+            # restores todo_was_done=True — enabling the invariant check on
+            # any later delete from this point in the exploration graph.
+            context.set("todo_was_done", True)
+        return resp
 
     def delete_todo(api: Any, context: Any) -> Any:
         todo_id = context.get("todo_id")
