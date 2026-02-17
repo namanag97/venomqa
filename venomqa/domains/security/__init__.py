@@ -15,39 +15,39 @@ Example:
 
 from venomqa.domains.security.actions.authentication import (
     AuthenticationTester,
-    TokenExpirationTest,
-    TokenRefreshTest,
     InvalidTokenTest,
     PermissionBoundaryTest,
+    TokenExpirationTest,
+    TokenRefreshTest,
 )
 from venomqa.domains.security.actions.injection import (
-    InjectionTester,
     AutoInjector,
+    CommandInjectionTest,
+    InjectionTester,
     SQLInjectionTest,
     XSSInjectionTest,
-    CommandInjectionTest,
 )
 from venomqa.domains.security.actions.owasp import (
-    OWASPChecker,
-    SecurityHeadersCheck,
     CORSPolicyCheck,
-    RateLimitCheck,
     ErrorLeakageCheck,
-)
-from venomqa.domains.security.scanner import (
-    SecurityScanner,
-    SecurityScanResult,
-    ScanConfig,
+    OWASPChecker,
+    RateLimitCheck,
+    SecurityHeadersCheck,
 )
 from venomqa.domains.security.journeys.security_journey import (
     SecurityJourney,
-    create_security_journey,
-    sql_injection_journey,
-    xss_journey,
     auth_bypass_journey,
+    create_security_journey,
+    full_security_journey,
     idor_journey,
     rate_limit_journey,
-    full_security_journey,
+    sql_injection_journey,
+    xss_journey,
+)
+from venomqa.domains.security.scanner import (
+    ScanConfig,
+    SecurityScanner,
+    SecurityScanResult,
 )
 
 __all__ = [

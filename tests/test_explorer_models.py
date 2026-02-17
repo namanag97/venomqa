@@ -5,19 +5,19 @@ This test script verifies that the models in venomqa/explorer/models.py
 are actually working implementations, not placeholder slop.
 """
 
-import pytest
 from datetime import datetime, timedelta
 
+import pytest
+
 from venomqa.explorer.models import (
-    State,
     Action,
-    Transition,
-    StateGraph,
+    CoverageReport,
+    ExplorationResult,
     Issue,
     IssueSeverity,
-    CoverageReport,
-    ExplorationConfig,
-    ExplorationResult,
+    State,
+    StateGraph,
+    Transition,
 )
 
 

@@ -7,14 +7,11 @@ handling features in realistic scenarios.
 from __future__ import annotations
 
 import time
-from datetime import datetime
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
 from venomqa.core.models import Journey, Step
-from venomqa.core.context import ExecutionContext
 from venomqa.errors import (
     BackoffStrategy,
     CircuitBreaker,

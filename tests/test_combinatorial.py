@@ -22,12 +22,10 @@ from venomqa.combinatorial import (
     Dimension,
     DimensionSpace,
     DimensionValue,
-    TransitionKey,
     at_most_one,
     exclude,
     require,
 )
-
 
 # ============================================================
 # Dimension Tests
@@ -567,7 +565,8 @@ class TestCombinatorialGraphBuilder:
         )
 
     def test_register_transition(self, basic_builder):
-        action = lambda client, ctx: None
+        def action(client, ctx):
+            return None
         trans = basic_builder.register_transition(
             "auth", "anon", "user", action=action, name="login"
         )
@@ -749,7 +748,7 @@ class TestCombinatorialGraphBuilder:
         graph = basic_builder.build(strength=2)
 
         # Find an edge that transitions auth anon->user
-        for from_node, edges in graph.edges.items():
+        for _from_node, edges in graph.edges.items():
             for edge in edges:
                 if "auth_anon_to_user" in edge.name:
                     # Execute the edge action

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from venomqa.v1.core.state import State
     from venomqa.v1.core.context import Context
+    from venomqa.v1.core.state import State
 
 
 @dataclass
@@ -108,7 +109,7 @@ def precondition_has_context(*keys: str) -> Precondition:
     A future version will give preconditions access to the full World so they can
     check context directly.
     """
-    def check(state: "State") -> bool:  # noqa: ARG001
+    def check(state: State) -> bool:  # noqa: ARG001
         # Always eligible from State perspective; real check is at invocation time.
         return True
 
@@ -177,7 +178,7 @@ class Action:
                 # Can't inspect (e.g., built-in), assume no context
                 self._accepts_context = False
 
-    def invoke(self, api: Any, context: "Context") -> ActionResult:
+    def invoke(self, api: Any, context: Context) -> ActionResult:
         """Execute the action, passing context if accepted.
 
         This is the preferred way to call an action from the framework.
@@ -188,7 +189,7 @@ class Action:
         else:
             return self.execute(api)
 
-    def can_execute(self, state: "State") -> bool:
+    def can_execute(self, state: State) -> bool:
         """Check if all preconditions are satisfied."""
         return all(p(state) for p in self.preconditions)
 

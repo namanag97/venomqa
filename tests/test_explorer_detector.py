@@ -9,17 +9,14 @@ This test module verifies that the StateDetector can properly:
 5. Extract HATEOAS links for available actions
 """
 
+from typing import Any
+
 import pytest
-from typing import Any, Dict, List, Optional
 
 from venomqa.explorer.detector import (
-    StateDetector,
     AuthState,
     EntityState,
-    AUTH_TOKEN_FIELDS,
-    USER_FIELDS,
-    ENTITY_ID_FIELDS,
-    STATUS_FIELDS,
+    StateDetector,
 )
 from venomqa.explorer.models import Action, State
 
@@ -139,7 +136,7 @@ class TestDetectState:
         """Test state detection with custom extractor."""
         detector = StateDetector()
 
-        def custom_extractor(response: Dict[str, Any]) -> Optional[State]:
+        def custom_extractor(response: dict[str, Any]) -> State | None:
             if "custom_state" in response:
                 return State(
                     id="custom_state_id",
@@ -620,7 +617,7 @@ class TestHATEOASExtraction:
         """Test custom action extractor."""
         detector = StateDetector()
 
-        def custom_extractor(response: Dict[str, Any]) -> List[Action]:
+        def custom_extractor(response: dict[str, Any]) -> list[Action]:
             if "custom_actions" in response:
                 return [
                     Action(

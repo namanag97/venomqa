@@ -2,18 +2,23 @@
 
 from __future__ import annotations
 
-import pytest
-
+from venomqa.v1.core.constraints import (
+    AnonHasNoRole,
+    AuthHasRole,
+    FreeCannotExceedUsage,
+    constraint,
+)
 from venomqa.v1.core.dimensions import (
-    AuthStatus, UserRole, EntityStatus, CountClass, UsageClass, PlanType,
+    AuthStatus,
+    CountClass,
+    EntityStatus,
+    PlanType,
+    UsageClass,
+    UserRole,
 )
 from venomqa.v1.core.hyperedge import Hyperedge
 from venomqa.v1.core.hypergraph import Hypergraph
-from venomqa.v1.core.constraints import (
-    AnonHasNoRole, AuthHasRole, FreeCannotExceedUsage, constraint,
-)
-from venomqa.v1.core.state import State, Observation
-
+from venomqa.v1.core.state import Observation, State
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -426,7 +431,7 @@ class TestAgentWithHypergraph:
 
         world = self._make_world()
         agent = Agent(world=world, actions=[action], max_steps=5, hypergraph=True)
-        result = agent.explore()
+        agent.explore()
 
         assert agent.hypergraph is not None
         assert agent.hypergraph.node_count >= 1
@@ -467,7 +472,6 @@ class TestAgentWithHypergraph:
         from venomqa.v1 import Agent
         from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
         from venomqa.v1.world import World
-        from venomqa.v1.adapters.mock_storage import MockStorage
 
         # Use a MockStorage that we can manually seed observations through
         # Actually, we just need the world to have observations with dimension keys.
@@ -493,7 +497,7 @@ class TestAgentWithHypergraph:
 
         action = Action(name="dummy", execute=dummy)
         agent = Agent(world=world, actions=[action], max_steps=3, hypergraph=True)
-        result = agent.explore()
+        agent.explore()
 
         hg = agent.hypergraph
         assert hg is not None

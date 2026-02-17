@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Callable
-import uuid
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from venomqa.v1.core.state import State
     from venomqa.v1.core.action import Action, ActionResult
+    from venomqa.v1.core.state import State
     from venomqa.v1.core.transition import Transition
     from venomqa.v1.world import World
 
@@ -57,7 +58,7 @@ class Invariant:
     """
 
     name: str
-    check: Callable[["World"], bool]
+    check: Callable[[World], bool]
     message: str = ""
     severity: Severity = Severity.MEDIUM
     timing: InvariantTiming = InvariantTiming.POST_ACTION
@@ -92,10 +93,10 @@ class ResponseAssertion:
 
     expected_status: list[int] | None = None
     expect_failure: bool = False  # If True, action should fail (4xx/5xx)
-    check: Callable[["ActionResult"], bool] | None = None
+    check: Callable[[ActionResult], bool] | None = None
     message: str = ""
 
-    def validate(self, result: "ActionResult") -> tuple[bool, str]:
+    def validate(self, result: ActionResult) -> tuple[bool, str]:
         """Validate the action result against assertions.
 
         Returns:
@@ -136,22 +137,22 @@ class Violation:
 
     id: str
     invariant_name: str
-    state: "State"
+    state: State
     message: str
     severity: Severity
-    action: "Action | None" = None
-    action_result: "ActionResult | None" = None
-    reproduction_path: list["Transition"] = field(default_factory=list)
+    action: Action | None = None
+    action_result: ActionResult | None = None
+    reproduction_path: list[Transition] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)
 
     @classmethod
     def create(
         cls,
         invariant: Invariant,
-        state: "State",
-        action: "Action | None" = None,
-        reproduction_path: list["Transition"] | None = None,
-        action_result: "ActionResult | None" = None,
+        state: State,
+        action: Action | None = None,
+        reproduction_path: list[Transition] | None = None,
+        action_result: ActionResult | None = None,
     ) -> Violation:
         """Create a violation from an invariant and state."""
         return cls(

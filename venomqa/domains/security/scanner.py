@@ -14,29 +14,27 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from venomqa.security.testing import (
-    SecurityTestResult,
-    VulnerabilityFinding,
-    VulnerabilitySeverity,
-    VulnerabilityType,
-)
 from venomqa.domains.security.actions.authentication import (
     AuthenticationTester,
     AuthTestConfig,
 )
 from venomqa.domains.security.actions.injection import (
-    InjectionTester,
     InjectionTestConfig,
+    InjectionTester,
 )
 from venomqa.domains.security.actions.owasp import (
-    OWASPChecker,
     OWASPCheckConfig,
+    OWASPChecker,
+)
+from venomqa.security.testing import (
+    SecurityTestResult,
+    VulnerabilityFinding,
+    VulnerabilitySeverity,
 )
 
 logger = logging.getLogger(__name__)
@@ -491,8 +489,8 @@ class SecurityScanner:
             f"**Scan Date:** {result.scan_started.strftime('%Y-%m-%d %H:%M:%S')}  ",
             f"**Duration:** {result.scan_duration_ms:.0f}ms\n",
             "## Summary\n",
-            f"| Metric | Value |",
-            f"|--------|-------|",
+            "| Metric | Value |",
+            "|--------|-------|",
             f"| Total Findings | {result.total_findings} |",
             f"| Critical | {result.findings_by_severity.get('critical', 0)} |",
             f"| High | {result.findings_by_severity.get('high', 0)} |",
@@ -522,15 +520,15 @@ class SecurityScanner:
                             f"**Location:** {finding.location}  ",
                             f"**CWE:** {finding.cwe or 'N/A'}  ",
                             f"**OWASP:** {finding.owasp or 'N/A'}\n",
-                            f"**Description:**  ",
+                            "**Description:**  ",
                             f"{finding.description}\n",
-                            f"**Payload:**  ",
-                            f"```",
+                            "**Payload:**  ",
+                            "```",
                             f"{finding.payload}",
-                            f"```\n",
-                            f"**Evidence:**  ",
+                            "```\n",
+                            "**Evidence:**  ",
                             f"{finding.evidence}\n",
-                            f"**Remediation:**  ",
+                            "**Remediation:**  ",
                             f"{finding.remediation}\n",
                             "---\n",
                         ])

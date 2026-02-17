@@ -24,12 +24,9 @@ Example:
 
 from __future__ import annotations
 
-import functools
 import inspect
 import json
 import logging
-import os
-import re
 import sys
 import threading
 import time
@@ -38,12 +35,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
-    from venomqa.errors.base import VenomQAError
+    pass
 
 logger = logging.getLogger(__name__)
 

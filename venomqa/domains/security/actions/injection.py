@@ -18,8 +18,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-import urllib.parse
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Final
 
 from venomqa.security.testing import (
@@ -427,7 +426,7 @@ class XSSInjectionTest:
 
         all_params = {**params, **data}
 
-        for param_name, original_value in all_params.items():
+        for param_name, _original_value in all_params.items():
             payloads = list(XSSPayloads.all_payloads())
             if self.config.max_payloads:
                 payloads = payloads[: self.config.max_payloads]
@@ -470,7 +469,7 @@ class XSSInjectionTest:
                                 ),
                                 payload=payload[:100],
                                 location=f"{endpoint}?{param_name}=",
-                                evidence=f"Payload reflected in response",
+                                evidence="Payload reflected in response",
                                 remediation=(
                                     "Encode all user input in output using context-appropriate encoding. "
                                     "Implement Content-Security-Policy headers. "

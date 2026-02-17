@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -576,8 +575,8 @@ class TestBackendSwitching:
 
     @pytest.mark.skip(reason="Requires running PostgreSQL server")
     def test_runner_with_postgres_backend(self) -> None:
+        from venomqa.core.models import Checkpoint, Journey, Step
         from venomqa.runner import JourneyRunner
-        from venomqa.core.models import Journey, Step, Checkpoint
 
         manager = PostgreSQLStateManager(connection_url="postgresql://localhost/testdb")
 
@@ -602,14 +601,14 @@ class TestBackendSwitching:
         mock_client.last_request.return_value = None
 
         runner = JourneyRunner(client=mock_client, state_manager=manager)
-        result = runner.run(journey)
+        runner.run(journey)
 
         assert "chk_cp1" in manager._checkpoints
 
     def test_runner_with_mock_backend(self) -> None:
-        from venomqa.runner import JourneyRunner
-        from venomqa.core.models import Journey, Step, Checkpoint
         from tests.conftest import MockStateManager
+        from venomqa.core.models import Checkpoint, Journey, Step
+        from venomqa.runner import JourneyRunner
 
         manager = MockStateManager()
 
@@ -629,6 +628,6 @@ class TestBackendSwitching:
         mock_client.last_request.return_value = None
 
         runner = JourneyRunner(client=mock_client, state_manager=manager)
-        result = runner.run(journey)
+        runner.run(journey)
 
         assert "cp1" in manager._checkpoints

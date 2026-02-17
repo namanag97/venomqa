@@ -3,13 +3,11 @@
 VenomQA Comprehensive Validation Suite - Using Correct APIs
 """
 
-import sys
-import os
-import traceback
 import json
-import tempfile
+import os
+import sys
+import traceback
 from datetime import datetime
-from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -48,7 +46,7 @@ def test(name: str):
 
 @test("Core: Journey creation and basic execution")
 def test_journey_basic():
-    from venomqa import Journey, Step, Client
+    from venomqa import Client, Journey, Step
     from venomqa.runner import JourneyRunner
 
     executed = []
@@ -76,7 +74,7 @@ def test_journey_basic():
 
 @test("Core: Checkpoint and Branch execution")
 def test_checkpoint_branch():
-    from venomqa import Journey, Step, Checkpoint, Branch, Path, Client
+    from venomqa import Branch, Checkpoint, Client, Journey, Path, Step
     from venomqa.runner import JourneyRunner
 
     executed = {"branches": []}
@@ -124,7 +122,7 @@ def test_execution_context():
 
 @test("Core: Step with expect_failure")
 def test_expect_failure():
-    from venomqa import Journey, Step, Client
+    from venomqa import Client, Journey, Step
     from venomqa.runner import JourneyRunner
 
     def failing_step(client, ctx):
@@ -172,9 +170,9 @@ def test_cache_adapter():
     assert cache.get("key1") is None
 
     # Health
-    assert cache.health_check() == True
+    assert cache.health_check()
     cache.set_healthy(False)
-    assert cache.health_check() == False
+    assert not cache.health_check()
 
     # Stats - returns CacheStats object
     stats = cache.get_stats()
@@ -229,14 +227,14 @@ def test_mail_adapter():
     assert len(emails) == 1
 
     # Health
-    assert mail.health_check() == True
+    assert mail.health_check()
     print("   ✓ Mail works")
 
 
 @test("Adapter: MockStorageAdapter")
 def test_storage_adapter():
+
     from venomqa.adapters import MockStorageAdapter
-    import io
 
     storage = MockStorageAdapter()
 
@@ -259,7 +257,6 @@ def test_storage_adapter():
 @test("Adapter: MockTimeAdapter")
 def test_time_adapter():
     from venomqa.adapters import MockTimeAdapter
-    from datetime import datetime
 
     time = MockTimeAdapter()
 
@@ -337,9 +334,8 @@ def test_memory_state_manager():
 
 @test("Reporter: All reporters work")
 def test_reporters():
-    from venomqa.reporters import MarkdownReporter, JSONReporter, JUnitReporter
     from venomqa.core.models import JourneyResult, StepResult
-    from datetime import datetime
+    from venomqa.reporters import JSONReporter, JUnitReporter, MarkdownReporter
 
     result = JourneyResult(
         journey_name="test",
@@ -399,8 +395,10 @@ def test_http_client():
 
 @test("Client: OAuth2 login helper")
 def test_oauth2():
+    import random
+    import string
+
     from venomqa import Client
-    import random, string
 
     try:
         with Client("http://localhost:8001", timeout=5.0) as client:

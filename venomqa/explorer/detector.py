@@ -14,15 +14,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     pass  # For any future type imports
 
-import re
 from venomqa.explorer.models import Action, State, StateID
-
 
 # Common authentication-related field names
 AUTH_TOKEN_FIELDS = {
@@ -89,10 +88,10 @@ class AuthState:
         self,
         is_authenticated: bool = False,
         has_token: bool = False,
-        token_type: Optional[str] = None,
-        user_info: Optional[Dict[str, Any]] = None,
-        roles: Optional[List[str]] = None,
-        permissions: Optional[List[str]] = None,
+        token_type: str | None = None,
+        user_info: dict[str, Any] | None = None,
+        roles: list[str] | None = None,
+        permissions: list[str] | None = None,
     ) -> None:
         self.is_authenticated = is_authenticated
         self.has_token = has_token
@@ -101,7 +100,7 @@ class AuthState:
         self.roles = roles or []
         self.permissions = permissions or []
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "is_authenticated": self.is_authenticated,
@@ -118,17 +117,17 @@ class EntityState:
 
     def __init__(
         self,
-        entity_type: Optional[str] = None,
-        entity_id: Optional[str] = None,
-        status: Optional[str] = None,
-        properties: Optional[Dict[str, Any]] = None,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        status: str | None = None,
+        properties: dict[str, Any] | None = None,
     ) -> None:
         self.entity_type = entity_type
         self.entity_id = entity_id
         self.status = status
         self.properties = properties or {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "entity_type": self.entity_type,
@@ -168,20 +167,20 @@ class StateDetector:
 
     def __init__(self) -> None:
         """Initialize the state detector."""
-        self.state_extractors: List[Callable[[Dict[str, Any]], Optional[State]]] = []
-        self.action_extractors: List[Callable[[Dict[str, Any]], List[Action]]] = []
-        self.known_states: Dict[StateID, State] = {}
-        self.state_key_fields: List[str] = []
-        self._state_hashes: Dict[str, StateID] = {}
+        self.state_extractors: list[Callable[[dict[str, Any]], State | None]] = []
+        self.action_extractors: list[Callable[[dict[str, Any]], list[Action]]] = []
+        self.known_states: dict[StateID, State] = {}
+        self.state_key_fields: list[str] = []
+        self._state_hashes: dict[str, StateID] = {}
 
         # Initialize default state key fields
         self.state_key_fields = ["status", "state", "phase"]
 
     def detect_state(
         self,
-        response: Dict[str, Any],
-        endpoint: Optional[str] = None,
-        method: Optional[str] = None,
+        response: dict[str, Any],
+        endpoint: str | None = None,
+        method: str | None = None,
     ) -> State:
         """
         Detect the current state from an API response.
@@ -218,7 +217,7 @@ class StateDetector:
         state_name = self._infer_state_name(response, endpoint)
 
         # Build metadata
-        metadata: Dict[str, Any] = {}
+        metadata: dict[str, Any] = {}
         if endpoint:
             metadata["endpoint"] = endpoint
         if method:
@@ -249,9 +248,9 @@ class StateDetector:
 
     def detect_available_actions(
         self,
-        response: Dict[str, Any],
-        current_state: Optional[State] = None,
-    ) -> List[Action]:
+        response: dict[str, Any],
+        current_state: State | None = None,
+    ) -> list[Action]:
         """
         Detect available actions from an API response.
 
@@ -262,7 +261,7 @@ class StateDetector:
         Returns:
             List of available Action objects
         """
-        actions: List[Action] = []
+        actions: list[Action] = []
 
         # Try custom action extractors first
         for extractor in self.action_extractors:
@@ -274,8 +273,8 @@ class StateDetector:
         actions.extend(hateoas_actions)
 
         # Deduplicate actions
-        seen: Set[Tuple[str, str]] = set()
-        unique_actions: List[Action] = []
+        seen: set[tuple[str, str]] = set()
+        unique_actions: list[Action] = []
         for action in actions:
             key = (action.method, action.endpoint)
             if key not in seen:
@@ -284,7 +283,7 @@ class StateDetector:
 
         return unique_actions
 
-    def detect_auth_state(self, response: Dict[str, Any]) -> AuthState:
+    def detect_auth_state(self, response: dict[str, Any]) -> AuthState:
         """
         Detect authentication state from response.
 
@@ -321,7 +320,7 @@ class StateDetector:
         auth_state.token_type = token_type
 
         # Check for user info
-        user_info: Dict[str, Any] = {}
+        user_info: dict[str, Any] = {}
         for field in USER_FIELDS:
             if field in response:
                 value = response[field]
@@ -366,8 +365,8 @@ class StateDetector:
 
     def detect_entity_state(
         self,
-        response: Dict[str, Any],
-        endpoint: Optional[str] = None,
+        response: dict[str, Any],
+        endpoint: str | None = None,
     ) -> EntityState:
         """
         Detect entity state from response.
@@ -411,7 +410,7 @@ class StateDetector:
 
         # Extract other properties (exclude known fields)
         excluded = AUTH_TOKEN_FIELDS | USER_FIELDS | ENTITY_ID_FIELDS | STATUS_FIELDS
-        properties: Dict[str, Any] = {}
+        properties: dict[str, Any] = {}
         for key, value in response.items():
             if key not in excluded and not key.startswith("_"):
                 # Only include simple types for properties
@@ -425,7 +424,7 @@ class StateDetector:
 
         return entity_state
 
-    def fingerprint(self, response: Dict[str, Any]) -> str:
+    def fingerprint(self, response: dict[str, Any]) -> str:
         """
         Create a unique fingerprint for a response.
 
@@ -439,7 +438,7 @@ class StateDetector:
             A hex string fingerprint
         """
         # Extract key fields for fingerprinting
-        fingerprint_data: Dict[str, Any] = {}
+        fingerprint_data: dict[str, Any] = {}
 
         # Include state key fields
         for field in self.state_key_fields:
@@ -467,7 +466,7 @@ class StateDetector:
         canonical = json.dumps(fingerprint_data, sort_keys=True, default=str)
         return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
-    def _infer_entity_type_from_endpoint(self, endpoint: str) -> Optional[str]:
+    def _infer_entity_type_from_endpoint(self, endpoint: str) -> str | None:
         """
         Infer entity type from endpoint path.
 
@@ -508,7 +507,7 @@ class StateDetector:
 
         return None
 
-    def _get_structure_signature(self, response: Dict[str, Any]) -> str:
+    def _get_structure_signature(self, response: dict[str, Any]) -> str:
         """
         Get a signature representing the structure of the response.
 
@@ -544,7 +543,7 @@ class StateDetector:
 
     def add_state_extractor(
         self,
-        extractor: Callable[[Dict[str, Any]], Optional[State]],
+        extractor: Callable[[dict[str, Any]], State | None],
     ) -> None:
         """
         Add a custom state extraction function.
@@ -556,7 +555,7 @@ class StateDetector:
 
     def add_action_extractor(
         self,
-        extractor: Callable[[Dict[str, Any]], List[Action]],
+        extractor: Callable[[dict[str, Any]], list[Action]],
     ) -> None:
         """
         Add a custom action extraction function.
@@ -579,7 +578,7 @@ class StateDetector:
         if field not in self.state_key_fields:
             self.state_key_fields.append(field)
 
-    def set_state_key_fields(self, fields: List[str]) -> None:
+    def set_state_key_fields(self, fields: list[str]) -> None:
         """
         Set the fields to use for state identification.
 
@@ -590,8 +589,8 @@ class StateDetector:
 
     def _generate_state_id(
         self,
-        response: Dict[str, Any],
-        endpoint: Optional[str] = None,
+        response: dict[str, Any],
+        endpoint: str | None = None,
     ) -> StateID:
         """
         Generate a unique state ID from response data.
@@ -633,8 +632,8 @@ class StateDetector:
 
     def _extract_state_properties(
         self,
-        response: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        response: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Extract state-relevant properties from response data.
 
@@ -650,7 +649,7 @@ class StateDetector:
             "_links", "links", "meta", "_meta"
         }
 
-        properties: Dict[str, Any] = {}
+        properties: dict[str, Any] = {}
         for key, value in response.items():
             # Skip transient fields
             if key.lower() in transient_fields:
@@ -665,8 +664,8 @@ class StateDetector:
 
     def _extract_links(
         self,
-        response: Dict[str, Any],
-    ) -> List[Action]:
+        response: dict[str, Any],
+    ) -> list[Action]:
         """
         Extract HATEOAS-style links from response data.
 
@@ -676,7 +675,7 @@ class StateDetector:
         Returns:
             List of Action objects from discovered links
         """
-        actions: List[Action] = []
+        actions: list[Action] = []
 
         # Look for _links (HAL format)
         if "_links" in response and isinstance(response["_links"], dict):
@@ -698,9 +697,9 @@ class StateDetector:
 
         return actions
 
-    def _parse_hal_links(self, links: Dict[str, Any]) -> List[Action]:
+    def _parse_hal_links(self, links: dict[str, Any]) -> list[Action]:
         """Parse HAL-style _links object."""
-        actions: List[Action] = []
+        actions: list[Action] = []
 
         for rel, link_data in links.items():
             if rel == "self":
@@ -736,9 +735,9 @@ class StateDetector:
 
         return actions
 
-    def _parse_links_array(self, links: List[Any]) -> List[Action]:
+    def _parse_links_array(self, links: list[Any]) -> list[Action]:
         """Parse links array format."""
-        actions: List[Action] = []
+        actions: list[Action] = []
 
         for link in links:
             if not isinstance(link, dict):
@@ -759,9 +758,9 @@ class StateDetector:
 
         return actions
 
-    def _parse_jsonapi_links(self, links: Dict[str, Any]) -> List[Action]:
+    def _parse_jsonapi_links(self, links: dict[str, Any]) -> list[Action]:
         """Parse JSON:API style links object."""
-        actions: List[Action] = []
+        actions: list[Action] = []
 
         for rel, link in links.items():
             if rel == "self":
@@ -793,9 +792,9 @@ class StateDetector:
 
         return actions
 
-    def _parse_actions_array(self, actions_data: List[Any]) -> List[Action]:
+    def _parse_actions_array(self, actions_data: list[Any]) -> list[Action]:
         """Parse actions/operations array."""
-        actions: List[Action] = []
+        actions: list[Action] = []
 
         for action_item in actions_data:
             if not isinstance(action_item, dict):
@@ -833,8 +832,8 @@ class StateDetector:
 
     def _infer_state_name(
         self,
-        response: Dict[str, Any],
-        endpoint: Optional[str] = None,
+        response: dict[str, Any],
+        endpoint: str | None = None,
     ) -> str:
         """
         Infer a human-readable state name.
@@ -892,7 +891,7 @@ class StateDetector:
         # If no key fields, states with different IDs are different
         return False
 
-    def get_known_state(self, state_id: StateID) -> Optional[State]:
+    def get_known_state(self, state_id: StateID) -> State | None:
         """
         Get a previously detected state by ID.
 
@@ -909,7 +908,7 @@ class StateDetector:
         self.known_states.clear()
         self._state_hashes.clear()
 
-    def get_known_states(self) -> List[State]:
+    def get_known_states(self) -> list[State]:
         """
         Get all known states.
 
@@ -920,10 +919,10 @@ class StateDetector:
 
 
 def extract_context(
-    response_json: Dict[str, Any],
-    endpoint: Optional[str] = None,
-    existing_context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    response_json: dict[str, Any],
+    endpoint: str | None = None,
+    existing_context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Extract relevant context data from an API response.
 
@@ -960,9 +959,9 @@ def extract_context(
     if not isinstance(response_json, dict):
         return context
 
-    def _flatten_dict(d: Dict[str, Any], prefix: str = "") -> List[Tuple[str, Any]]:
+    def _flatten_dict(d: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
         """Flatten a nested dictionary into key-value pairs."""
-        items: List[Tuple[str, Any]] = []
+        items: list[tuple[str, Any]] = []
         for key, value in d.items():
             full_key = f"{prefix}.{key}" if prefix else key
             if isinstance(value, dict):
@@ -1026,8 +1025,8 @@ def extract_context(
 
 def substitute_path_params(
     endpoint: str,
-    context: Dict[str, Any],
-) -> Optional[str]:
+    context: dict[str, Any],
+) -> str | None:
     """
     Substitute path parameters with actual values from context.
 
@@ -1112,9 +1111,9 @@ def substitute_path_params(
 
 
 def generate_state_name(
-    context: Dict[str, Any],
-    response: Optional[Dict[str, Any]] = None,
-    status_code: Optional[int] = None,
+    context: dict[str, Any],
+    response: dict[str, Any] | None = None,
+    status_code: int | None = None,
 ) -> str:
     """
     Generate a human-readable state name based on context.
@@ -1139,7 +1138,7 @@ def generate_state_name(
         >>> generate_state_name(ctx)
         'Anonymous | Todo:42 | Completed'
     """
-    parts: List[str] = []
+    parts: list[str] = []
 
     # Authentication status
     if context.get("auth_token") or context.get("user_id"):
@@ -1177,7 +1176,7 @@ def generate_state_name(
     return " | ".join(parts) if parts else "Initial"
 
 
-def _infer_entity_type_from_endpoint(endpoint: Optional[str]) -> Optional[str]:
+def _infer_entity_type_from_endpoint(endpoint: str | None) -> str | None:
     """
     Infer entity type from endpoint path.
 

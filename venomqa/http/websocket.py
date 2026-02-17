@@ -32,13 +32,13 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from venomqa.errors import ConnectionError, ConnectionTimeoutError, RequestTimeoutError
 from venomqa.http.base import (
     BaseAsyncClient,
     BaseClient,
     ValidationError,
     _validate_positive_number,
 )
-from venomqa.errors import ConnectionError, ConnectionTimeoutError, RequestTimeoutError
 
 if TYPE_CHECKING:
     from websockets.client import WebSocketClientProtocol

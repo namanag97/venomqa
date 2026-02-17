@@ -548,7 +548,7 @@ def validate_for_production(config: dict[str, Any]) -> list[dict[str, Any]]:
     db_url = config.get("db_url", "")
     if db_url and "@" in db_url and "://" in db_url:
         # Simple check for non-env-var password
-        if not "${" in db_url and ":" in db_url.split("@")[0]:
+        if "${" not in db_url and ":" in db_url.split("@")[0]:
             warnings.append({
                 "field": "db_url",
                 "level": "warning",

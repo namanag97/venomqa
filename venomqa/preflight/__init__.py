@@ -25,6 +25,16 @@ Legacy preflight (environment / config checks) is still available via
 ``PreflightChecker`` and ``run_preflight_checks``.
 """
 
+# Re-export legacy preflight symbols so existing ``from venomqa.preflight import ...``
+# continues to work without changes.
+from venomqa.preflight._legacy import (
+    CheckResult,
+    CheckStatus,
+    PreflightChecker,
+    PreflightResult,
+    run_preflight_checks,
+    run_preflight_checks_with_output,
+)
 from venomqa.preflight.auto import AutoPreflight
 from venomqa.preflight.checks import (
     AuthCheck,
@@ -54,17 +64,6 @@ from venomqa.preflight.errors import (
     PreflightError,
 )
 from venomqa.preflight.smoke import SmokeTest, SmokeTestReport
-
-# Re-export legacy preflight symbols so existing ``from venomqa.preflight import ...``
-# continues to work without changes.
-from venomqa.preflight._legacy import (
-    CheckResult,
-    CheckStatus,
-    PreflightChecker,
-    PreflightResult,
-    run_preflight_checks,
-    run_preflight_checks_with_output,
-)
 
 __all__ = [
     # New smoke-test API

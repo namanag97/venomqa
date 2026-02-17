@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from venomqa.core.models import Issue, Severity
-from venomqa.runner.formatter import IssueFormatter
+from venomqa.core.models import Severity
 from venomqa.runner.cache import CacheManager
+from venomqa.runner.formatter import IssueFormatter
 from venomqa.runner.persistence import ResultsPersister
 from venomqa.runner.resolver import (
-    ActionResolver,
     DictActionResolver,
     RegistryActionResolver,
 )
@@ -381,7 +378,8 @@ class TestActionResolver:
     def test_registry_action_resolver(self) -> None:
         with patch("venomqa.plugins.registry.get_registry") as mock_get_registry:
             mock_registry = MagicMock()
-            mock_action = lambda c, ctx: None
+            def mock_action(c, ctx):
+                return None
             mock_registry.resolve_action.return_value = mock_action
             mock_get_registry.return_value = mock_registry
 

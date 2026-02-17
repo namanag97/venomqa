@@ -50,8 +50,8 @@ def history_list(
         venomqa history list --journey checkout_flow
         venomqa history list --status failed
     """
-    from venomqa.storage import ResultsRepository
     from venomqa.cli.output import CLIOutput, ProgressConfig
+    from venomqa.storage import ResultsRepository
 
     config: dict[str, Any] = ctx.obj.get("config", {})
     db_url = config.get("results_database", "sqlite:///venomqa_results.db")
@@ -127,8 +127,8 @@ def history_show(ctx: click.Context, run_id: str, output_format: str) -> None:
     Examples:
         venomqa history show abc123def456
     """
-    from venomqa.storage import ResultsRepository
     from venomqa.cli.output import CLIOutput, ProgressConfig
+    from venomqa.storage import ResultsRepository
 
     config: dict[str, Any] = ctx.obj.get("config", {})
     db_url = config.get("results_database", "sqlite:///venomqa_results.db")
@@ -171,7 +171,7 @@ def history_show(ctx: click.Context, run_id: str, output_format: str) -> None:
             click.echo(json.dumps(data, indent=2, default=str))
         else:
             status_style = "green" if matching_run.status.value == "passed" else "red"
-            output.console.print(f"\n[bold]Journey Run Details[/bold]\n")
+            output.console.print("\n[bold]Journey Run Details[/bold]\n")
             output.console.print(f"  [bold]ID:[/bold] {matching_run.id}")
             output.console.print(f"  [bold]Journey:[/bold] {matching_run.journey_name}")
             output.console.print(
@@ -185,7 +185,7 @@ def history_show(ctx: click.Context, run_id: str, output_format: str) -> None:
             )
 
             if steps:
-                output.console.print(f"\n[bold]Step Results:[/bold]")
+                output.console.print("\n[bold]Step Results:[/bold]")
                 from rich.table import Table
 
                 table = Table(show_header=True, header_style="bold")
@@ -245,8 +245,8 @@ def history_compare(ctx: click.Context, run1_id: str, run2_id: str, output_forma
     Examples:
         venomqa history compare abc123 def456
     """
-    from venomqa.storage import ResultsRepository
     from venomqa.cli.output import CLIOutput, ProgressConfig
+    from venomqa.storage import ResultsRepository
 
     config: dict[str, Any] = ctx.obj.get("config", {})
     db_url = config.get("results_database", "sqlite:///venomqa_results.db")
@@ -283,7 +283,7 @@ def history_compare(ctx: click.Context, run1_id: str, run2_id: str, output_forma
 
             click.echo(json.dumps(comparison, indent=2, default=str))
         else:
-            output.console.print(f"\n[bold]Run Comparison[/bold]\n")
+            output.console.print("\n[bold]Run Comparison[/bold]\n")
             run1 = comparison["run1"]
             run2 = comparison["run2"]
             r1_style = "green" if run1["status"] == "passed" else "red"
@@ -379,8 +379,8 @@ def history_stats(ctx: click.Context, days: int, output_format: str) -> None:
         venomqa history stats
         venomqa history stats --days 7
     """
-    from venomqa.storage import ResultsRepository
     from venomqa.cli.output import CLIOutput, ProgressConfig
+    from venomqa.storage import ResultsRepository
 
     config: dict[str, Any] = ctx.obj.get("config", {})
     db_url = config.get("results_database", "sqlite:///venomqa_results.db")
@@ -426,7 +426,7 @@ def history_stats(ctx: click.Context, days: int, output_format: str) -> None:
             output.console.print(f"  [bold]Max Duration:[/bold] {stats.max_duration_ms:.0f}ms")
 
             if stats.total_issues > 0:
-                output.console.print(f"\n[bold]Issues:[/bold]")
+                output.console.print("\n[bold]Issues:[/bold]")
                 output.console.print(f"  Total: {stats.total_issues}")
                 if stats.critical_issues:
                     output.console.print(f"  [red]Critical: {stats.critical_issues}[/red]")
@@ -434,12 +434,12 @@ def history_stats(ctx: click.Context, days: int, output_format: str) -> None:
                     output.console.print(f"  [red]High: {stats.high_issues}[/red]")
 
             if stats.top_failing_journeys:
-                output.console.print(f"\n[bold]Top Failing Journeys:[/bold]")
+                output.console.print("\n[bold]Top Failing Journeys:[/bold]")
                 for name, count in stats.top_failing_journeys[:5]:
                     output.console.print(f"  [red]{name}[/red]: {count} failures")
 
             if stats.slowest_journeys:
-                output.console.print(f"\n[bold]Slowest Journeys:[/bold]")
+                output.console.print("\n[bold]Slowest Journeys:[/bold]")
                 for name, duration in stats.slowest_journeys[:5]:
                     output.console.print(f"  {name}: {duration:.0f}ms avg")
 
@@ -463,8 +463,8 @@ def history_cleanup(ctx: click.Context, days: int, dry_run: bool, yes: bool) -> 
         venomqa history cleanup --days 30
         venomqa history cleanup --dry-run
     """
-    from venomqa.storage import ResultsRepository
     from venomqa.cli.output import CLIOutput, ProgressConfig
+    from venomqa.storage import ResultsRepository
 
     config: dict[str, Any] = ctx.obj.get("config", {})
     db_url = config.get("results_database", "sqlite:///venomqa_results.db")

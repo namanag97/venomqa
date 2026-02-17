@@ -13,25 +13,18 @@ This validates that VenomQA is production-ready by testing:
 Run: python tests/validation/comprehensive_validation.py
 """
 
-import sys
 import os
 import sqlite3
+import sys
 import tempfile
-import threading
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
-from typing import Any
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import json
-import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from venomqa import Journey, Step, Checkpoint, Branch, Path, Client
+from venomqa import Branch, Checkpoint, Client, Journey, Path, Step
 from venomqa.runner import JourneyRunner
-from venomqa.state import SQLiteStateManager, InMemoryStateManager
+from venomqa.state import InMemoryStateManager, SQLiteStateManager
 
 PASSED = 0
 FAILED = 0
@@ -109,8 +102,8 @@ def test_basic_journey():
 
     assert result.success, f"Journey should succeed, got: {result.issues}"
     assert executed == ["step1", "step2", "step3"], f"Wrong execution order: {executed}"
-    print(f"   ✓ All steps executed in order")
-    print(f"   ✓ Context passed correctly between steps")
+    print("   ✓ All steps executed in order")
+    print("   ✓ Context passed correctly between steps")
 
 
 @test("2. Checkpoint Creation and Tracking")
@@ -154,7 +147,7 @@ def test_checkpoints():
     result = runner.run(journey)
     client.disconnect()
 
-    assert result.success, f"Journey should succeed"
+    assert result.success, "Journey should succeed"
     assert "chk_cp1" in state_manager._checkpoints, "Checkpoint cp1 not created"
     assert "chk_cp2" in state_manager._checkpoints, "Checkpoint cp2 not created"
 
@@ -235,7 +228,7 @@ def test_state_rollback():
 
     print(f"   Balance history: {balances}")
 
-    assert result.success, f"Journey should succeed"
+    assert result.success, "Journey should succeed"
 
     initial = next(b for n, b in balances if n == "initial")
     after_50 = next(b for n, b in balances if n == "after_add_50")
@@ -251,8 +244,8 @@ def test_state_rollback():
 
     state_manager.disconnect()
     os.unlink(db_file)
-    print(f"   ✓ Branch 1: 150 -> 120")
-    print(f"   ✓ Branch 2: 150 -> 175 (rollback worked!)")
+    print("   ✓ Branch 1: 150 -> 120")
+    print("   ✓ Branch 2: 150 -> 175 (rollback worked!)")
 
 
 @test("4. Three-Way Branching with Rollback")
@@ -374,7 +367,7 @@ def test_nested_checkpoints():
 
     state_manager.disconnect()
     os.unlink(db_file)
-    print(f"   ✓ 4 checkpoints created, rollback works to any level")
+    print("   ✓ 4 checkpoints created, rollback works to any level")
 
 
 @test("6. InMemoryStateManager - No Database Required")
@@ -406,12 +399,11 @@ def test_memory_state_manager():
     assert state_manager.has_checkpoint("chk_cp2")
 
     state_manager.disconnect()
-    print(f"   ✓ MemoryStateManager works without database")
+    print("   ✓ MemoryStateManager works without database")
 
 
 @test("7. Error Handling in Steps")
 def test_error_handling():
-    errors_caught = []
 
     def failing_step(client, ctx):
         raise ValueError("Intentional error for testing")
@@ -465,7 +457,7 @@ def test_expected_failure():
     client.disconnect()
 
     assert result.success, "Journey with expected failure should succeed"
-    print(f"   ✓ Expected failure handled correctly")
+    print("   ✓ Expected failure handled correctly")
 
 
 @test("9. Context Isolation Between Branches")
@@ -522,7 +514,7 @@ def test_context_isolation():
     client.disconnect()
 
     assert result.success
-    print(f"   ✓ Context properly isolated between branches")
+    print("   ✓ Context properly isolated between branches")
 
 
 @test("10. Long Journey - 50 Steps")
@@ -552,7 +544,7 @@ def test_long_journey():
     assert result.success
     assert len(executed) == 50
     assert executed == list(range(50))
-    print(f"   ✓ 50 steps executed successfully in order")
+    print("   ✓ 50 steps executed successfully in order")
 
 
 @test("11. Multiple Journeys Sequentially")
@@ -576,7 +568,7 @@ def test_multiple_journeys():
     client.disconnect()
 
     assert all(r.success for r in results)
-    print(f"   ✓ 10 journeys executed successfully")
+    print("   ✓ 10 journeys executed successfully")
 
 
 @test("12. Fail-Fast Mode")
@@ -649,7 +641,7 @@ def test_branch_with_failed_path():
     assert len(result.branch_results) == 1
     branch_result = result.branch_results[0]
     assert not branch_result.all_passed, "Branch should not pass when one path fails"
-    print(f"   ✓ Branch failure properly tracked")
+    print("   ✓ Branch failure properly tracked")
 
 
 @test("14. Step Result Storage and Retrieval")
@@ -682,7 +674,7 @@ def test_step_result_storage():
     client.disconnect()
 
     assert result.success
-    print(f"   ✓ Step results stored and retrieved correctly")
+    print("   ✓ Step results stored and retrieved correctly")
 
 
 @test("15. Journey Result Metadata")
@@ -749,16 +741,16 @@ def test_database_reset():
     client.connect()
     runner = JourneyRunner(client=client, state_manager=state_manager)
 
-    for i in range(5):
+    for _i in range(5):
         state_manager.reset()
-        result = runner.run(journey)
+        runner.run(journey)
         count_result = state_manager.execute("SELECT COUNT(*) as c FROM items")
         assert count_result[0]["c"] == 1
 
     client.disconnect()
     state_manager.disconnect()
     os.unlink(db_file)
-    print(f"   ✓ Database reset works correctly")
+    print("   ✓ Database reset works correctly")
 
 
 @test("18. Context Snapshot and Restore")
@@ -791,8 +783,8 @@ def test_context_snapshot_restore():
 
     assert ctx.get("key1") == "value1", f"Should restore to original, got {ctx.get('key1')}"
     assert ctx.get("key2") == "value2"
-    assert ctx.get("key3") is None, f"key3 should not exist after restore"
-    print(f"   ✓ Context snapshot/restore works")
+    assert ctx.get("key3") is None, "key3 should not exist after restore"
+    print("   ✓ Context snapshot/restore works")
 
 
 @test("19. Empty Journey")
@@ -807,7 +799,7 @@ def test_empty_journey():
 
     assert result.success
     assert len(result.step_results) == 0
-    print(f"   ✓ Empty journey handled correctly")
+    print("   ✓ Empty journey handled correctly")
 
 
 @test("20. Complex Real-World Journey")
@@ -816,8 +808,8 @@ def test_complex_real_world():
     conn = sqlite3.connect(db_file)
     conn.execute("""
         CREATE TABLE users (
-            id TEXT PRIMARY KEY, 
-            email TEXT, 
+            id TEXT PRIMARY KEY,
+            email TEXT,
             balance REAL DEFAULT 0,
             status TEXT DEFAULT 'active'
         )
@@ -918,7 +910,7 @@ def test_complex_real_world():
 
     state_manager.disconnect()
     os.unlink(db_file)
-    print(f"   ✓ Complex e-commerce flow with branching completed")
+    print("   ✓ Complex e-commerce flow with branching completed")
 
 
 def main():
@@ -966,7 +958,7 @@ def main():
 
     if FAILED > 0:
         print("\n FAILED TESTS:")
-        for name, error, tb in ERRORS:
+        for name, error, _tb in ERRORS:
             print(f"\n  ❌ {name}")
             print(f"     {error}")
         print("\n" + "=" * 70)

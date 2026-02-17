@@ -4,8 +4,9 @@ These tests require a running PostgreSQL instance.
 Skip if not available.
 """
 
-import pytest
 import os
+
+import pytest
 
 # Skip all tests if no database URL is provided
 pytestmark = pytest.mark.skipif(

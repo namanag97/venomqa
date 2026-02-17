@@ -8,7 +8,6 @@ from typing import Any
 
 from venomqa.v1.recording.recorder import RecordedRequest
 
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------

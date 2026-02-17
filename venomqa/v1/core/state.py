@@ -53,7 +53,7 @@ class Observation:
         system: str,
         data: dict[str, Any],
         metadata: dict[str, Any] | None = None,
-    ) -> "Observation":
+    ) -> Observation:
         """Create an observation with optional metadata."""
         return cls(
             system=system,
@@ -76,7 +76,7 @@ class State:
     created_at: datetime = field(default_factory=datetime.now)
     checkpoint_id: str | None = None
     parent_transition_id: str | None = None
-    hyperedge: "Hyperedge | None" = None
+    hyperedge: Hyperedge | None = None
 
     @classmethod
     def create(

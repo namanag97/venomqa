@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import time
 from datetime import datetime
 from typing import Any
@@ -11,15 +10,23 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from venomqa.core.models import (
-    BranchResult,
     Issue,
     JourneyResult,
-    PathResult,
     Severity,
     StepResult,
 )
+from venomqa.notifications.alerts import (
+    AlertAggregator,
+    AlertCondition,
+    AlertManager,
+    AlertState,
+    AlertTrigger,
+    NotificationConfig,
+    NotificationManager,
+    RateLimiter,
+    create_notification_manager_from_config,
+)
 from venomqa.notifications.channels import (
-    BaseChannel,
     ChannelType,
     CustomWebhookChannel,
     DiscordChannel,
@@ -30,19 +37,6 @@ from venomqa.notifications.channels import (
     SlackChannel,
     create_channel,
 )
-from venomqa.notifications.alerts import (
-    AlertAggregator,
-    AlertCondition,
-    AlertManager,
-    AlertSeverity,
-    AlertState,
-    AlertTrigger,
-    NotificationConfig,
-    NotificationManager,
-    RateLimiter,
-    create_notification_manager_from_config,
-)
-
 
 # ============================================================================
 # Test Fixtures

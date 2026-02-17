@@ -9,12 +9,12 @@ This module contains the fundamental data structures:
 - ExplorationResult: Final output
 """
 
-from venomqa.v1.core.state import State, Observation
 from venomqa.v1.core.action import Action, ActionResult
-from venomqa.v1.core.transition import Transition
 from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import Invariant, Violation, Severity
+from venomqa.v1.core.invariant import Invariant, Severity, Violation
 from venomqa.v1.core.result import ExplorationResult
+from venomqa.v1.core.state import Observation, State
+from venomqa.v1.core.transition import Transition
 
 __all__ = [
     "State",

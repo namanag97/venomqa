@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import io
 import json
-import socket
-from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -278,7 +275,7 @@ class TestPreflightCheckerChecks:
 
         mock_sock = MagicMock()
         mock_socket.return_value = mock_sock
-        mock_sock.connect.side_effect = socket.timeout("Connection timed out")
+        mock_sock.connect.side_effect = TimeoutError("Connection timed out")
 
         result = checker._check_target_api()
 
@@ -346,7 +343,7 @@ class TestPreflightCheckerChecks:
 
         mock_sock = MagicMock()
         mock_socket.return_value = mock_sock
-        mock_sock.connect.side_effect = socket.error("Connection refused")
+        mock_sock.connect.side_effect = OSError("Connection refused")
 
         result = checker._check_database()
 
@@ -423,7 +420,7 @@ class TestRunPreflightChecks:
         """Test run_preflight_checks passes config to checker."""
         config = {"base_url": "http://example.com", "timeout": 60}
 
-        with patch.object(PreflightChecker, "__init__", return_value=None) as mock_init:
+        with patch.object(PreflightChecker, "__init__", return_value=None):
             with patch.object(PreflightChecker, "run", return_value=PreflightResult()):
                 # Need to also patch _register_default_checks since __init__ is mocked
                 with patch.object(PreflightChecker, "_register_default_checks"):
@@ -893,7 +890,7 @@ class TestSmokeTest:
 
     def test_run_all_all_pass(self):
         health_resp = _mock_response(200)
-        auth_resp = _mock_response(200, json_body=[])
+        _mock_response(200, json_body=[])
 
         with patch("httpx.Client") as mock_cls:
             client_mock = MagicMock()

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
+from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (
     Branch,
@@ -16,13 +16,10 @@ from venomqa.core.models import (
     Journey,
     JourneyResult,
     Path,
-    PathResult,
-    BranchResult,
     Severity,
     Step,
     StepResult,
 )
-from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 
 
 class TestDataFactory:
@@ -146,7 +143,8 @@ class TestStepFactory:
         assert step.name == "custom_step"
 
     def test_create_step_with_custom_action(self) -> None:
-        custom_action = lambda c, ctx: c.post("/custom")
+        def custom_action(c, ctx):
+            return c.post("/custom")
         step = TestDataFactory.create_step(action=custom_action)
 
         assert step.action is custom_action

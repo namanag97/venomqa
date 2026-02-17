@@ -6,13 +6,13 @@ used directly or customized for specific applications.
 
 from venomqa.domains.security.journeys.security_journey import (
     SecurityJourney,
-    create_security_journey,
-    sql_injection_journey,
-    xss_journey,
     auth_bypass_journey,
+    create_security_journey,
+    full_security_journey,
     idor_journey,
     rate_limit_journey,
-    full_security_journey,
+    sql_injection_journey,
+    xss_journey,
 )
 
 __all__ = [

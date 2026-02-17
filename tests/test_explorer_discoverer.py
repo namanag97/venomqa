@@ -12,8 +12,7 @@ from pathlib import Path
 import pytest
 
 from venomqa.explorer.discoverer import APIDiscoverer
-from venomqa.explorer.models import Action, ExplorationConfig
-
+from venomqa.explorer.models import ExplorationConfig
 
 # Path to test fixtures
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

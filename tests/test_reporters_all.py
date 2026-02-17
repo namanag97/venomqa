@@ -19,9 +19,9 @@ from venomqa.core.models import (
     StepResult,
 )
 from venomqa.reporters.base import BaseReporter
-from venomqa.reporters.markdown import MarkdownReporter
 from venomqa.reporters.json_report import JSONReporter
 from venomqa.reporters.junit import JUnitReporter
+from venomqa.reporters.markdown import MarkdownReporter
 
 
 class TestBaseReporter:

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from venomqa.v1.core.action import ActionResult
@@ -15,7 +16,7 @@ class Step:
     """A single action in a journey."""
 
     name: str
-    action: Callable[..., "ActionResult"]
+    action: Callable[..., ActionResult]
     description: str = ""
 
     def __hash__(self) -> int:
@@ -84,7 +85,7 @@ class Journey:
 
     name: str
     steps: list[Step | Checkpoint | Branch] = field(default_factory=list)
-    invariants: list["Invariant"] = field(default_factory=list)
+    invariants: list[Invariant] = field(default_factory=list)
     description: str = ""
 
     def __hash__(self) -> int:

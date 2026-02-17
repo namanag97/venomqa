@@ -2,57 +2,48 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta
 from typing import Any
-from unittest.mock import MagicMock, Mock
 
-import pytest
-
-from venomqa.security.testing import (
-    SecurityTestResult,
-    VulnerabilityFinding,
-    VulnerabilitySeverity,
-    VulnerabilityType,
-    SQLInjectionPayloads,
-    XSSPayloads,
-    CommandInjectionPayloads,
-)
 from venomqa.domains.security.actions.authentication import (
-    AuthenticationTester,
-    AuthTestConfig,
     InvalidTokenTest,
     PermissionBoundaryTest,
     TokenExpirationTest,
     TokenRefreshTest,
 )
 from venomqa.domains.security.actions.injection import (
-    InjectionTester,
-    InjectionTestConfig,
     AutoInjector,
+    InjectionTestConfig,
     SQLInjectionTest,
     XSSInjectionTest,
-    CommandInjectionTest,
 )
 from venomqa.domains.security.actions.owasp import (
-    OWASPChecker,
-    OWASPCheckConfig,
-    SecurityHeadersCheck,
     CORSPolicyCheck,
-    RateLimitCheck,
     ErrorLeakageCheck,
-)
-from venomqa.domains.security.scanner import (
-    SecurityScanner,
-    ScanConfig,
-    SecurityScanResult,
+    OWASPCheckConfig,
+    OWASPChecker,
+    RateLimitCheck,
+    SecurityHeadersCheck,
 )
 from venomqa.domains.security.journeys.security_journey import (
-    SecurityJourney,
     create_security_journey,
+    full_security_journey,
     sql_injection_journey,
     xss_journey,
-    full_security_journey,
+)
+from venomqa.domains.security.scanner import (
+    ScanConfig,
+    SecurityScanner,
+    SecurityScanResult,
+)
+from venomqa.security.testing import (
+    CommandInjectionPayloads,
+    SecurityTestResult,
+    SQLInjectionPayloads,
+    VulnerabilityFinding,
+    VulnerabilitySeverity,
+    VulnerabilityType,
+    XSSPayloads,
 )
 
 

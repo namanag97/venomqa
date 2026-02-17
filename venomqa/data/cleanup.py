@@ -20,7 +20,6 @@ Example:
 
 from __future__ import annotations
 
-import copy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -453,7 +452,7 @@ class CleanupManager:
         if tables is None:
             # Get unique tables from tracked resources
             tables = list(
-                set(r.table for r in self._tracker.get_all() if r.table)
+                {r.table for r in self._tracker.get_all() if r.table}
             )
 
         if not tables:
@@ -533,7 +532,7 @@ class CleanupManager:
 
                     warnings.warn(
                         f"Failed to delete {resource.resource_type}/"
-                        f"{resource.resource_id}: {error_msg}"
+                        f"{resource.resource_id}: {error_msg}", stacklevel=2
                     )
 
         end_time = datetime.now()
@@ -615,7 +614,7 @@ class CleanupManager:
 
         # Get unique tables to truncate
         resources = self._tracker.get_cleanup_order(journey, resource_types)
-        tables = list(set(r.table for r in resources if r.table))
+        tables = list({r.table for r in resources if r.table})
 
         deleted_count = 0
         failed: list[tuple[TrackedResource, str]] = []

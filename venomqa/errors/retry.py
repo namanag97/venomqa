@@ -40,8 +40,10 @@ from venomqa.errors.base import (
     ErrorCode,
     RateLimitedError,
     RetryExhaustedError,
-    TimeoutError as VenomTimeoutError,
     VenomQAError,
+)
+from venomqa.errors.base import (
+    TimeoutError as VenomTimeoutError,
 )
 
 if TYPE_CHECKING:

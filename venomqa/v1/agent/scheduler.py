@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-import time
-from concurrent.futures import ThreadPoolExecutor, Future
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from venomqa.v1.core.result import ExplorationResult
 
@@ -22,7 +22,7 @@ class ScheduledRun:
 
     id: str
     name: str
-    agent_factory: Callable[[], "Agent"]
+    agent_factory: Callable[[], Agent]
     schedule: str  # cron-like or "once"
     enabled: bool = True
     last_run: datetime | None = None
@@ -165,7 +165,6 @@ class Scheduler:
     def _execute_run(self, run: ScheduledRun) -> RunResult:
         """Execute a single run."""
         started_at = datetime.now()
-        error: str | None = None
 
         try:
             # Create fresh agent

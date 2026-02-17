@@ -30,12 +30,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from venomqa.errors import ConnectionError, RequestFailedError, RequestTimeoutError
 from venomqa.http.base import (
     BaseAsyncClient,
     BaseClient,
     ValidationError,
 )
-from venomqa.errors import ConnectionError, RequestFailedError, RequestTimeoutError
 
 if TYPE_CHECKING:
     import grpc

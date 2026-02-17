@@ -23,14 +23,12 @@ from __future__ import annotations
 
 import html
 import json
-import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from venomqa.comparison.diff import (
-    ChangeType,
     ComparisonResult,
     DiffConfig,
     DiffType,
@@ -569,8 +567,8 @@ class BaselineManager:
     def _deserialize_result(self, data: dict[str, Any]) -> Any:
         """Deserialize dictionary to JourneyResult-like object."""
         # Create a simple object that has the same interface
-        from types import SimpleNamespace
         from datetime import datetime
+        from types import SimpleNamespace
 
         def parse_step(s: dict[str, Any]) -> SimpleNamespace:
             return SimpleNamespace(
@@ -1087,7 +1085,6 @@ class ComparisonHTMLReporter:
 
     def _render_header(self, comparison: ComparisonResult) -> str:
         """Render the report header."""
-        status = "has-regressions" if comparison.has_regressions else "clean"
         status_text = "REGRESSIONS DETECTED" if comparison.has_regressions else "NO REGRESSIONS"
         status_color = "#fee2e2" if comparison.has_regressions else "#dcfce7"
 

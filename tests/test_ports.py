@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import datetime
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -20,16 +19,23 @@ from venomqa.ports import (
     ClientPort,
     ColumnInfo,
     DatabasePort,
-    FilePort,
+    Email,
+    EmailAttachment,
     FileInfo,
+    FilePort,
+    IndexedDocument,
     JobInfo,
     JobResult,
     JobStatus,
     MailPort,
-    Email,
-    EmailAttachment,
-    QueuePort,
+    MockEndpoint,
+    MockPort,
+    MockResponse,
+    NotificationPort,
+    PushNotification,
     QueryResult,
+    QueuePort,
+    RecordedRequest,
     Request,
     RequestBuilder,
     Response,
@@ -37,9 +43,6 @@ from venomqa.ports import (
     SearchIndex,
     SearchPort,
     SearchResult,
-    IndexedDocument,
-    NotificationPort,
-    PushNotification,
     SMSMessage,
     StateEntry,
     StatePort,
@@ -47,8 +50,6 @@ from venomqa.ports import (
     StorageObject,
     StoragePort,
     TableInfo,
-    TaskInfo,
-    TaskResult,
     TimeInfo,
     TimePort,
     WebhookPort,
@@ -58,10 +59,6 @@ from venomqa.ports import (
     WebSocketPort,
     WSConnection,
     WSMessage,
-    MockPort,
-    MockEndpoint,
-    MockResponse,
-    RecordedRequest,
 )
 
 

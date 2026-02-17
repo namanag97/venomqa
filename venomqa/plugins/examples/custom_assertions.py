@@ -327,21 +327,21 @@ class CustomAssertionsPlugin(VenomQAPlugin):
 
         if expected_length >= 0 and actual_length != expected_length:
             return self._handle_failure(
-                message or f"List length mismatch",
+                message or "List length mismatch",
                 expected=expected_length,
                 actual=actual_length,
             )
 
         if min_length is not None and actual_length < min_length:
             return self._handle_failure(
-                message or f"List too short",
+                message or "List too short",
                 expected=f">= {min_length}",
                 actual=actual_length,
             )
 
         if max_length is not None and actual_length > max_length:
             return self._handle_failure(
-                message or f"List too long",
+                message or "List too long",
                 expected=f"<= {max_length}",
                 actual=actual_length,
             )
@@ -398,7 +398,7 @@ class CustomAssertionsPlugin(VenomQAPlugin):
         """
         if not re.search(pattern, value):
             return self._handle_failure(
-                message or f"Value does not match pattern",
+                message or "Value does not match pattern",
                 expected=pattern,
                 actual=value,
             )
@@ -426,7 +426,7 @@ class CustomAssertionsPlugin(VenomQAPlugin):
         """
         if not (min_value <= value <= max_value):
             return self._handle_failure(
-                message or f"Value out of range",
+                message or "Value out of range",
                 expected=f"{min_value} <= x <= {max_value}",
                 actual=value,
             )
@@ -460,7 +460,7 @@ class CustomAssertionsPlugin(VenomQAPlugin):
         expected = sorted(values, reverse=reverse)
         if values != expected:
             return self._handle_failure(
-                message or f"List is not sorted",
+                message or "List is not sorted",
                 expected=expected,
                 actual=values,
             )
@@ -547,7 +547,7 @@ class CustomAssertionsPlugin(VenomQAPlugin):
         """
         if not isinstance(value, expected_type):
             return self._handle_failure(
-                message or f"Type mismatch",
+                message or "Type mismatch",
                 expected=expected_type,
                 actual=type(value),
             )

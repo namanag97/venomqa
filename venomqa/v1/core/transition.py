@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-import uuid
 
 from venomqa.v1.core.action import ActionResult
 

@@ -16,13 +16,12 @@ from typing import Any
 
 import pytest
 
-from venomqa.core.graph import StateGraph
 from venomqa.combinatorial import (
+    CoveringArrayGenerator,
     Dimension,
     DimensionSpace,
-    CoveringArrayGenerator,
-    Combination,
 )
+from venomqa.core.graph import StateGraph
 
 
 def compute_fingerprint(data: Any) -> str:

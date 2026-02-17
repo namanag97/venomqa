@@ -39,8 +39,6 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from rich.rule import Rule
-from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
@@ -1125,12 +1123,12 @@ class CLIOutput:
         self.console.print(error_panel)
 
         # Error message
-        self.console.print(f"\n[bold]Error Message:[/bold]")
+        self.console.print("\n[bold]Error Message:[/bold]")
         self.console.print(f"  [red]{error}[/red]")
 
         # Request details
         if request and self.config.show_request_response:
-            self.console.print(f"\n[bold]Request:[/bold]")
+            self.console.print("\n[bold]Request:[/bold]")
             method = request.get("method", "?")
             url = request.get("url", "?")
             self.console.print(f"  [cyan]{method}[/cyan] {url}")
@@ -1139,7 +1137,7 @@ class CLIOutput:
 
         # Response details
         if response and self.config.show_request_response:
-            self.console.print(f"\n[bold]Response:[/bold]")
+            self.console.print("\n[bold]Response:[/bold]")
             status = response.get("status_code", "?")
             status_color = "green" if 200 <= int(status or 0) < 300 else "red"
             self.console.print(f"  Status: [{status_color}]{status}[/{status_color}]")
@@ -1151,7 +1149,7 @@ class CLIOutput:
 
         # Stack trace (filtered)
         if stack_trace:
-            self.console.print(f"\n[bold]Stack Trace (user code):[/bold]")
+            self.console.print("\n[bold]Stack Trace (user code):[/bold]")
             for line in stack_trace.split("\n")[:15]:
                 if line.strip():
                     if ">>>" in line:
@@ -1161,7 +1159,7 @@ class CLIOutput:
 
         # Troubleshooting suggestions
         if suggestions:
-            self.console.print(f"\n[bold]Troubleshooting Suggestions:[/bold]")
+            self.console.print("\n[bold]Troubleshooting Suggestions:[/bold]")
             for suggestion in suggestions:
                 self.console.print(f"  [green]{self._symbol('bullet')}[/green] {suggestion}")
 

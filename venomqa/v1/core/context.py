@@ -104,7 +104,7 @@ class Context:
         self._data.update(data)
 
     # Scoped access
-    def scope(self, namespace: str) -> "ScopedContext":
+    def scope(self, namespace: str) -> ScopedContext:
         """Get a scoped view of the context.
 
         Example:

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from functools import wraps
-from typing import Callable, TypeVar, Any
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from venomqa.v1.core.action import Action, ActionResult, Precondition
 from venomqa.v1.core.invariant import Invariant, Severity

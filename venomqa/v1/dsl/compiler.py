@@ -41,7 +41,7 @@ from __future__ import annotations
 from venomqa.v1.core.action import Action
 from venomqa.v1.core.graph import Graph
 from venomqa.v1.core.invariant import Invariant
-from venomqa.v1.dsl.journey import Journey, Step, Checkpoint, Branch, Path
+from venomqa.v1.dsl.journey import Branch, Checkpoint, Journey, Step
 
 
 class CompiledJourney:

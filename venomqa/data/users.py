@@ -19,10 +19,10 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from typing import Any
 
-from venomqa.data.generators import FakeDataGenerator, fake as default_fake
+from venomqa.data.generators import FakeDataGenerator
+from venomqa.data.generators import fake as default_fake
 
 
 @dataclass

@@ -15,8 +15,8 @@ import gc
 import statistics
 import time
 import tracemalloc
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import pytest
 
@@ -162,7 +162,7 @@ class TestTimingRegression:
         for level in range(1, 4):
             nodes_at_level[level] = []
             for parent in nodes_at_level[level - 1]:
-                for c in range(3):
+                for _c in range(3):
                     child = f"L{level}_N{len(nodes_at_level[level])}"
                     graph.add_node(child)
                     nodes_at_level[level].append(child)
@@ -234,7 +234,7 @@ class TestMemoryRegression:
         for level in range(1, 4):
             nodes_at_level[level] = []
             for parent in nodes_at_level[level - 1]:
-                for c in range(3):
+                for _c in range(3):
                     child = f"L{level}_N{len(nodes_at_level[level])}"
                     graph.add_node(child)
                     nodes_at_level[level].append(child)

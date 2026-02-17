@@ -6,10 +6,14 @@ import io
 
 import pytest
 
-from venomqa.v1.core.dimensions import AuthStatus, UserRole, CountClass, PlanType, BUILTIN_DIMENSIONS
+from venomqa.v1.core.coverage import DimensionAxisCoverage, DimensionCoverage
+from venomqa.v1.core.dimensions import (
+    BUILTIN_DIMENSIONS,
+    AuthStatus,
+    UserRole,
+)
 from venomqa.v1.core.hyperedge import Hyperedge
 from venomqa.v1.core.hypergraph import Hypergraph
-from venomqa.v1.core.coverage import DimensionCoverage, DimensionAxisCoverage
 from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
 
 

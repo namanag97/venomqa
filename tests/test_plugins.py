@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,12 +11,9 @@ from venomqa.core.models import Journey, JourneyResult, Step, StepResult
 from venomqa.plugins import (
     ActionPlugin,
     AdapterPlugin,
-    BranchContext,
     FailureContext,
-    GeneratorPlugin,
     HookManager,
     HookPriority,
-    HookPlugin,
     HookType,
     JourneyContext,
     PluginConfig,
@@ -32,8 +29,6 @@ from venomqa.plugins import (
     reset_hook_manager,
     reset_plugin_manager,
 )
-from datetime import datetime
-
 
 # =============================================================================
 # Test Fixtures
@@ -516,7 +511,8 @@ class TestPluginManager:
 
     def test_action_extraction(self, reset_managers):
         """Test actions are extracted from action plugins."""
-        my_action = lambda: "action result"
+        def my_action():
+            return "action result"
 
         class TestActions(ActionPlugin):
             name = "test-actions"

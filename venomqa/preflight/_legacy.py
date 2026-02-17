@@ -21,10 +21,11 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -420,7 +421,7 @@ class PreflightChecker:
             try:
                 sock.connect((host, port))
                 sock.close()
-            except (socket.timeout, socket.error, OSError) as e:
+            except (TimeoutError, OSError) as e:
                 duration_ms = (time.perf_counter() - start_time) * 1000
                 return CheckResult(
                     name="target_api",
@@ -645,7 +646,7 @@ class PreflightChecker:
                 message=f"Database reachable at {host}:{port}",
                 duration_ms=duration_ms,
             )
-        except (socket.timeout, socket.error, OSError) as e:
+        except (TimeoutError, OSError) as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
             return CheckResult(
                 name="database",

@@ -31,6 +31,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+# Real adapters (for integration tests - may require optional dependencies)
+from venomqa.adapters.asyncio_concurrency import AsyncConcurrencyAdapter
+
 # Mock adapters (always available - in-memory, for unit tests)
 from venomqa.adapters.cache import CacheEntry, MockCacheAdapter
 from venomqa.adapters.concurrency import ThreadConcurrencyAdapter
@@ -39,13 +42,10 @@ from venomqa.adapters.local_storage import LocalStorageAdapter
 from venomqa.adapters.mail import MockMailAdapter
 from venomqa.adapters.queue import MockQueueAdapter
 from venomqa.adapters.real_time import RealTimeAdapter
-from venomqa.adapters.storage import LocalFileAdapter, MockStorageAdapter
-from venomqa.adapters.time import MockTimeAdapter, SystemTimeAdapter
-
-# Real adapters (for integration tests - may require optional dependencies)
-from venomqa.adapters.asyncio_concurrency import AsyncConcurrencyAdapter
-from venomqa.adapters.threading_concurrency import ThreadingConcurrencyAdapter
 from venomqa.adapters.smtp_mock import SMTPMockAdapter
+from venomqa.adapters.storage import LocalFileAdapter, MockStorageAdapter
+from venomqa.adapters.threading_concurrency import ThreadingConcurrencyAdapter
+from venomqa.adapters.time import MockTimeAdapter, SystemTimeAdapter
 
 # Redis-dependent adapters
 try:

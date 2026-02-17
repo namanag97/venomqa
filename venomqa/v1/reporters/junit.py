@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from xml.etree import ElementTree as ET
 from io import StringIO
+from xml.etree import ElementTree as ET
 
 from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.core.invariant import Severity
 
 
 class JUnitReporter:
@@ -43,7 +42,7 @@ class JUnitReporter:
         for t in result.graph.transitions:
             explored_pairs.add((t.from_state_id, t.action_name))
 
-        for state_id, action_name in explored_pairs:
+        for _state_id, action_name in explored_pairs:
             testcase = ET.SubElement(testsuite, "testcase")
             testcase.set("name", f"action:{action_name}")
             testcase.set("classname", f"venomqa.actions.{action_name}")

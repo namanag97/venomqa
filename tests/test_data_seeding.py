@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import json
 import tempfile
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from venomqa.data.cleanup import (
     CleanupConfig,
     CleanupManager,
-    CleanupResult,
     CleanupStrategy,
     ResourceTracker,
     TrackedResource,
@@ -25,10 +23,8 @@ from venomqa.data.seeding import (
     SeedFile,
     SeedManager,
     SeedMode,
-    SeedResult,
     seed_fixture,
 )
-
 
 # ============================================================================
 # Fixtures
@@ -528,9 +524,9 @@ class TestResourceTracker:
     def test_cleanup_order_with_priority(self):
         """Test cleanup order respects priority."""
         tracker = ResourceTracker()
-        r1 = tracker.track("users", 1, priority=1)
-        r2 = tracker.track("orders", 100, priority=10)  # High priority
-        r3 = tracker.track("payments", 200, priority=5)
+        tracker.track("users", 1, priority=1)
+        tracker.track("orders", 100, priority=10)  # High priority
+        tracker.track("payments", 200, priority=5)
 
         cleanup_order = tracker.get_cleanup_order()
         # Higher priority should come first (by negative priority in sort)
@@ -809,7 +805,7 @@ users:
         # Create a mock context
         from venomqa.context import TestContext
 
-        ctx = TestContext()
+        TestContext()
 
         @seed_fixture(seed_file=str(seed_file), mode=SeedMode.API)
         def my_fixture(client, ctx):

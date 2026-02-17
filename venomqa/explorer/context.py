@@ -1,15 +1,16 @@
 """Context extraction and path parameter substitution for state chain exploration."""
 
-from typing import Any, Dict, List, Optional, Set, Tuple
+import builtins
 import re
+from typing import Any
 
 
 class ExplorationContext:
     """Accumulates context (IDs, tokens) through exploration chain."""
 
     def __init__(self):
-        self._data: Dict[str, Any] = {}
-        self._extracted_keys: Set[str] = set()
+        self._data: dict[str, Any] = {}
+        self._extracted_keys: set[str] = set()
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a value from the context.
@@ -44,7 +45,7 @@ class ExplorationContext:
         """
         return key in self._data
 
-    def keys(self) -> Set[str]:
+    def keys(self) -> builtins.set[str]:
         """Get all keys in the context.
 
         Returns:
@@ -52,7 +53,7 @@ class ExplorationContext:
         """
         return set(self._data.keys())
 
-    def extracted_keys(self) -> Set[str]:
+    def extracted_keys(self) -> builtins.set[str]:
         """Get all keys that were explicitly extracted (not inherited).
 
         Returns:
@@ -71,7 +72,7 @@ class ExplorationContext:
         # Don't copy extracted_keys - new context starts fresh for tracking
         return new_ctx
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert context to a dictionary.
 
         Returns:
@@ -79,7 +80,7 @@ class ExplorationContext:
         """
         return self._data.copy()
 
-    def update(self, data: Dict[str, Any]) -> None:
+    def update(self, data: dict[str, Any]) -> None:
         """Update context with multiple key-value pairs.
 
         Args:
@@ -129,7 +130,7 @@ def _normalize_key(key: str) -> str:
     return result
 
 
-def _infer_context_key_from_endpoint(endpoint: str) -> Optional[str]:
+def _infer_context_key_from_endpoint(endpoint: str) -> str | None:
     """Infer the context key name from an endpoint path.
 
     Extracts the resource name from the endpoint and converts it to
@@ -181,10 +182,10 @@ def _infer_context_key_from_endpoint(endpoint: str) -> Optional[str]:
 
 
 def _flatten_dict(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     prefix: str = "",
     separator: str = "."
-) -> List[Tuple[str, Any]]:
+) -> list[tuple[str, Any]]:
     """Flatten a nested dictionary into a list of (key_path, value) tuples.
 
     Args:
@@ -195,7 +196,7 @@ def _flatten_dict(
     Returns:
         List of (key_path, value) tuples
     """
-    items: List[Tuple[str, Any]] = []
+    items: list[tuple[str, Any]] = []
 
     for key, value in data.items():
         new_key = f"{prefix}{separator}{key}" if prefix else key
@@ -215,7 +216,7 @@ def _flatten_dict(
 
 
 def extract_context_from_response(
-    response_data: Dict[str, Any],
+    response_data: dict[str, Any],
     endpoint: str,
     context: ExplorationContext
 ) -> ExplorationContext:
@@ -290,7 +291,7 @@ def extract_context_from_response(
 def substitute_path_params(
     endpoint: str,
     context: ExplorationContext
-) -> Optional[str]:
+) -> str | None:
     """
     Replace {param} placeholders with actual context values.
 
@@ -356,7 +357,7 @@ def substitute_path_params(
 
 def generate_state_name(
     context: ExplorationContext,
-    response_data: Dict[str, Any]
+    response_data: dict[str, Any]
 ) -> str:
     """
     Generate human-readable state name from context.
@@ -376,7 +377,7 @@ def generate_state_name(
         - "Anonymous | Todo:42"
         - "Authenticated | User:5 | Todo:42 | Completed"
     """
-    parts: List[str] = []
+    parts: list[str] = []
 
     # Authentication status
     if context.get("auth_token") or context.get("access_token"):
@@ -450,7 +451,7 @@ def has_unresolved_placeholders(endpoint: str) -> bool:
     return bool(re.search(r'\{[^}]+\}', endpoint))
 
 
-def get_required_placeholders(endpoint: str) -> List[str]:
+def get_required_placeholders(endpoint: str) -> list[str]:
     """Get list of placeholder names required by an endpoint.
 
     Args:

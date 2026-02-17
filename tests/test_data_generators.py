@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import random
 import re
 from datetime import date, datetime
 from decimal import Decimal
 
-import pytest
-
 from venomqa.data import (
-    ContentGenerator,
-    EcommerceGenerator,
     FakeDataGenerator,
-    UserGenerator,
     content,
     create_content_generator,
     create_ecommerce_generator,

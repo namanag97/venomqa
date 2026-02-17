@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from io import StringIO
 
-from venomqa.v1.core.result import ExplorationResult
 from venomqa.v1.core.invariant import Severity
+from venomqa.v1.core.result import ExplorationResult
 
 
 class MarkdownReporter:

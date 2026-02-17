@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from venomqa.v1.reporters.console import ConsoleReporter
-from venomqa.v1.reporters.markdown import MarkdownReporter
 from venomqa.v1.reporters.json import JSONReporter
 from venomqa.v1.reporters.junit import JUnitReporter
+from venomqa.v1.reporters.markdown import MarkdownReporter
 
 
 def main(args: list[str] | None = None) -> int:
@@ -61,7 +61,7 @@ def main(args: list[str] | None = None) -> int:
 
 def cmd_explore(args: Any) -> int:
     """Run exploration command."""
-    from venomqa.v1 import explore, BFS, DFS, Random
+    from venomqa.v1 import BFS, DFS, Random, explore
 
     # Load journey from file
     journey = load_journey(args.journey_file)
@@ -139,9 +139,9 @@ def cmd_record(args: Any) -> int:
             print(f"Error: Could not load journey from {args.journey_file}", file=sys.stderr)
             return 1
 
+        from venomqa.v1.agent import Agent
         from venomqa.v1.dsl.compiler import compile
         from venomqa.v1.world import World
-        from venomqa.v1.agent import Agent
 
         compiled = compile(journey)
         world = World(api=recorder, systems={})

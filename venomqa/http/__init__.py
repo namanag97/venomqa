@@ -20,14 +20,6 @@ Example:
 """
 
 # REST HTTP Client
-from venomqa.http.rest import (
-    AsyncClient,
-    Client,
-    ClientValidationError,
-    RequestRecord,
-    SecureCredentials,
-)
-
 # Base client classes
 from venomqa.http.base import (
     AuthCredentials,
@@ -56,6 +48,13 @@ from venomqa.http.grpc import (
     ProtoService,
     gRPCClient,
     gRPCResponse,
+)
+from venomqa.http.rest import (
+    AsyncClient,
+    Client,
+    ClientValidationError,
+    RequestRecord,
+    SecureCredentials,
 )
 
 # WebSocket Client

@@ -8,12 +8,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from venomqa.http import Client, AsyncClient, RequestRecord
+from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import Journey, Step
-from venomqa.errors import RetryExhaustedError
+from venomqa.http import Client
 from venomqa.runner import JourneyRunner
-from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 
 
 class TestConnectionPooling:
@@ -161,7 +160,7 @@ class TestHistoryPerformance:
         assert elapsed < 1.0
 
     def test_clear_history_is_fast(self, mock_client: MockClient) -> None:
-        for i in range(10000):
+        for _i in range(10000):
             mock_client.history.append(MagicMock())
 
         start_time = time.perf_counter()
@@ -228,7 +227,7 @@ class TestStepExecutionPerformance:
 
     def test_rapid_step_execution(self, mock_client: MockClient) -> None:
         steps = [
-            Step(name=f"step_{i}", action=lambda c, ctx: c.get(f"/endpoint")) for i in range(100)
+            Step(name=f"step_{i}", action=lambda c, ctx: c.get("/endpoint")) for i in range(100)
         ]
 
         journey = Journey(name="perf_test", steps=steps)
@@ -247,6 +246,7 @@ class TestStepExecutionPerformance:
 
     def test_step_result_overhead(self, mock_client: MockClient) -> None:
         from datetime import datetime
+
         from venomqa.core.models import StepResult
 
         start_time = time.perf_counter()
@@ -513,8 +513,8 @@ class TestConnectionPool:
 
         pool = ConnectionPool(factory=lambda: object(), max_size=2, min_size=1)
 
-        with pool.acquire(timeout=1.0) as conn1:
-            with pool.acquire(timeout=1.0) as conn2:
+        with pool.acquire(timeout=1.0):
+            with pool.acquire(timeout=1.0):
                 stats = pool.get_stats()
                 assert stats.total_connections == 2
 
@@ -525,10 +525,10 @@ class TestConnectionPool:
 
         pool = ConnectionPool(factory=lambda: {"id": id(object())}, max_size=5, min_size=1)
 
-        with pool.acquire() as conn1:
+        with pool.acquire():
             pass
 
-        with pool.acquire() as conn2:
+        with pool.acquire():
             pass
 
         stats = pool.get_stats()
@@ -743,8 +743,9 @@ class TestBatchExecutor:
 
     def test_batch_result_properties(self) -> None:
         from datetime import datetime
-        from venomqa.performance.batch import BatchResult
+
         from venomqa.core.models import JourneyResult, StepResult
+        from venomqa.performance.batch import BatchResult
 
         now = datetime.now()
         results = [
@@ -824,7 +825,7 @@ class TestLoadTester:
         assert config.concurrent_users == 5
 
     def test_load_test_quick_execution(self, mock_client: MockClient) -> None:
-        from venomqa.performance.load_tester import LoadTester, LoadTestConfig
+        from venomqa.performance.load_tester import LoadTestConfig, LoadTester
         from venomqa.runner import JourneyRunner
 
         steps = [Step(name="step", action=lambda c, ctx: c.get("/api"))]
@@ -846,7 +847,7 @@ class TestLoadTester:
         assert "p99" in result.percentiles
 
     def test_load_test_result_summary(self, mock_client: MockClient) -> None:
-        from venomqa.performance.load_tester import LoadTester, LoadTestConfig
+        from venomqa.performance.load_tester import LoadTestConfig, LoadTester
         from venomqa.runner import JourneyRunner
 
         steps = [Step(name="step", action=lambda c, ctx: c.get("/api"))]

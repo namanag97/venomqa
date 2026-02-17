@@ -1,15 +1,22 @@
 """End-to-end exploration tests."""
 
-import pytest
-from unittest.mock import MagicMock
 
 from venomqa.v1 import (
-    State, Observation, Action, ActionResult, HTTPRequest, HTTPResponse,
-    Graph, Invariant, Violation, Severity, ExplorationResult,
-    World, Agent, BFS, DFS, Random,
-    Journey, Step,
+    BFS,
+    DFS,
+    Action,
+    ActionResult,
+    Agent,
+    HTTPRequest,
+    HTTPResponse,
+    Invariant,
+    Journey,
+    Random,
+    Severity,
+    Step,
+    World,
 )
-from venomqa.v1.adapters import MockQueue, MockMail, MockStorage
+from venomqa.v1.adapters import MockMail, MockQueue
 
 
 class MockHttpClient:
@@ -106,7 +113,7 @@ class TestBasicExploration:
         ]
 
         agent = Agent(world=world, actions=actions, max_steps=5)
-        result = agent.explore()
+        agent.explore()
 
         # "never" action should not have been executed
         paths = [call[1] for call in api.calls]

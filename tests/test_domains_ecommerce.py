@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from venomqa import Journey
 
 
@@ -20,14 +18,14 @@ class TestEcommerceDomainsImports:
     def test_ecommerce_has_expected_journeys(self) -> None:
         from venomqa.domains.ecommerce import (
             checkout_flow,
-            guest_checkout_flow,
             express_checkout_flow,
-            inventory_update_flow,
-            stock_alert_flow,
+            guest_checkout_flow,
             inventory_reconciliation_flow,
+            inventory_update_flow,
+            payment_failure_flow,
             payment_processing_flow,
             refund_flow,
-            payment_failure_flow,
+            stock_alert_flow,
         )
 
         assert isinstance(checkout_flow, Journey)

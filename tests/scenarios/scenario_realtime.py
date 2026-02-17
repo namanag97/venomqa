@@ -12,13 +12,12 @@ Requires: full_featured_app with WebSocket support running on localhost:8000
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from typing import Any
 
 from venomqa import Branch, Checkpoint, Journey, Path, Step
-from venomqa.http.websocket import AsyncWebSocketClient, ConnectionState, WebSocketMessage
 from venomqa.core.context import ExecutionContext
+from venomqa.http.websocket import AsyncWebSocketClient, WebSocketMessage
 
 # =============================================================================
 # WebSocket Helpers

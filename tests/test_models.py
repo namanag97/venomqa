@@ -21,6 +21,7 @@ from venomqa.core.models import (
     StepResult,
 )
 from venomqa.errors import JourneyValidationError
+
 from .conftest import MockClient, MockHTTPResponse
 
 
@@ -79,7 +80,7 @@ class TestCheckpoint:
         assert checkpoint.name == "after_setup"
 
     def test_checkpoint_is_pydantic_model(self) -> None:
-        checkpoint = Checkpoint(name="test")
+        Checkpoint(name="test")
         assert hasattr(Checkpoint, "model_fields")
 
 

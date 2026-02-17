@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 from venomqa.core.models import (
     Branch,
     Checkpoint,
@@ -14,7 +15,6 @@ from venomqa.core.models import (
 from venomqa.errors import JourneyValidationError
 from venomqa.runner import JourneyRunner
 from venomqa.state.postgres import PostgreSQLStateManager
-from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 
 
 class TestCheckpointValidation:

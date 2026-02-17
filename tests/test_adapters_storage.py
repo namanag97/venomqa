@@ -8,7 +8,7 @@ from io import BytesIO
 
 import pytest
 
-from venomqa.adapters.storage import MockStorageAdapter, LocalFileAdapter
+from venomqa.adapters.storage import LocalFileAdapter, MockStorageAdapter
 
 
 class TestMockStorageAdapter:

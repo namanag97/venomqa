@@ -29,13 +29,13 @@ from typing import Any
 
 import httpx
 
+from venomqa.errors import ConnectionError, RequestFailedError, RequestTimeoutError
 from venomqa.http.base import (
     BaseAsyncClient,
     BaseClient,
     ValidationError,
     _validate_endpoint,
 )
-from venomqa.errors import ConnectionError, RequestFailedError, RequestTimeoutError
 
 logger = logging.getLogger(__name__)
 

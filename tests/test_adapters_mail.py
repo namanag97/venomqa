@@ -6,8 +6,8 @@ from datetime import datetime
 
 import pytest
 
-from venomqa.ports.mail import Email, EmailAttachment
 from venomqa.adapters.mail import MockMailAdapter
+from venomqa.ports.mail import Email, EmailAttachment
 
 
 class TestMockMailAdapter:

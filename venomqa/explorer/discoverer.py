@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 import yaml
 
@@ -50,7 +50,7 @@ class APIDiscoverer:
     def __init__(
         self,
         base_url: str,
-        config: Optional[ExplorationConfig] = None,
+        config: ExplorationConfig | None = None,
     ) -> None:
         """
         Initialize the API discoverer.
@@ -61,12 +61,12 @@ class APIDiscoverer:
         """
         self.base_url = base_url.rstrip("/")
         self.config = config or ExplorationConfig()
-        self.discovered_actions: Set[Action] = set()
-        self.discovered_endpoints: Set[str] = set()
-        self._spec_components: Dict[str, Any] = {}
-        self._spec_security_schemes: Dict[str, Any] = {}
+        self.discovered_actions: set[Action] = set()
+        self.discovered_endpoints: set[str] = set()
+        self._spec_components: dict[str, Any] = {}
+        self._spec_security_schemes: dict[str, Any] = {}
 
-    async def discover(self) -> List[Action]:
+    async def discover(self) -> list[Action]:
         """
         Discover all available API endpoints.
 
@@ -106,8 +106,8 @@ class APIDiscoverer:
 
     async def discover_from_openapi(
         self,
-        spec_url: Optional[str] = None,
-    ) -> List[Action]:
+        spec_url: str | None = None,
+    ) -> list[Action]:
         """
         Discover endpoints from an OpenAPI/Swagger specification.
 
@@ -134,7 +134,7 @@ class APIDiscoverer:
                 f"{self.base_url}/docs/openapi.json",
             ]
 
-        spec_data: Optional[Dict[str, Any]] = None
+        spec_data: dict[str, Any] | None = None
         async with httpx.AsyncClient(
             timeout=self.config.request_timeout_seconds,
             verify=self.config.verify_ssl,
@@ -156,7 +156,7 @@ class APIDiscoverer:
 
         return self.parse_openapi_spec(spec_data)
 
-    def from_openapi(self, spec_path: str) -> List[Action]:
+    def from_openapi(self, spec_path: str) -> list[Action]:
         """
         Parse an OpenAPI specification from a file path and extract API actions.
 
@@ -191,8 +191,8 @@ class APIDiscoverer:
 
     def parse_openapi_spec(
         self,
-        spec: Union[Dict[str, Any], str, Path],
-    ) -> List[Action]:
+        spec: dict[str, Any] | str | Path,
+    ) -> list[Action]:
         """
         Parse an OpenAPI specification and extract endpoints as Action objects.
 
@@ -232,7 +232,7 @@ class APIDiscoverer:
         global_security = spec_dict.get("security", [])
 
         # Parse each path and operation
-        actions: List[Action] = []
+        actions: list[Action] = []
         for path, path_item in paths.items():
             if not isinstance(path_item, dict):
                 continue
@@ -271,8 +271,8 @@ class APIDiscoverer:
 
     def _load_spec(
         self,
-        spec: Union[Dict[str, Any], str, Path],
-    ) -> Dict[str, Any]:
+        spec: dict[str, Any] | str | Path,
+    ) -> dict[str, Any]:
         """
         Load OpenAPI spec from various formats.
 
@@ -305,7 +305,7 @@ class APIDiscoverer:
                 try:
                     return yaml.safe_load(spec)
                 except yaml.YAMLError:
-                    raise ValueError(f"Could not parse spec: not valid JSON or YAML")
+                    raise ValueError("Could not parse spec: not valid JSON or YAML")
 
         raise ValueError(f"Invalid spec type: {type(spec)}")
 
@@ -313,10 +313,10 @@ class APIDiscoverer:
         self,
         method: str,
         path: str,
-        operation: Dict[str, Any],
-        path_params: List[Dict[str, Any]],
-        global_security: List[Dict[str, List[str]]],
-    ) -> Optional[Action]:
+        operation: dict[str, Any],
+        path_params: list[dict[str, Any]],
+        global_security: list[dict[str, list[str]]],
+    ) -> Action | None:
         """
         Parse an OpenAPI operation into an Action.
 
@@ -352,7 +352,7 @@ class APIDiscoverer:
         all_params = [self._resolve_parameter(p) for p in raw_params if isinstance(p, dict)]
 
         # Extract path parameters and build example path
-        path_param_values: Dict[str, Any] = {}
+        path_param_values: dict[str, Any] = {}
         for param in all_params:
             if param.get("in") == "path":
                 param_name = param.get("name", "")
@@ -361,7 +361,7 @@ class APIDiscoverer:
                     path_param_values[param_name] = value
 
         # Extract query parameters
-        query_params: Dict[str, Any] = {}
+        query_params: dict[str, Any] = {}
         for param in all_params:
             if param.get("in") == "query":
                 param_name = param.get("name", "")
@@ -375,7 +375,7 @@ class APIDiscoverer:
                         query_params[param_name] = self._build_example_from_schema(schema)
 
         # Extract cookie parameters (store in headers as Cookie)
-        cookie_params: Dict[str, Any] = {}
+        cookie_params: dict[str, Any] = {}
         for param in all_params:
             if param.get("in") == "cookie":
                 param_name = param.get("name", "")
@@ -385,7 +385,7 @@ class APIDiscoverer:
                         cookie_params[param_name] = value
 
         # Extract request body schema (for POST, PUT, PATCH)
-        body: Optional[Dict[str, Any]] = None
+        body: dict[str, Any] | None = None
         request_body = operation.get("requestBody", {})
 
         # Resolve requestBody $ref if present
@@ -405,7 +405,7 @@ class APIDiscoverer:
         requires_auth = bool(operation_security) and operation_security != []
 
         # Determine auth type from security schemes
-        auth_type: Optional[str] = None
+        auth_type: str | None = None
         if requires_auth and operation_security:
             for sec_req in operation_security:
                 if isinstance(sec_req, dict):
@@ -417,7 +417,7 @@ class APIDiscoverer:
                         break
 
         # Build headers from parameters
-        headers: Dict[str, str] = {}
+        headers: dict[str, str] = {}
         for param in all_params:
             if param.get("in") == "header":
                 param_name = param.get("name", "")
@@ -457,7 +457,7 @@ class APIDiscoverer:
             requires_auth=requires_auth,
         )
 
-    def _get_param_example_value(self, param: Dict[str, Any]) -> Any:
+    def _get_param_example_value(self, param: dict[str, Any]) -> Any:
         """
         Extract an example value from a parameter definition.
 
@@ -505,8 +505,8 @@ class APIDiscoverer:
 
     def _extract_request_body_example(
         self,
-        request_body: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+        request_body: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """
         Extract an example request body from OpenAPI requestBody.
 
@@ -580,7 +580,7 @@ class APIDiscoverer:
 
         return None
 
-    def _resolve_ref(self, ref: str) -> Dict[str, Any]:
+    def _resolve_ref(self, ref: str) -> dict[str, Any]:
         """
         Resolve a JSON $ref pointer to its target schema.
 
@@ -613,7 +613,7 @@ class APIDiscoverer:
 
         return current if isinstance(current, dict) else {}
 
-    def _resolve_parameter(self, param: Dict[str, Any]) -> Dict[str, Any]:
+    def _resolve_parameter(self, param: dict[str, Any]) -> dict[str, Any]:
         """
         Resolve a parameter, following $ref if present.
 
@@ -630,8 +630,8 @@ class APIDiscoverer:
 
     def _build_example_from_schema(
         self,
-        schema: Dict[str, Any],
-        visited: Optional[Set[str]] = None,
+        schema: dict[str, Any],
+        visited: set[str] | None = None,
     ) -> Any:
         """
         Build an example value from an OpenAPI schema.
@@ -698,7 +698,7 @@ class APIDiscoverer:
         if schema_type == "object":
             result = {}
             properties = schema.get("properties", {})
-            required = schema.get("required", [])
+            schema.get("required", [])
 
             # Build example for each property
             for prop_name, prop_schema in properties.items():
@@ -724,7 +724,7 @@ class APIDiscoverer:
             enum = schema.get("enum")
             default = schema.get("default")
             min_length = schema.get("minLength", 0)
-            pattern = schema.get("pattern")
+            schema.get("pattern")
 
             if default is not None:
                 return default
@@ -805,8 +805,8 @@ class APIDiscoverer:
 
     async def discover_from_html(
         self,
-        start_url: Optional[str] = None,
-    ) -> List[Action]:
+        start_url: str | None = None,
+    ) -> list[Action]:
         """
         Discover endpoints by crawling HTML pages.
 
@@ -816,13 +816,14 @@ class APIDiscoverer:
         Returns:
             List of discovered Action objects
         """
-        import httpx
         import re
 
+        import httpx
+
         url = start_url or self.base_url
-        actions: List[Action] = []
-        visited_urls: Set[str] = set()
-        urls_to_visit: List[str] = [url]
+        actions: list[Action] = []
+        visited_urls: set[str] = set()
+        urls_to_visit: list[str] = [url]
 
         async with httpx.AsyncClient(
             timeout=self.config.request_timeout_seconds,
@@ -898,8 +899,8 @@ class APIDiscoverer:
 
     async def discover_from_response(
         self,
-        response: Dict[str, Any],
-    ) -> List[Action]:
+        response: dict[str, Any],
+    ) -> list[Action]:
         """
         Discover endpoints from API response data (HATEOAS links).
 
@@ -909,7 +910,7 @@ class APIDiscoverer:
         Returns:
             List of newly discovered Action objects
         """
-        actions: List[Action] = []
+        actions: list[Action] = []
 
         # Look for HAL-style _links
         if "_links" in response and isinstance(response["_links"], dict):
@@ -992,7 +993,7 @@ class APIDiscoverer:
     async def discover_from_har(
         self,
         har_path: str,
-    ) -> List[Action]:
+    ) -> list[Action]:
         """
         Discover endpoints from a HAR (HTTP Archive) file.
 
@@ -1009,15 +1010,15 @@ class APIDiscoverer:
             raise FileNotFoundError(f"HAR file not found: {har_path}")
 
         # Load and parse HAR file
-        with open(har_file, "r", encoding="utf-8") as f:
+        with open(har_file, encoding="utf-8") as f:
             har_data = json.load(f)
 
-        actions: List[Action] = []
+        actions: list[Action] = []
 
         # HAR structure: { log: { entries: [ { request: {...}, response: {...} } ] } }
         entries = har_data.get("log", {}).get("entries", [])
 
-        seen_patterns: Set[Tuple[str, str]] = set()
+        seen_patterns: set[tuple[str, str]] = set()
 
         for entry in entries:
             request = entry.get("request", {})
@@ -1028,7 +1029,7 @@ class APIDiscoverer:
                 continue
 
             # Parse URL to get endpoint
-            from urllib.parse import urlparse, parse_qs
+            from urllib.parse import urlparse
 
             parsed = urlparse(url)
 
@@ -1060,13 +1061,13 @@ class APIDiscoverer:
             seen_patterns.add(pattern_key)
 
             # Extract query parameters
-            params: Optional[Dict[str, Any]] = None
+            params: dict[str, Any] | None = None
             query_string = request.get("queryString", [])
             if query_string:
                 params = {qs["name"]: qs.get("value", "") for qs in query_string}
 
             # Extract body for POST/PUT/PATCH
-            body: Optional[Dict[str, Any]] = None
+            body: dict[str, Any] | None = None
             post_data = request.get("postData", {})
             if post_data and method in ("POST", "PUT", "PATCH"):
                 mime_type = post_data.get("mimeType", "")
@@ -1080,7 +1081,7 @@ class APIDiscoverer:
                     body = {p["name"]: p.get("value", "") for p in post_data["params"]}
 
             # Extract headers (only non-standard ones)
-            headers: Optional[Dict[str, str]] = None
+            headers: dict[str, str] | None = None
             request_headers = request.get("headers", [])
             custom_headers = {}
             skip_headers = {"host", "connection", "content-length", "accept", "user-agent", "content-type", "cookie"}
@@ -1108,7 +1109,7 @@ class APIDiscoverer:
 
     def add_seed_endpoints(
         self,
-        endpoints: List[Tuple[str, str]],
+        endpoints: list[tuple[str, str]],
     ) -> None:
         """
         Add seed endpoints for discovery.
@@ -1192,7 +1193,7 @@ class APIDiscoverer:
 
         return endpoint
 
-    def _extract_path_params(self, endpoint: str) -> List[str]:
+    def _extract_path_params(self, endpoint: str) -> list[str]:
         """
         Extract path parameter names from an endpoint.
 
@@ -1207,7 +1208,7 @@ class APIDiscoverer:
         matches = re.findall(pattern, endpoint)
         return matches
 
-    def get_discovered_actions(self) -> List[Action]:
+    def get_discovered_actions(self) -> list[Action]:
         """
         Get all currently discovered actions.
 

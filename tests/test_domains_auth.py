@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from venomqa import Journey
 
 
@@ -19,15 +17,15 @@ class TestAuthDomainsImports:
 
     def test_auth_has_expected_journeys(self) -> None:
         from venomqa.domains.auth import (
-            registration_flow,
             email_verification_flow,
-            registration_with_profile_flow,
-            oauth_google_flow,
             oauth_github_flow,
+            oauth_google_flow,
             oauth_linking_flow,
-            password_reset_flow,
             password_change_flow,
+            password_reset_flow,
             password_strength_flow,
+            registration_flow,
+            registration_with_profile_flow,
         )
 
         assert isinstance(registration_flow, Journey)

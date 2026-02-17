@@ -39,22 +39,19 @@ Example:
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import Any, Hashable
+from collections.abc import Hashable
+from dataclasses import dataclass
+from typing import Any
 
 from venomqa.combinatorial.constraints import ConstraintSet
 from venomqa.combinatorial.dimensions import Combination, DimensionSpace
 from venomqa.combinatorial.generator import CoveringArrayGenerator
 from venomqa.core.graph import (
     ActionCallable,
-    Edge,
-    Invariant,
     InvariantChecker,
     Severity,
     StateChecker,
     StateGraph,
-    StateNode,
 )
 
 logger = logging.getLogger(__name__)

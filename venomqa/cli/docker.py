@@ -181,7 +181,7 @@ def docker_up(
 
     manager = get_docker_manager(config, compose_file)
 
-    console.print(f"[bold]Starting Docker infrastructure...[/bold]")
+    console.print("[bold]Starting Docker infrastructure...[/bold]")
     console.print(f"  Compose file: {manager.compose_file}")
 
     try:

@@ -9,15 +9,14 @@ IMPORTANT: Step actions MUST use context.state_manager.execute()
 for database operations so that SAVEPOINTs work correctly.
 """
 
-import sys
 import os
 import sqlite3
+import sys
 import tempfile
-from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from venomqa import Journey, Step, Checkpoint, Branch, Path, Client
+from venomqa import Branch, Checkpoint, Client, Journey, Path, Step
 from venomqa.runner import JourneyRunner
 from venomqa.state import SQLiteStateManager
 
@@ -191,7 +190,7 @@ after_second_deposit_without_rollback = 145.0
 withdraw_final = None
 deposit_final = None
 
-for i, (msg, bal) in enumerate(balances):
+for _i, (msg, bal) in enumerate(balances):
     if msg == "verify_final":
         if withdraw_final is None:
             withdraw_final = bal

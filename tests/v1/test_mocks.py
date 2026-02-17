@@ -1,11 +1,12 @@
 """Unit tests for mock adapters."""
 
-import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from venomqa.v1.adapters.mock_queue import MockQueue, Message
-from venomqa.v1.adapters.mock_mail import MockMail, Email
-from venomqa.v1.adapters.mock_storage import MockStorage, StoredFile
+import pytest
+
+from venomqa.v1.adapters.mock_mail import MockMail
+from venomqa.v1.adapters.mock_queue import MockQueue
+from venomqa.v1.adapters.mock_storage import MockStorage
 from venomqa.v1.adapters.mock_time import MockTime
 
 

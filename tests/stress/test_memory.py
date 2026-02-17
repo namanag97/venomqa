@@ -32,7 +32,7 @@ class TestContextMemory:
 
     def test_context_data_memory_growth(self) -> None:
         ctx = ExecutionContext()
-        initial_size = len(ctx._data)
+        len(ctx._data)
 
         for i in range(10000):
             ctx.set(f"key_{i}", f"value_{i}")

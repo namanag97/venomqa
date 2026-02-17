@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from venomqa.v1.core.state import Observation
 from venomqa.v1.world.rollbackable import SystemCheckpoint
@@ -155,7 +155,7 @@ class PostgresAdapter:
                 result = observer(self)
                 data.update(result)
             except Exception as e:
-                data[f"observer_error"] = str(e)
+                data["observer_error"] = str(e)
 
         return Observation.create(
             system="db",

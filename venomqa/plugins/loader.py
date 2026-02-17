@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from venomqa.plugins.base import VenomQAPlugin
-from venomqa.plugins.types import PluginConfig, PluginsConfig, PluginType
+from venomqa.plugins.types import PluginConfig, PluginsConfig
 
 if TYPE_CHECKING:
     pass
@@ -119,15 +119,9 @@ class PluginLoader:
 
         try:
             # Python 3.10+ importlib.metadata
-            if sys.version_info >= (3, 10):
-                from importlib.metadata import entry_points
+            from importlib.metadata import entry_points
 
-                eps = entry_points(group=ENTRY_POINT_GROUP)
-            else:
-                from importlib.metadata import entry_points
-
-                all_eps = entry_points()
-                eps = all_eps.get(ENTRY_POINT_GROUP, [])
+            eps = entry_points(group=ENTRY_POINT_GROUP)
 
             for ep in eps:
                 try:

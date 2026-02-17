@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass
 from typing import Any
 
 from venomqa.v1.core.hyperedge import Hyperedge

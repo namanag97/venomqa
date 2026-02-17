@@ -6,7 +6,6 @@ from typing import Any, Protocol, runtime_checkable
 
 from venomqa.v1.core.state import Observation
 
-
 # SystemCheckpoint is implementation-specific
 # PostgreSQL: savepoint name string
 # Redis: dict of key->value dumps

@@ -376,7 +376,6 @@ class TestAsyncClient:
 
         with patch.object(client._client, "aclose", new_callable=MagicMock) as mock_close:
             mock_close.return_value = None
-            import asyncio
 
             async def mock_aclose():
                 return None

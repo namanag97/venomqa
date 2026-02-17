@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from venomqa.v1.core.action import ActionResult, HTTPRequest, HTTPResponse
+from venomqa.v1.core.action import ActionResult
 
 
 @dataclass
@@ -28,7 +28,7 @@ class RecordedRequest:
         return 200 <= self.status_code < 400
 
     @classmethod
-    def from_action_result(cls, result: ActionResult) -> "RecordedRequest":
+    def from_action_result(cls, result: ActionResult) -> RecordedRequest:
         req = result.request
         resp = result.response
         return cls(

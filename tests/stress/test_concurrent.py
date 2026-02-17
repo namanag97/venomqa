@@ -134,7 +134,7 @@ class TestConcurrentContextAccess:
         def modifier(modifier_id: int) -> None:
             try:
                 ctx.set(f"modifier_{modifier_id}", f"modified_{modifier_id}")
-                snapshot = ctx.snapshot()
+                ctx.snapshot()
                 ctx.restore(initial_snapshot)
             except Exception as e:
                 with lock:

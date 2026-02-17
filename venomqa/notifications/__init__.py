@@ -59,17 +59,6 @@ Configuration via YAML:
           channels: [slack]
 """
 
-from venomqa.notifications.channels import (
-    BaseChannel,
-    ChannelType,
-    CustomWebhookChannel,
-    DiscordChannel,
-    EmailChannel,
-    NotificationEvent,
-    NotificationMessage,
-    PagerDutyChannel,
-    SlackChannel,
-)
 from venomqa.notifications.alerts import (
     AlertCondition,
     AlertManager,
@@ -80,6 +69,17 @@ from venomqa.notifications.alerts import (
     NotificationManager,
     RateLimiter,
     create_notification_manager_from_config,
+)
+from venomqa.notifications.channels import (
+    BaseChannel,
+    ChannelType,
+    CustomWebhookChannel,
+    DiscordChannel,
+    EmailChannel,
+    NotificationEvent,
+    NotificationMessage,
+    PagerDutyChannel,
+    SlackChannel,
 )
 
 __all__ = [

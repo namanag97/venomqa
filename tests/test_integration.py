@@ -4,19 +4,17 @@ from __future__ import annotations
 
 import pytest
 
-from venomqa.http import Client
 from venomqa.core.models import (
     Branch,
     Checkpoint,
     Journey,
-    JourneyResult,
     Path,
     Severity,
     Step,
 )
 from venomqa.errors import JourneyValidationError
 from venomqa.runner import JourneyRunner
-from venomqa.state import PostgreSQLStateManager
+
 from .conftest import MockClient, MockHTTPResponse, MockStateManager
 
 

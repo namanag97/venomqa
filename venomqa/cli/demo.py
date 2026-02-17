@@ -10,7 +10,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 import click
 
@@ -238,10 +238,10 @@ def demo(port: int, server_only: bool, keep_running: bool, verbose: bool, explai
     After running the demo, create your own project with:
         venomqa init --with-sample
     """
+    from rich import box
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
-    from rich import box
 
     console = Console()
 

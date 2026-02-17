@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
-from pathlib import Path
-from typing import Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -34,7 +31,7 @@ class TestHealthCheck:
 
     def test_health_check_initialization(self):
         """Test HealthCheck can be initialized with name, function, and required flag."""
-        def check_fn() -> Tuple[bool, str]:
+        def check_fn() -> tuple[bool, str]:
             return True, "All good"
 
         check = HealthCheck("test_check", check_fn, required=True)
@@ -71,7 +68,7 @@ class TestHealthCheck:
 
     def test_health_check_run_catches_exception(self):
         """Test HealthCheck.run() catches exceptions and returns failure."""
-        def failing_check() -> Tuple[bool, str]:
+        def failing_check() -> tuple[bool, str]:
             raise RuntimeError("Something went wrong")
 
         check = HealthCheck("test", failing_check)

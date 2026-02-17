@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from venomqa.errors import RollbackError, StateNotConnectedError
-from venomqa.state import BaseStateManager, PostgreSQLStateManager, StateManager
+from venomqa.state import BaseStateManager, PostgreSQLStateManager
 from venomqa.state.base import StateManager as StateManagerProtocol
 
 

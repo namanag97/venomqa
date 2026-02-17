@@ -51,10 +51,11 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Iterator, Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -377,11 +378,11 @@ class ExplorationResult:
 
     def broken_nodes(self) -> list[str]:
         """Get list of node IDs where invariants failed."""
-        return list(set(v.node.id for v in self.invariant_violations))
+        return list({v.node.id for v in self.invariant_violations})
 
     def broken_edges(self) -> list[str]:
         """Get list of edge names that caused invariant failures."""
-        return list(set(v.edge.name for v in self.invariant_violations if v.edge))
+        return list({v.edge.name for v in self.invariant_violations if v.edge})
 
 
 class StateGraph:

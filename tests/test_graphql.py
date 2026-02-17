@@ -11,12 +11,10 @@ Tests GraphQL-specific features including:
 
 from __future__ import annotations
 
-import asyncio
-import json
-import pytest
-from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from venomqa.http.graphql import GraphQLError, GraphQLResponse
 
@@ -295,7 +293,6 @@ class TestGraphQLAssertions:
     def test_functional_api(self, successful_response: GraphQLResponse, error_response: GraphQLResponse) -> None:
         """Test the functional assertion API."""
         from venomqa.graphql.assertions import (
-            GraphQLAssertionError,
             assert_graphql_data_at,
             assert_graphql_error_contains,
             assert_graphql_no_errors,
@@ -425,7 +422,6 @@ class TestGraphQLFragments:
         from venomqa.graphql.fragments import (
             FragmentRegistry,
             fragment,
-            get_global_registry,
         )
 
         registry = FragmentRegistry()
@@ -785,7 +781,6 @@ class TestGraphQLTester:
 
     def test_tester_query_with_validation(self) -> None:
         """Test tester validates queries against schema."""
-        from venomqa.graphql.schema import SchemaValidationError
         from venomqa.graphql.tester import GraphQLTester
 
         with patch("venomqa.graphql.tester.GraphQLClient") as MockClient:

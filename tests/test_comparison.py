@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -17,26 +15,20 @@ from venomqa.comparison import (
     ComparisonResult,
     DiffConfig,
     JSONDiff,
-    ResponseDiff,
     RunComparator,
     SnapshotManager,
     StatusChange,
-    StepComparison,
-    TimingDiff,
     TrendAnalyzer,
     TrendData,
     TrendPoint,
 )
-from venomqa.comparison.diff import ChangeType, DiffType, JSONDiffItem
+from venomqa.comparison.diff import ChangeType, DiffType
 from venomqa.core.models import (
-    BranchResult,
     Issue,
     JourneyResult,
-    PathResult,
     Severity,
     StepResult,
 )
-
 
 # ============================================================================
 # Fixtures
@@ -781,7 +773,7 @@ class TestTrendAnalyzer:
     def test_trend_direction(self) -> None:
         """Test determining trend direction."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            analyzer = TrendAnalyzer(tmpdir)
+            TrendAnalyzer(tmpdir)
 
             # Create improving trend
             trend = TrendData(

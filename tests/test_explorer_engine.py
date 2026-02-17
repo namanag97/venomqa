@@ -10,15 +10,11 @@ real exploration logic including:
 """
 
 import asyncio
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from venomqa.explorer.engine import (
     ExplorationEngine,
-    ExplorationError,
     ExplorationStrategy,
 )
 from venomqa.explorer.models import (

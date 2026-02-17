@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
-import copy
 
 from venomqa.v1.core.state import Observation
 from venomqa.v1.world.rollbackable import SystemCheckpoint

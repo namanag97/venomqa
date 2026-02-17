@@ -611,7 +611,7 @@ class LoadTestResult:
         ts_p50 = [ts.p50_ms for ts in self.time_series]
         ts_p95 = [ts.p95_ms for ts in self.time_series]
         ts_p99 = [ts.p99_ms for ts in self.time_series]
-        ts_errors = [ts.error_count for ts in self.time_series]
+        [ts.error_count for ts in self.time_series]
         ts_users = [ts.active_users for ts in self.time_series]
 
         return f"""<!DOCTYPE html>

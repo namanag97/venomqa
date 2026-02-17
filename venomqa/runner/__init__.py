@@ -32,12 +32,14 @@ from venomqa.errors import (
     JourneyTimeoutError,
     VenomQAError,
 )
-from venomqa.errors.debug import DebugLogger, StepThroughController
 from venomqa.errors import (
     PathError as PathError,
 )
+from venomqa.errors.debug import DebugLogger, StepThroughController
 from venomqa.errors.retry import (
     JourneyTimeoutError as EnhancedJourneyTimeoutError,
+)
+from venomqa.errors.retry import (
     StepTimeoutError,
 )
 from venomqa.runner.cache import CacheManager
@@ -506,9 +508,8 @@ class JourneyRunner:
             self.output.step_start(step.name, self._step_counter, step.description)
 
         started_at = datetime.now()
-        start_time = time.time()
+        time.time()
         error: str | None = None
-        exception_raised: Exception | None = None
         response: dict[str, Any] | None = None
         request: dict[str, Any] | None = None
         success = False
@@ -597,7 +598,6 @@ class JourneyRunner:
 
         except VenomQAError as e:
             error = f"[{e.error_code.value}] {e.message}"
-            exception_raised = e
             success = step.expect_failure
 
             if self.client.history:
@@ -616,7 +616,6 @@ class JourneyRunner:
 
         except Exception as e:
             error = str(e)
-            exception_raised = e
             success = step.expect_failure
 
             if self.client.history:

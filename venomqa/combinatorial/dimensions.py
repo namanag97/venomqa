@@ -17,8 +17,9 @@ Example:
 from __future__ import annotations
 
 import itertools
+from collections.abc import Hashable
 from dataclasses import dataclass, field
-from typing import Any, Hashable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -260,7 +261,7 @@ class DimensionSpace:
         names = self.dimension_names
 
         return [
-            Combination(dict(zip(names, combo)))
+            Combination(dict(zip(names, combo, strict=False)))
             for combo in itertools.product(*value_lists)
         ]
 

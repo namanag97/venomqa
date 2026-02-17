@@ -5,21 +5,20 @@ These tests verify that the StateExplorer can be instantiated and called,
 ensuring the basic functionality works end-to-end.
 """
 
-import pytest
-from datetime import datetime, timedelta
 
+import pytest
+
+from venomqa.explorer.detector import StateDetector
+from venomqa.explorer.discoverer import APIDiscoverer
+from venomqa.explorer.engine import ExplorationStrategy
 from venomqa.explorer.explorer import StateExplorer
 from venomqa.explorer.models import (
-    Action,
     CoverageReport,
     ExplorationConfig,
     ExplorationResult,
     State,
     StateGraph,
 )
-from venomqa.explorer.engine import ExplorationStrategy
-from venomqa.explorer.detector import StateDetector
-from venomqa.explorer.discoverer import APIDiscoverer
 
 
 class TestStateExplorerInstantiation:

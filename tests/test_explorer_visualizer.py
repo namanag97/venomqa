@@ -7,7 +7,6 @@ PNG rendering when graphviz is available.
 """
 
 import json
-import re
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -27,7 +26,6 @@ from venomqa.explorer.visualizer import (
     OutputFormat,
     VisualizationError,
 )
-
 
 # =============================================================================
 # Fixtures

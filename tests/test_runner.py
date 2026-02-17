@@ -2,25 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from unittest.mock import MagicMock, patch
-
 import pytest
 
-from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (
     Branch,
-    BranchResult,
     Checkpoint,
     Journey,
-    JourneyResult,
     Path,
-    PathResult,
     Severity,
     Step,
-    StepResult,
 )
 from venomqa.runner import JourneyRunner, MissingStateManagerError
+
 from .conftest import MockClient, MockHTTPResponse, MockStateManager
 
 
@@ -89,7 +82,7 @@ class TestJourneyRunner:
         state_manager = MockStateManager()
         runner = JourneyRunner(client=mock_client, state_manager=state_manager)
 
-        result = runner.run(sample_journey_simple)
+        runner.run(sample_journey_simple)
 
         assert state_manager.is_connected() is False
 

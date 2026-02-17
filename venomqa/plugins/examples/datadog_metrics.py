@@ -37,8 +37,8 @@ import logging
 import os
 import time
 from typing import TYPE_CHECKING, Any
-from urllib.request import Request, urlopen
 from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 from venomqa.plugins.base import HookPlugin
 from venomqa.plugins.types import (

@@ -14,26 +14,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from venomqa import Journey, Step, Checkpoint, Branch, Path
+from venomqa import Branch, Checkpoint, Journey, Path, Step
 from venomqa.domains.security.actions.authentication import (
-    AuthenticationTester,
-    AuthTestConfig,
     InvalidTokenTest,
     PermissionBoundaryTest,
-    TokenExpirationTest,
-    TokenRefreshTest,
 )
 from venomqa.domains.security.actions.injection import (
     InjectionTester,
-    InjectionTestConfig,
 )
 from venomqa.domains.security.actions.owasp import (
-    OWASPChecker,
     OWASPCheckConfig,
-    SecurityHeadersCheck,
-    CORSPolicyCheck,
     RateLimitCheck,
-    ErrorLeakageCheck,
+    SecurityHeadersCheck,
 )
 
 
@@ -296,7 +288,7 @@ def _test_xss_action(client: Any, ctx: dict[str, Any]) -> Any:
     ctx["xss_findings"] = all_findings
     assert not any(
         f.severity.value in ("critical", "high") for f in all_findings
-    ), f"XSS vulnerability found"
+    ), "XSS vulnerability found"
 
     return {"total_findings": len(all_findings)}
 
@@ -314,7 +306,7 @@ def _test_auth_bypass_action(client: Any, ctx: dict[str, Any]) -> Any:
     ctx["auth_bypass_findings"] = all_findings
     assert not any(
         f.severity.value == "critical" for f in all_findings
-    ), f"Critical auth bypass found"
+    ), "Critical auth bypass found"
 
     return {"total_findings": len(all_findings)}
 

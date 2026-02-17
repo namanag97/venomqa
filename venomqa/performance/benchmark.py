@@ -306,27 +306,27 @@ class BenchmarkResult:
             f"Benchmark Results: {self.journey_name}",
             "=" * 60,
             "",
-            f"Configuration:",
+            "Configuration:",
             f"  Iterations: {self.config.iterations} (+ {self.config.warmup_iterations} warmup)",
             f"  Parallel workers: {self.config.parallel_workers}",
             "",
-            f"Summary:",
+            "Summary:",
             f"  Total time: {self.total_duration_ms:.2f}ms ({self.total_duration_ms/1000:.2f}s)",
             f"  Success rate: {self.success_rate:.1f}%",
             "",
-            f"Latency (ms):",
+            "Latency (ms):",
             f"  Min:    {self.min_duration_ms:>10.2f}",
             f"  Avg:    {self.avg_duration_ms:>10.2f}",
             f"  Max:    {self.max_duration_ms:>10.2f}",
             f"  StdDev: {self.std_dev_ms:>10.2f}",
             "",
-            f"Percentiles (ms):",
+            "Percentiles (ms):",
             f"  p50:    {self.p50_ms:>10.2f}",
             f"  p90:    {self.p90_ms:>10.2f}",
             f"  p95:    {self.p95_ms:>10.2f}",
             f"  p99:    {self.p99_ms:>10.2f}",
             "",
-            f"Throughput:",
+            "Throughput:",
             f"  Steps/second:     {self.steps_per_second:>10.2f}",
             f"  Journeys/minute:  {self.journeys_per_minute:>10.2f}",
             f"  Requests/second:  {self.throughput_rps:>10.4f}",
@@ -518,12 +518,11 @@ class Benchmarker:
         Returns:
             IterationResult for this iteration.
         """
-        memory_before = None
         if self.config.track_memory:
             try:
                 import tracemalloc
                 tracemalloc.start()
-                memory_before = tracemalloc.get_traced_memory()[0]
+                tracemalloc.get_traced_memory()[0]
             except ImportError:
                 pass
 

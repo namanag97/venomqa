@@ -12,13 +12,11 @@ Requires: todo_app or full_featured_app running on localhost:8000
 from __future__ import annotations
 
 import gc
-import sys
 import time
 from typing import Any
 
-from venomqa import Branch, Checkpoint, Journey, Path, Step
+from venomqa import Checkpoint, Journey, Step
 from venomqa.core.context import ExecutionContext
-
 
 # =============================================================================
 # Memory Tracking Utilities

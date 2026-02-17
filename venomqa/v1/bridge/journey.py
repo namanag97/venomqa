@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from venomqa.v1.dsl.journey import Journey, Step, Checkpoint, Branch, Path
 from venomqa.v1.core.invariant import Invariant, Severity
+from venomqa.v1.dsl.journey import Branch, Checkpoint, Journey, Step
 
 
 @runtime_checkable

@@ -70,7 +70,6 @@ from venomqa.errors.retry import (
     CircuitBreakerRegistry,
     CircuitState,
     CircuitStats,
-    JourneyTimeoutError as JourneyTimeoutErrorEnhanced,
     ResilientClient,
     RetryConfig,
     RetryPolicy,
@@ -82,6 +81,9 @@ from venomqa.errors.retry import (
     execute_with_timeout_async,
     with_timeout,
     with_timeout_async,
+)
+from venomqa.errors.retry import (
+    JourneyTimeoutError as JourneyTimeoutErrorEnhanced,
 )
 from venomqa.errors.retry import (
     RetryExhaustedError as RetryExhaustedErrorRetry,  # noqa: F401

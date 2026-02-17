@@ -12,12 +12,9 @@ Tests cover:
 
 from __future__ import annotations
 
-import json
-import os
 import re
 import textwrap
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -29,11 +26,10 @@ from venomqa.preflight.config import (
     HealthCheckConfig,
     ListCheckConfig,
     PreflightConfig,
+    _substitute_recursive,
     generate_example_config,
     substitute_env_vars,
-    _substitute_recursive,
 )
-
 
 # =========================================================================
 # substitute_env_vars
@@ -696,7 +692,6 @@ class TestSmokeTestFromConfig:
     def test_legacy_mode_still_works(self):
         """SmokeTest created directly (not from config) still uses legacy run_all."""
         from venomqa.preflight import SmokeTest
-        from venomqa.preflight.checks import SmokeTestResult
 
         smoke = SmokeTest("http://test:8000")
         assert smoke._config is None
@@ -854,6 +849,7 @@ class TestCustomHTTPCheck:
 
     def test_custom_check_connection_error(self):
         import httpx
+
         from venomqa.preflight.checks import CustomHTTPCheck
 
         mock_client = MagicMock()

@@ -25,7 +25,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from venomqa.http.graphql import AsyncGraphQLClient, GraphQLClient, GraphQLResponse
 from venomqa.graphql.assertions import GraphQLExpectation, expect_graphql
 from venomqa.graphql.schema import (
     GraphQLSchemaInfo,
@@ -39,6 +38,7 @@ from venomqa.graphql.subscriptions import (
     SubscriptionEvent,
     SubscriptionOptions,
 )
+from venomqa.http.graphql import AsyncGraphQLClient, GraphQLClient, GraphQLResponse
 
 logger = logging.getLogger(__name__)
 

@@ -6,8 +6,8 @@ from datetime import datetime
 
 import pytest
 
-from venomqa.ports.queue import JobInfo, JobResult, JobStatus
 from venomqa.adapters.queue import MockQueueAdapter
+from venomqa.ports.queue import JobStatus
 
 
 def sample_task(x: int, y: int) -> int:

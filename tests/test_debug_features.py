@@ -1,8 +1,5 @@
 """Tests for debug features and enhanced error handling."""
 
-import pytest
-from datetime import datetime
-from unittest.mock import Mock, patch
 
 from venomqa.errors.debug import (
     DebugContext,
@@ -14,7 +11,6 @@ from venomqa.errors.debug import (
     TroubleshootingEngine,
     create_debug_context,
     format_error,
-    ERROR_SUGGESTIONS,
 )
 
 

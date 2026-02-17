@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -409,7 +408,7 @@ class TestResultsRepository:
 
         # Try to delete runs older than 0 days (all runs)
         # This won't delete the run we just created since it's from today
-        deleted = repo.delete_old_runs(days=0)
+        repo.delete_old_runs(days=0)
 
         # The run from today should still exist
         runs = repo.list_runs()

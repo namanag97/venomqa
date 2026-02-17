@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from venomqa.adapters.time import SystemTimeAdapter, MockTimeAdapter
+from venomqa.adapters.time import MockTimeAdapter, SystemTimeAdapter
 from venomqa.ports.time import ScheduledTask
 
 
@@ -262,12 +262,12 @@ class TestMockTimeAdapter:
         assert task_id == "mock-task-1"
 
     def test_schedule_after(self, adapter: MockTimeAdapter) -> None:
-        task_id = adapter.schedule_after(60.0, lambda: "result")
+        adapter.schedule_after(60.0, lambda: "result")
         tasks = adapter.get_scheduled_tasks()
         assert len(tasks) == 1
 
     def test_schedule_every(self, adapter: MockTimeAdapter) -> None:
-        task_id = adapter.schedule_every(30.0, lambda: None)
+        adapter.schedule_every(30.0, lambda: None)
         tasks = adapter.get_scheduled_tasks()
         recurring = [t for t in tasks if t.recurring]
         assert len(recurring) == 1

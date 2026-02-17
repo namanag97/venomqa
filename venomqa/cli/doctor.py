@@ -6,7 +6,7 @@ import importlib.metadata
 import shutil
 import subprocess
 import sys
-from typing import Callable, Tuple
+from collections.abc import Callable
 
 import click
 from rich.console import Console
@@ -21,7 +21,7 @@ class HealthCheck:
     def __init__(
         self,
         name: str,
-        check_fn: Callable[[], Tuple[bool, str]],
+        check_fn: Callable[[], tuple[bool, str]],
         required: bool = True,
     ) -> None:
         """Initialize a health check.
@@ -35,7 +35,7 @@ class HealthCheck:
         self.check_fn = check_fn
         self.required = required
 
-    def run(self) -> Tuple[bool, str]:
+    def run(self) -> tuple[bool, str]:
         """Run the health check and return (success, message)."""
         try:
             return self.check_fn()
@@ -43,7 +43,7 @@ class HealthCheck:
             return False, str(e)
 
 
-def check_python_version() -> Tuple[bool, str]:
+def check_python_version() -> tuple[bool, str]:
     """Check if Python version meets minimum requirements (>= 3.10)."""
     version = sys.version_info
     if version >= (3, 10):
@@ -51,7 +51,7 @@ def check_python_version() -> Tuple[bool, str]:
     return False, f"Python {version.major}.{version.minor} (requires >= 3.10)"
 
 
-def check_docker() -> Tuple[bool, str]:
+def check_docker() -> tuple[bool, str]:
     """Check if Docker is installed and daemon is running."""
     if not shutil.which("docker"):
         return False, "Docker not found in PATH"
@@ -78,7 +78,7 @@ def check_docker() -> Tuple[bool, str]:
     return False, "Docker installed but daemon not running"
 
 
-def check_docker_compose() -> Tuple[bool, str]:
+def check_docker_compose() -> tuple[bool, str]:
     """Check if Docker Compose is available (v2 or v1)."""
     # Try docker compose (v2)
     try:
@@ -110,7 +110,7 @@ def check_docker_compose() -> Tuple[bool, str]:
     return False, "Docker Compose not found"
 
 
-def check_package(package: str) -> Tuple[bool, str]:
+def check_package(package: str) -> tuple[bool, str]:
     """Check if a Python package is installed and return its version.
 
     Args:
@@ -130,7 +130,7 @@ def check_package(package: str) -> Tuple[bool, str]:
         return False, f"{package} not installed"
 
 
-def check_graphviz() -> Tuple[bool, str]:
+def check_graphviz() -> tuple[bool, str]:
     """Check if Graphviz is installed (optional, for journey visualization)."""
     if shutil.which("dot"):
         try:
@@ -148,7 +148,7 @@ def check_graphviz() -> Tuple[bool, str]:
     return False, "graphviz not installed (optional, for journey visualization)"
 
 
-def check_postgresql_client() -> Tuple[bool, str]:
+def check_postgresql_client() -> tuple[bool, str]:
     """Check if PostgreSQL client (psql) is available."""
     if shutil.which("psql"):
         try:
@@ -165,7 +165,7 @@ def check_postgresql_client() -> Tuple[bool, str]:
     return False, "psql not found (optional, for database state management)"
 
 
-def check_git() -> Tuple[bool, str]:
+def check_git() -> tuple[bool, str]:
     """Check if Git is installed (optional, for version tracking)."""
     if shutil.which("git"):
         try:
@@ -181,7 +181,7 @@ def check_git() -> Tuple[bool, str]:
     return False, "git not found (optional)"
 
 
-def check_redis_client() -> Tuple[bool, str]:
+def check_redis_client() -> tuple[bool, str]:
     """Check if Redis client is available."""
     # Check Python redis package
     try:
@@ -198,7 +198,7 @@ def check_redis_client() -> Tuple[bool, str]:
     return False, "Redis client not found (optional, for cache state management)"
 
 
-def check_disk_space() -> Tuple[bool, str]:
+def check_disk_space() -> tuple[bool, str]:
     """Check available disk space (recommend at least 5GB free)."""
     try:
         total, used, free = shutil.disk_usage("/")
@@ -215,7 +215,7 @@ def check_disk_space() -> Tuple[bool, str]:
         return False, f"Could not check disk space: {e}"
 
 
-def check_common_ports() -> Tuple[bool, str]:
+def check_common_ports() -> tuple[bool, str]:
     """Check if common testing ports are available or services are running."""
     import socket
 
@@ -243,7 +243,7 @@ def check_common_ports() -> Tuple[bool, str]:
     return True, "No services detected on common ports"
 
 
-def check_config_file() -> Tuple[bool, str]:
+def check_config_file() -> tuple[bool, str]:
     """Check if a VenomQA configuration file exists."""
     from pathlib import Path
 
@@ -261,7 +261,7 @@ def check_config_file() -> Tuple[bool, str]:
     return False, "No venomqa.yaml found (run 'venomqa init' to create one)"
 
 
-def check_journeys_directory() -> Tuple[bool, str]:
+def check_journeys_directory() -> tuple[bool, str]:
     """Check if journeys directory exists with journey files."""
     from pathlib import Path
 
@@ -310,7 +310,7 @@ def get_health_checks() -> list[HealthCheck]:
 def run_health_checks(
     checks: list[HealthCheck] | None = None,
     verbose: bool = False,
-) -> Tuple[int, int, int]:
+) -> tuple[int, int, int]:
     """Run all health checks and display results.
 
     Args:

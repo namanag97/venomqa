@@ -2,22 +2,16 @@
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
-from io import StringIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
+from tests.conftest import MockClient, MockHTTPResponse
 from venomqa.core.models import (
     Journey,
-    JourneyResult,
     Severity,
     Step,
-    StepResult,
 )
 from venomqa.runner import JourneyRunner
-from tests.conftest import MockClient, MockHTTPResponse
 
 
 class TestRequestHistory:

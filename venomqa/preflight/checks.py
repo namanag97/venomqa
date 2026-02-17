@@ -8,11 +8,10 @@ to produce clear error messages with actionable suggestions.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
-
 
 # ---------------------------------------------------------------------------
 # Suggestions -- reusable hints attached to failed checks

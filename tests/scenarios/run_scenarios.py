@@ -44,10 +44,6 @@ from typing import Any
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from venomqa import Client, JourneyRunner
-from venomqa.reporters import HTMLReporter, JSONReporter, MarkdownReporter
-from venomqa.state import InMemoryStateManager
-
 # Import all scenarios
 from tests.scenarios.scenario_concurrent_users import (
     concurrent_checkout_journey,
@@ -77,6 +73,8 @@ from tests.scenarios.scenario_time_based import (
     cart_expiration_journey,
     session_timeout_journey,
 )
+from venomqa import Client, JourneyRunner
+from venomqa.state import InMemoryStateManager
 
 # Scenario registry
 SCENARIOS = {

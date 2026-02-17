@@ -17,9 +17,9 @@ import subprocess
 import tempfile
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from venomqa.explorer.models import StateGraph, State, Transition, Issue
+from venomqa.explorer.models import Issue, State, StateGraph, Transition
 
 
 class OutputFormat(str, Enum):
@@ -36,7 +36,7 @@ class OutputFormat(str, Enum):
 class VisualizationError(Exception):
     """Error during visualization rendering."""
 
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
         """Initialize with message and optional details."""
         super().__init__(message)
         self.message = message
@@ -71,8 +71,8 @@ class GraphVisualizer:
 
     def __init__(
         self,
-        graph: Optional[StateGraph] = None,
-        options: Optional[Dict[str, Any]] = None,
+        graph: StateGraph | None = None,
+        options: dict[str, Any] | None = None,
     ) -> None:
         """
         Initialize the graph visualizer.
@@ -83,9 +83,9 @@ class GraphVisualizer:
         """
         self.graph = graph
         self.options = options or {}
-        self.issues: List[Issue] = []
-        self._node_styles: Dict[str, Dict[str, str]] = {}
-        self._edge_styles: Dict[str, Dict[str, str]] = {}
+        self.issues: list[Issue] = []
+        self._node_styles: dict[str, dict[str, str]] = {}
+        self._edge_styles: dict[str, dict[str, str]] = {}
 
         # Default options
         self._default_options = {
@@ -110,7 +110,7 @@ class GraphVisualizer:
         """
         self.graph = graph
 
-    def highlight_issues(self, issues: List[Issue]) -> None:
+    def highlight_issues(self, issues: list[Issue]) -> None:
         """
         Set issues to highlight in the visualization.
 
@@ -297,7 +297,7 @@ class GraphVisualizer:
         lines = ["flowchart TD"]
 
         # Track node styles for styling section
-        node_classes: Dict[str, str] = {}
+        node_classes: dict[str, str] = {}
 
         # Add nodes with shapes
         for state_id, state in self.graph.states.items():
@@ -355,11 +355,11 @@ class GraphVisualizer:
         if self.graph is None:
             raise ValueError("Graph is not set. Call set_graph() first.")
 
-        json_data = self.render_json()
+        self.render_json()
         mermaid_diagram = self.to_mermaid()
 
         # Escape for HTML embedding
-        mermaid_escaped = html_module.escape(mermaid_diagram)
+        html_module.escape(mermaid_diagram)
 
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -513,7 +513,7 @@ class GraphVisualizer:
         lines.append('</div>')
         return "\n".join(lines)
 
-    def render_json(self) -> Dict[str, Any]:
+    def render_json(self) -> dict[str, Any]:
         """
         Render the graph as JSON for web visualization.
 
@@ -576,7 +576,7 @@ class GraphVisualizer:
     def set_node_style(
         self,
         state_id: str,
-        style: Dict[str, str],
+        style: dict[str, str],
     ) -> None:
         """
         Set custom style for a specific node.
@@ -591,7 +591,7 @@ class GraphVisualizer:
         self,
         from_state: str,
         to_state: str,
-        style: Dict[str, str],
+        style: dict[str, str],
     ) -> None:
         """
         Set custom style for a specific edge.

@@ -1278,7 +1278,6 @@ class HTMLReporter(BaseReporter):
 
     def _render_branch_node(self, branch: BranchResult, journey_index: int, step_index: int) -> str:
         """Render a branch node with paths."""
-        status_class = "success" if branch.all_passed else "failure"
         branch_id = f"{journey_index}-branch-{step_index}"
 
         path_nodes = []
@@ -1463,7 +1462,7 @@ class HTMLReporter(BaseReporter):
             </div>"""
 
         issues_html = []
-        for journey_name, issue in all_issues:
+        for _journey_name, issue in all_issues:
             severity_class = f"issue-{issue.severity.value}"
             badge_class = f"badge-{issue.severity.value}"
 

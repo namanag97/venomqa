@@ -39,8 +39,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from re import Pattern
 from threading import Lock
-from typing import Any, Pattern
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import httpx

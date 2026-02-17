@@ -23,7 +23,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
-from venomqa.data.generators import FakeDataGenerator, fake as default_fake
+from venomqa.data.generators import FakeDataGenerator
+from venomqa.data.generators import fake as default_fake
 
 
 @dataclass
@@ -240,7 +241,7 @@ class EcommerceGenerator:
             "old": ["delivered", "completed"],
         }
 
-        for i in range(count):
+        for _i in range(count):
             days_ago = random.randint(0, date_range_days)
             age = "recent" if days_ago < 7 else ("mid" if days_ago < 30 else "old")
             status = random.choice(statuses_by_age[age])

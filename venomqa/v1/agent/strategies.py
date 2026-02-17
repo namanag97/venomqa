@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from collections import deque, Counter
+from collections import Counter, deque
 from typing import Protocol, runtime_checkable
 
-from venomqa.v1.core.state import State
 from venomqa.v1.core.action import Action
 from venomqa.v1.core.graph import Graph
+from venomqa.v1.core.state import State
 
 
 @runtime_checkable
@@ -224,7 +224,7 @@ class Weighted(BaseStrategy):
 
         r = self._rng.random() * total
         cumulative = 0.0
-        for pair, weight in zip(unexplored, weights):
+        for pair, weight in zip(unexplored, weights, strict=False):
             cumulative += weight
             if r <= cumulative:
                 return pair

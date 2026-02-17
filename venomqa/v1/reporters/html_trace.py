@@ -6,7 +6,6 @@ import json
 from typing import Any
 
 from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.core.invariant import Severity
 
 
 class HTMLTraceReporter:

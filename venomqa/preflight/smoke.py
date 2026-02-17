@@ -25,14 +25,11 @@ from venomqa.preflight.checks import (
     BaseCheck,
     CRUDCheck,
     CustomHTTPCheck,
-    DatabaseCheck,
     HealthCheck,
     ListCheck,
-    OpenAPICheck,
     SmokeTestResult,
 )
 from venomqa.preflight.errors import APINotReadyError
-
 
 # ---------------------------------------------------------------------------
 # SmokeTestReport
@@ -69,7 +66,7 @@ class SmokeTestReport:
     def summary(self) -> str:
         """One-line summary of the run."""
         total = len(self.results)
-        passed = len(self.passed_results)
+        len(self.passed_results)
         failed = len(self.failed_results)
         if self.passed:
             return (

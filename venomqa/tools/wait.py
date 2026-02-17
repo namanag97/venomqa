@@ -33,7 +33,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
 
@@ -118,7 +118,6 @@ async def wait_for(
     """
     start_time = time.time()
     attempts = 0
-    last_error: Exception | None = None
 
     while True:
         elapsed = time.time() - start_time
@@ -141,8 +140,8 @@ async def wait_for(
 
             if result:
                 return True
-        except Exception as e:
-            last_error = e
+        except Exception:
+            pass
             # Continue polling on exception
 
         await asyncio.sleep(interval)
@@ -241,7 +240,6 @@ async def poll_until(
     start_time = time.time()
     attempts = 0
     last_value: T | None = None
-    last_error: Exception | None = None
 
     while True:
         elapsed = time.time() - start_time
@@ -265,8 +263,8 @@ async def poll_until(
 
             if condition(value):
                 return value
-        except Exception as e:
-            last_error = e
+        except Exception:
+            pass
             # Continue polling on exception
 
         await asyncio.sleep(interval)

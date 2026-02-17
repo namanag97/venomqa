@@ -1103,7 +1103,7 @@ from typing import Any
         dimensions = []
 
         # 1. HTTP method dimension
-        methods = sorted(set(ep.method.upper() for ep in self.schema.endpoints))
+        methods = sorted({ep.method.upper() for ep in self.schema.endpoints})
         if methods:
             dimensions.append(Dimension(
                 name="http_method",

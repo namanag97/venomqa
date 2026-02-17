@@ -442,7 +442,7 @@ class TestBenchmarkSuite:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             suite.export_json(f.name)
 
-            with open(f.name, "r") as rf:
+            with open(f.name) as rf:
                 data = json.load(rf)
 
             assert "results" in data

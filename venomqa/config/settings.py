@@ -105,8 +105,8 @@ def _configure_fake_generator(config: QAConfig) -> None:
         # Set locale if different from default
         if config.data_locale != "en_US":
             # Create a new generator with the specified locale
-            from venomqa.data.generators import FakeDataGenerator
             import venomqa.data as data_module
+            from venomqa.data.generators import FakeDataGenerator
 
             new_fake = FakeDataGenerator(
                 locale=config.data_locale,

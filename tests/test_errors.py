@@ -3,25 +3,20 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from venomqa.core.context import ExecutionContext
+from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 from venomqa.core.models import (
     Branch,
     Checkpoint,
     Issue,
     Journey,
-    JourneyResult,
     Path,
-    Severity,
     Step,
-    StepResult,
 )
 from venomqa.errors import StateNotConnectedError
 from venomqa.runner import JourneyRunner
-from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 
 
 class TestErrorRecovery:

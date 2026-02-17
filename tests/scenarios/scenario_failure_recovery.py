@@ -177,7 +177,7 @@ def create_todo_with_retry(client: Any, context: ExecutionContext) -> Any:
 
         return result
 
-    except RetryExhaustedError as e:
+    except RetryExhaustedError:
         context.get("failed_steps", []).append("create_todo_with_retry")
         context["create_attempts"] = attempt_count
         context["create_exhausted"] = True
@@ -323,7 +323,7 @@ def multiple_circuit_operations(client: Any, context: ExecutionContext) -> Any:
     if not circuit:
         return {"status": "error"}
 
-    for i in range(10):
+    for _i in range(10):
         try:
             operation_with_circuit_breaker(client, context)
             results["successful"] += 1

@@ -15,44 +15,43 @@ Run specific category:
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock
 
-from venomqa import Client, JourneyRunner
-from venomqa.state import InMemoryStateManager
-from venomqa.core.models import JourneyResult
+import pytest
+
+from tests.scenarios.scenario_concurrent_users import (
+    concurrent_checkout_journey,
+    inventory_stress_journey,
+)
 
 # Import all scenarios
 from tests.scenarios.scenario_deep_branching import (
     deep_branching_journey,
     triple_nested_journey,
 )
-from tests.scenarios.scenario_concurrent_users import (
-    concurrent_checkout_journey,
-    inventory_stress_journey,
+from tests.scenarios.scenario_failure_recovery import (
+    failure_recovery_journey,
+    partial_save_journey,
+)
+from tests.scenarios.scenario_file_operations import (
+    file_cleanup_journey,
+    file_operations_journey,
 )
 from tests.scenarios.scenario_long_running import (
     long_running_journey,
     memory_intensive_journey,
 )
-from tests.scenarios.scenario_failure_recovery import (
-    failure_recovery_journey,
-    partial_save_journey,
-)
 from tests.scenarios.scenario_realtime import (
-    websocket_recovery_journey,
     notification_journey,
-)
-from tests.scenarios.scenario_file_operations import (
-    file_operations_journey,
-    file_cleanup_journey,
+    websocket_recovery_journey,
 )
 from tests.scenarios.scenario_time_based import (
     cart_expiration_journey,
     session_timeout_journey,
 )
-
+from venomqa import Client, JourneyRunner
+from venomqa.core.models import JourneyResult
+from venomqa.state import InMemoryStateManager
 
 # =============================================================================
 # Fixtures

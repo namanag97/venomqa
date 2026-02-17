@@ -3,28 +3,19 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
-from textwrap import dedent
 
 import pytest
 import yaml
 
 from venomqa.generators import (
     EndpointInfo,
-    GeneratedAction,
-    GeneratedFixture,
     GeneratorConfig,
     OpenAPIGenerator,
     OpenAPIParseError,
-    OpenAPISchema,
     ParameterInfo,
     PropertyInfo,
-    RequestBodyInfo,
-    ResponseInfo,
-    SchemaInfo,
 )
-
 
 # Sample OpenAPI specification for testing
 SAMPLE_OPENAPI_SPEC = {

@@ -19,7 +19,6 @@ import pytest
 
 from venomqa.core.graph import StateGraph
 
-
 # Path to golden files
 GOLDEN_DIR = Path(__file__).parent / "golden"
 
@@ -194,7 +193,7 @@ class TestSummaryFormatGolden:
         summary = result.summary()
 
         # Hash the summary to detect format changes
-        summary_hash = hashlib.sha256(summary.encode()).hexdigest()[:16]
+        hashlib.sha256(summary.encode()).hexdigest()[:16]
 
         # Check key content is present (not exact match due to timestamps)
         actual = {

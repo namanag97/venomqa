@@ -31,7 +31,7 @@ from venomqa.plugins.base import (
     ReporterPlugin,
     VenomQAPlugin,
 )
-from venomqa.plugins.hooks import HookManager, get_hook_manager
+from venomqa.plugins.hooks import HookManager
 from venomqa.plugins.loader import PluginLoader, PluginLoadError
 from venomqa.plugins.types import (
     BranchContext,
@@ -50,10 +50,12 @@ if TYPE_CHECKING:
         BranchResult,
         Journey,
         JourneyResult,
-        Path as JourneyPath,
         PathResult,
         Step,
         StepResult,
+    )
+    from venomqa.core.models import (
+        Path as JourneyPath,
     )
     from venomqa.reporters.base import BaseReporter
 
@@ -247,7 +249,7 @@ class PluginManager:
             logger.warning(f"Plugin {name} not registered")
             return
 
-        plugin = self._plugins.pop(name)
+        self._plugins.pop(name)
         self._hooks.unregister_plugin(name)
         self._loader.unload(name)
 

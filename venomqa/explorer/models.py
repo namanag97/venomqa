@@ -12,10 +12,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 
 # Type alias for state identifiers
 StateID = str
@@ -50,14 +49,14 @@ class Action(BaseModel):
 
     method: str = Field(..., description="HTTP method")
     endpoint: str = Field(..., description="API endpoint path")
-    params: Optional[Dict[str, Any]] = Field(
+    params: dict[str, Any] | None = Field(
         default=None, description="Query parameters"
     )
-    body: Optional[Dict[str, Any]] = Field(default=None, description="Request body")
-    headers: Optional[Dict[str, str]] = Field(
+    body: dict[str, Any] | None = Field(default=None, description="Request body")
+    headers: dict[str, str] | None = Field(
         default=None, description="Additional headers"
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None, description="Human-readable description"
     )
     requires_auth: bool = Field(default=False, description="Requires authentication")
@@ -103,16 +102,16 @@ class State(BaseModel):
 
     id: StateID = Field(..., description="Unique state identifier")
     name: str = Field(..., description="Human-readable state name")
-    properties: Dict[str, Any] = Field(
+    properties: dict[str, Any] = Field(
         default_factory=dict, description="State properties"
     )
-    available_actions: List[Action] = Field(
+    available_actions: list[Action] = Field(
         default_factory=list, description="Available actions from this state"
     )
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional metadata"
     )
-    discovered_at: Optional[datetime] = Field(
+    discovered_at: datetime | None = Field(
         default=None, description="Discovery timestamp"
     )
 
@@ -149,16 +148,16 @@ class Transition(BaseModel):
     from_state: StateID = Field(..., description="Source state ID")
     action: Action = Field(..., description="Action that triggered the transition")
     to_state: StateID = Field(..., description="Destination state ID")
-    response: Optional[Dict[str, Any]] = Field(
+    response: dict[str, Any] | None = Field(
         default=None, description="API response data"
     )
-    status_code: Optional[int] = Field(default=None, description="HTTP status code")
-    duration_ms: Optional[float] = Field(
+    status_code: int | None = Field(default=None, description="HTTP status code")
+    duration_ms: float | None = Field(
         default=None, description="Transition duration in milliseconds"
     )
     success: bool = Field(default=True, description="Whether transition succeeded")
-    error: Optional[str] = Field(default=None, description="Error message if failed")
-    discovered_at: Optional[datetime] = Field(
+    error: str | None = Field(default=None, description="Error message if failed")
+    discovered_at: datetime | None = Field(
         default=None, description="Discovery timestamp"
     )
 
@@ -191,20 +190,20 @@ class StateGraph(BaseModel):
         metadata: Additional graph metadata
     """
 
-    states: Dict[StateID, State] = Field(
+    states: dict[StateID, State] = Field(
         default_factory=dict, description="Map of state IDs to states"
     )
-    transitions: List[Transition] = Field(
+    transitions: list[Transition] = Field(
         default_factory=list, description="All transitions"
     )
-    initial_state: Optional[StateID] = Field(
+    initial_state: StateID | None = Field(
         default=None, description="Initial state ID"
     )
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict, description="Graph metadata"
     )
     # Internal adjacency list for efficient graph operations
-    _adjacency: Dict[StateID, List[StateID]] = {}
+    _adjacency: dict[StateID, list[StateID]] = {}
 
     def model_post_init(self, __context: Any) -> None:
         """Initialize the adjacency list after model creation."""
@@ -269,7 +268,7 @@ class StateGraph(BaseModel):
             if transition.to_state not in self._adjacency[transition.from_state]:
                 self._adjacency[transition.from_state].append(transition.to_state)
 
-    def get_neighbors(self, state_id: StateID) -> List[StateID]:
+    def get_neighbors(self, state_id: StateID) -> list[StateID]:
         """
         Get all states reachable from the given state.
 
@@ -281,7 +280,7 @@ class StateGraph(BaseModel):
         """
         return list(self._adjacency.get(state_id, []))
 
-    def get_transitions_from(self, state_id: StateID) -> List[Transition]:
+    def get_transitions_from(self, state_id: StateID) -> list[Transition]:
         """
         Get all transitions originating from the given state.
 
@@ -293,7 +292,7 @@ class StateGraph(BaseModel):
         """
         return [t for t in self.transitions if t.from_state == state_id]
 
-    def get_transitions_to(self, state_id: StateID) -> List[Transition]:
+    def get_transitions_to(self, state_id: StateID) -> list[Transition]:
         """
         Get all transitions leading to the given state.
 
@@ -305,7 +304,7 @@ class StateGraph(BaseModel):
         """
         return [t for t in self.transitions if t.to_state == state_id]
 
-    def get_state(self, state_id: StateID) -> Optional[State]:
+    def get_state(self, state_id: StateID) -> State | None:
         """
         Get a state by its ID.
 
@@ -317,7 +316,7 @@ class StateGraph(BaseModel):
         """
         return self.states.get(state_id)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Convert the graph to a dictionary representation.
 
@@ -338,7 +337,7 @@ class StateGraph(BaseModel):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StateGraph":
+    def from_dict(cls, data: dict[str, Any]) -> StateGraph:
         """
         Create a StateGraph from a dictionary representation.
 
@@ -355,7 +354,7 @@ class StateGraph(BaseModel):
 
         # Restore states
         states_data = data.get("states", {})
-        for state_id, state_dict in states_data.items():
+        for _state_id, state_dict in states_data.items():
             state = State(**state_dict)
             graph.add_state(state)
 
@@ -367,14 +366,14 @@ class StateGraph(BaseModel):
 
         return graph
 
-    def get_all_actions(self) -> Set[Action]:
+    def get_all_actions(self) -> set[Action]:
         """
         Get all unique actions in the graph.
 
         Returns:
             Set of all unique actions
         """
-        actions: Set[Action] = set()
+        actions: set[Action] = set()
         for transition in self.transitions:
             actions.add(transition.action)
         return actions
@@ -396,8 +395,8 @@ class StateGraph(BaseModel):
         if from_state not in self.states:
             return False
 
-        visited: Set[StateID] = set()
-        queue: List[StateID] = [from_state]
+        visited: set[StateID] = set()
+        queue: list[StateID] = [from_state]
 
         while queue:
             current = queue.pop(0)
@@ -410,7 +409,7 @@ class StateGraph(BaseModel):
 
         return False
 
-    def find_cycles(self) -> List[List[StateID]]:
+    def find_cycles(self) -> list[list[StateID]]:
         """
         Find all cycles in the graph using Tarjan's algorithm.
 
@@ -423,11 +422,11 @@ class StateGraph(BaseModel):
         """
         # Tarjan's algorithm data structures
         index_counter = [0]
-        stack: List[StateID] = []
-        lowlinks: Dict[StateID, int] = {}
-        index: Dict[StateID, int] = {}
-        on_stack: Dict[StateID, bool] = {}
-        sccs: List[List[StateID]] = []
+        stack: list[StateID] = []
+        lowlinks: dict[StateID, int] = {}
+        index: dict[StateID, int] = {}
+        on_stack: dict[StateID, bool] = {}
+        sccs: list[list[StateID]] = []
 
         def strongconnect(node: StateID) -> None:
             # Set the depth index for node
@@ -449,7 +448,7 @@ class StateGraph(BaseModel):
 
             # If node is a root node, pop the stack and generate an SCC
             if lowlinks[node] == index[node]:
-                scc: List[StateID] = []
+                scc: list[StateID] = []
                 while True:
                     successor = stack.pop()
                     on_stack[successor] = False
@@ -471,7 +470,7 @@ class StateGraph(BaseModel):
 
         return sccs
 
-    def find_dead_ends(self) -> List[StateID]:
+    def find_dead_ends(self) -> list[StateID]:
         """
         Find all states with no outgoing transitions (dead ends).
 
@@ -481,14 +480,14 @@ class StateGraph(BaseModel):
         Returns:
             List of state IDs that are dead ends
         """
-        dead_ends: List[StateID] = []
+        dead_ends: list[StateID] = []
         for state_id in self.states:
             neighbors = self.get_neighbors(state_id)
             if len(neighbors) == 0:
                 dead_ends.append(state_id)
         return dead_ends
 
-    def find_unreachable_states(self) -> List[StateID]:
+    def find_unreachable_states(self) -> list[StateID]:
         """
         Find all states that are not reachable from the initial state.
 
@@ -499,8 +498,8 @@ class StateGraph(BaseModel):
             return list(self.states.keys())
 
         # BFS from initial state to find all reachable states
-        visited: Set[StateID] = set()
-        queue: List[StateID] = [self.initial_state]
+        visited: set[StateID] = set()
+        queue: list[StateID] = [self.initial_state]
 
         while queue:
             current = queue.pop(0)
@@ -515,7 +514,7 @@ class StateGraph(BaseModel):
 
     def get_shortest_path(
         self, from_state: StateID, to_state: StateID
-    ) -> Optional[List[StateID]]:
+    ) -> list[StateID] | None:
         """
         Find the shortest path between two states using BFS.
 
@@ -532,8 +531,8 @@ class StateGraph(BaseModel):
         if from_state not in self.states:
             return None
 
-        visited: Set[StateID] = set()
-        queue: List[List[StateID]] = [[from_state]]
+        visited: set[StateID] = set()
+        queue: list[list[StateID]] = [[from_state]]
 
         while queue:
             path = queue.pop(0)
@@ -571,21 +570,21 @@ class Issue(BaseModel):
     """
 
     severity: IssueSeverity = Field(..., description="Issue severity level")
-    state: Optional[StateID] = Field(
+    state: StateID | None = Field(
         default=None, description="State where issue was found"
     )
-    action: Optional[Action] = Field(
+    action: Action | None = Field(
         default=None, description="Action that triggered the issue"
     )
     error: str = Field(..., description="Error description")
-    suggestion: Optional[str] = Field(
+    suggestion: str | None = Field(
         default=None, description="Suggested fix or investigation"
     )
-    category: Optional[str] = Field(default=None, description="Issue category")
-    response_data: Optional[Dict[str, Any]] = Field(
+    category: str | None = Field(default=None, description="Issue category")
+    response_data: dict[str, Any] | None = Field(
         default=None, description="Relevant response data"
     )
-    discovered_at: Optional[datetime] = Field(
+    discovered_at: datetime | None = Field(
         default=None, description="Discovery timestamp"
     )
 
@@ -621,17 +620,17 @@ class CoverageReport(BaseModel):
     coverage_percent: float = Field(
         default=0.0, ge=0.0, le=100.0, description="Coverage percentage"
     )
-    uncovered_actions: List[Action] = Field(
+    uncovered_actions: list[Action] = Field(
         default_factory=list, description="Actions not executed"
     )
-    state_breakdown: Dict[str, int] = Field(
+    state_breakdown: dict[str, int] = Field(
         default_factory=dict, description="States by category"
     )
-    transition_breakdown: Dict[str, int] = Field(
+    transition_breakdown: dict[str, int] = Field(
         default_factory=dict, description="Transitions by outcome"
     )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return self.model_dump()
 
@@ -659,27 +658,27 @@ class ChainState(BaseModel):
 
     id: StateID = Field(..., description="Unique state identifier")
     name: str = Field(..., description="Human-readable state name based on context")
-    context: Dict[str, Any] = Field(
+    context: dict[str, Any] = Field(
         default_factory=dict,
         description="Accumulated context (IDs, tokens, etc.)"
     )
-    response: Optional[Dict[str, Any]] = Field(
+    response: dict[str, Any] | None = Field(
         default=None, description="Response that led to this state"
     )
-    available_actions: List[Action] = Field(
+    available_actions: list[Action] = Field(
         default_factory=list, description="Available actions from this state"
     )
     depth: int = Field(default=0, ge=0, description="Depth in exploration chain")
-    parent_state: Optional[StateID] = Field(
+    parent_state: StateID | None = Field(
         default=None, description="Parent state ID"
     )
-    parent_action: Optional[Action] = Field(
+    parent_action: Action | None = Field(
         default=None, description="Action that led to this state"
     )
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional metadata"
     )
-    discovered_at: Optional[datetime] = Field(
+    discovered_at: datetime | None = Field(
         default=None, description="Discovery timestamp"
     )
 
@@ -693,7 +692,7 @@ class ChainState(BaseModel):
             return False
         return self.id == other.id
 
-    def to_state(self) -> "State":
+    def to_state(self) -> State:
         """Convert to basic State for compatibility."""
         return State(
             id=self.id,
@@ -707,12 +706,12 @@ class ChainState(BaseModel):
     @classmethod
     def from_state(
         cls,
-        state: "State",
-        context: Optional[Dict[str, Any]] = None,
+        state: State,
+        context: dict[str, Any] | None = None,
         depth: int = 0,
-        parent_state: Optional[StateID] = None,
-        parent_action: Optional[Action] = None,
-    ) -> "ChainState":
+        parent_state: StateID | None = None,
+        parent_action: Action | None = None,
+    ) -> ChainState:
         """Create a ChainState from a basic State."""
         return cls(
             id=state.id,
@@ -759,16 +758,16 @@ class ExplorationConfig(BaseModel):
     request_timeout_seconds: int = Field(
         default=30, ge=1, description="Per-request timeout in seconds"
     )
-    include_patterns: List[str] = Field(
+    include_patterns: list[str] = Field(
         default_factory=list, description="Endpoint patterns to include"
     )
-    exclude_patterns: List[str] = Field(
+    exclude_patterns: list[str] = Field(
         default_factory=list, description="Endpoint patterns to exclude"
     )
-    auth_token: Optional[str] = Field(
+    auth_token: str | None = Field(
         default=None, description="Authentication token"
     )
-    headers: Dict[str, str] = Field(
+    headers: dict[str, str] = Field(
         default_factory=dict, description="Additional headers"
     )
     follow_redirects: bool = Field(
@@ -798,22 +797,22 @@ class ExplorationResult(BaseModel):
     """
 
     graph: StateGraph = Field(..., description="The explored state graph")
-    issues: List[Issue] = Field(default_factory=list, description="Discovered issues")
+    issues: list[Issue] = Field(default_factory=list, description="Discovered issues")
     coverage: CoverageReport = Field(..., description="Coverage report")
     duration: timedelta = Field(..., description="Total exploration duration")
     started_at: datetime = Field(..., description="Start timestamp")
     finished_at: datetime = Field(..., description="End timestamp")
-    config: Optional[ExplorationConfig] = Field(
+    config: ExplorationConfig | None = Field(
         default=None, description="Exploration configuration"
     )
-    error: Optional[str] = Field(
+    error: str | None = Field(
         default=None, description="Error message if failed"
     )
     success: bool = Field(default=True, description="Whether exploration succeeded")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "graph": self.graph.to_dict(),
@@ -827,10 +826,10 @@ class ExplorationResult(BaseModel):
             "success": self.success,
         }
 
-    def get_critical_issues(self) -> List[Issue]:
+    def get_critical_issues(self) -> list[Issue]:
         """Get all critical severity issues."""
         return [i for i in self.issues if i.severity == IssueSeverity.CRITICAL]
 
-    def get_issues_by_severity(self, severity: IssueSeverity) -> List[Issue]:
+    def get_issues_by_severity(self, severity: IssueSeverity) -> list[Issue]:
         """Get issues filtered by severity."""
         return [i for i in self.issues if i.severity == severity]

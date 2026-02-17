@@ -42,17 +42,23 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import random
 import time
 from collections import deque
+from collections.abc import Callable, Coroutine
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine, Deque, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 import httpx
 
+from venomqa.explorer.context import (
+    ExplorationContext,
+    extract_context_from_response,
+    generate_state_name,
+    substitute_path_params,
+)
 from venomqa.explorer.models import (
     Action,
     ChainState,
@@ -64,13 +70,6 @@ from venomqa.explorer.models import (
     StateGraph,
     StateID,
     Transition,
-)
-from venomqa.explorer.context import (
-    ExplorationContext,
-    extract_context_from_response,
-    substitute_path_params,
-    generate_state_name,
-    has_unresolved_placeholders,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,9 +91,9 @@ class ExplorationError(Exception):
     def __init__(
         self,
         message: str,
-        state_id: Optional[str] = None,
-        action: Optional[Action] = None,
-        cause: Optional[Exception] = None,
+        state_id: str | None = None,
+        action: Action | None = None,
+        cause: Exception | None = None,
     ) -> None:
         """Initialize with message and context."""
         super().__init__(message)
@@ -139,10 +138,10 @@ class ExplorationEngine:
 
     def __init__(
         self,
-        config: Optional[ExplorationConfig] = None,
+        config: ExplorationConfig | None = None,
         strategy: ExplorationStrategy = ExplorationStrategy.BFS,
-        base_url: Optional[str] = None,
-        http_client: Optional[httpx.AsyncClient] = None,
+        base_url: str | None = None,
+        http_client: httpx.AsyncClient | None = None,
     ) -> None:
         """
         Initialize the exploration engine.
@@ -159,22 +158,18 @@ class ExplorationEngine:
         self._http_client = http_client
         self._owns_client = False
         self.graph = StateGraph()
-        self.issues: List[Issue] = []
-        self.visited_states: Set[StateID] = set()
-        self.visited_transitions: Set[Tuple[StateID, str, str]] = set()
-        self._action_executor: Optional[
-            Callable[[Action], Union[Any, Coroutine[Any, Any, Any]]]
-        ] = None
-        self._state_detector: Optional[
-            Callable[[Dict[str, Any], Optional[str], Optional[str]], State]
-        ] = None
-        self._exploration_queue: Deque[Tuple[State, int]] = deque()
-        self._exploration_stack: List[Tuple[State, int]] = []
+        self.issues: list[Issue] = []
+        self.visited_states: set[StateID] = set()
+        self.visited_transitions: set[tuple[StateID, str, str]] = set()
+        self._action_executor: Callable[[Action], Any | Coroutine[Any, Any, Any]] | None = None
+        self._state_detector: Callable[[dict[str, Any], str | None, str | None], State] | None = None
+        self._exploration_queue: deque[tuple[State, int]] = deque()
+        self._exploration_stack: list[tuple[State, int]] = []
         self._current_depth = 0
-        self._all_discovered_actions: Set[Action] = set()
-        self._executed_actions: Set[Action] = set()
+        self._all_discovered_actions: set[Action] = set()
+        self._executed_actions: set[Action] = set()
         # For sync exploration with VenomQA client
-        self._venomqa_sync_client: Optional[Any] = None
+        self._venomqa_sync_client: Any | None = None
 
     def set_action_executor(
         self,
@@ -190,7 +185,7 @@ class ExplorationEngine:
 
     def set_state_detector(
         self,
-        detector: Callable[[Dict[str, Any], Optional[str], Optional[str]], State],
+        detector: Callable[[dict[str, Any], str | None, str | None], State],
     ) -> None:
         """
         Set the function used to detect state from responses.
@@ -223,7 +218,7 @@ class ExplorationEngine:
     async def explore(
         self,
         initial_state: State,
-        initial_actions: Optional[List[Action]] = None,
+        initial_actions: list[Action] | None = None,
     ) -> StateGraph:
         """
         Start exploration from an initial state.
@@ -278,7 +273,7 @@ class ExplorationEngine:
         self,
         state: State,
         depth: int = 0,
-    ) -> List[Tuple[State, Transition]]:
+    ) -> list[tuple[State, Transition]]:
         """
         Explore from a specific state.
 
@@ -289,7 +284,7 @@ class ExplorationEngine:
         Returns:
             List of (new_state, transition) tuples discovered
         """
-        discovered: List[Tuple[State, Transition]] = []
+        discovered: list[tuple[State, Transition]] = []
 
         # Check depth limits
         if depth >= self.config.max_depth:
@@ -341,7 +336,7 @@ class ExplorationEngine:
         self,
         action: Action,
         from_state: State,
-    ) -> Tuple[Optional[State], Optional[Transition]]:
+    ) -> tuple[State | None, Transition | None]:
         """
         Execute an action and detect the resulting state.
 
@@ -353,9 +348,9 @@ class ExplorationEngine:
             Tuple of (resulting state, transition) or (None, None) on failure
         """
         start_time = time.time()
-        response_data: Dict[str, Any] = {}
-        status_code: Optional[int] = None
-        error_msg: Optional[str] = None
+        response_data: dict[str, Any] = {}
+        status_code: int | None = None
+        error_msg: str | None = None
         success = True
 
         try:
@@ -424,7 +419,7 @@ class ExplorationEngine:
         duration_ms = (time.time() - start_time) * 1000
 
         # Detect resulting state
-        result_state: Optional[State] = None
+        result_state: State | None = None
         if self._state_detector:
             try:
                 result_state = self._state_detector(
@@ -466,7 +461,7 @@ class ExplorationEngine:
 
     async def _execute_http_action(
         self, action: Action
-    ) -> Tuple[Dict[str, Any], int]:
+    ) -> tuple[dict[str, Any], int]:
         """
         Execute an HTTP action using the built-in client.
 
@@ -511,8 +506,8 @@ class ExplorationEngine:
         self,
         action: Action,
         from_state: State,
-        response_data: Dict[str, Any],
-        status_code: Optional[int],
+        response_data: dict[str, Any],
+        status_code: int | None,
         success: bool,
     ) -> State:
         """
@@ -548,7 +543,7 @@ class ExplorationEngine:
                 state_name = f"State after {action.method} {action.endpoint}"
 
         # Determine available actions from the response (if any)
-        available_actions: List[Action] = []
+        available_actions: list[Action] = []
 
         # Look for links/actions in the response (HATEOAS pattern)
         links = response_data.get("_links", response_data.get("links", []))
@@ -766,7 +761,7 @@ class ExplorationEngine:
             initial_state: The starting state for exploration
         """
         # Use a priority-based approach: states with more unexplored actions get priority
-        states_to_explore: List[Tuple[int, State, int]] = [
+        states_to_explore: list[tuple[int, State, int]] = [
             (-len(initial_state.available_actions), initial_state, 0)
         ]
 
@@ -819,9 +814,9 @@ class ExplorationEngine:
         self,
         severity: IssueSeverity,
         error: str,
-        state: Optional[StateID] = None,
-        action: Optional[Action] = None,
-        suggestion: Optional[str] = None,
+        state: StateID | None = None,
+        action: Action | None = None,
+        suggestion: str | None = None,
     ) -> None:
         """
         Record an issue discovered during exploration.
@@ -903,8 +898,8 @@ class ExplorationEngine:
             CoverageReport with exploration metrics
         """
         # Calculate unique endpoints
-        endpoints_discovered: Set[str] = set()
-        endpoints_tested: Set[str] = set()
+        endpoints_discovered: set[str] = set()
+        endpoints_tested: set[str] = set()
 
         for action in self._all_discovered_actions:
             endpoints_discovered.add(action.endpoint)
@@ -925,14 +920,14 @@ class ExplorationEngine:
         ]
 
         # State breakdown
-        state_breakdown: Dict[str, int] = {}
+        state_breakdown: dict[str, int] = {}
         for state in self.graph.states.values():
             state_type = state.properties.get("success", True)
             key = "success" if state_type else "error"
             state_breakdown[key] = state_breakdown.get(key, 0) + 1
 
         # Transition breakdown
-        transition_breakdown: Dict[str, int] = {}
+        transition_breakdown: dict[str, int] = {}
         for transition in self.graph.transitions:
             key = "success" if transition.success else "failed"
             transition_breakdown[key] = transition_breakdown.get(key, 0) + 1
@@ -1012,7 +1007,7 @@ class ExplorationEngine:
         self.reset()
 
         # Initialize queue with (state, depth)
-        queue: Deque[Tuple[State, int]] = deque()
+        queue: deque[tuple[State, int]] = deque()
         queue.append((initial_state, 0))
 
         # Add initial state to graph
@@ -1104,7 +1099,7 @@ class ExplorationEngine:
 
         return self.graph
 
-    def _execute_action_sync(self, action: Action) -> Dict[str, Any]:
+    def _execute_action_sync(self, action: Action) -> dict[str, Any]:
         """
         Execute an action synchronously using httpx.
 
@@ -1120,7 +1115,7 @@ class ExplorationEngine:
             ExplorationError: If the request fails critically
         """
         start_time = time.time()
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "data": {},
             "status_code": None,
             "duration_ms": 0.0,
@@ -1194,7 +1189,7 @@ class ExplorationEngine:
 
     def _detect_state_from_response(
         self,
-        response: Dict[str, Any],
+        response: dict[str, Any],
         action: Action,
         from_state: State,
     ) -> State:
@@ -1241,8 +1236,8 @@ class ExplorationEngine:
     def execute_action_sync(
         self,
         action: Action,
-        from_state: Optional[State] = None,
-    ) -> Tuple[State, Transition]:
+        from_state: State | None = None,
+    ) -> tuple[State, Transition]:
         """
         Execute a single action synchronously and return the result.
 
@@ -1332,10 +1327,10 @@ class ExplorationEngine:
         # Use explore_bfs with a custom executor
         original_executor = self._execute_action_sync
 
-        def venomqa_executor(action: Action) -> Dict[str, Any]:
+        def venomqa_executor(action: Action) -> dict[str, Any]:
             """Execute action using VenomQA client."""
             start_time = time.time()
-            result: Dict[str, Any] = {
+            result: dict[str, Any] = {
                 "data": {},
                 "status_code": None,
                 "duration_ms": 0.0,
@@ -1348,7 +1343,7 @@ class ExplorationEngine:
                 method = action.method.upper()
                 path = action.endpoint
 
-                kwargs: Dict[str, Any] = {}
+                kwargs: dict[str, Any] = {}
                 if action.params:
                     kwargs["params"] = action.params
                 if action.body:
@@ -1416,9 +1411,9 @@ class ExplorationEngine:
 
     def explore_with_context(
         self,
-        initial_actions: List[Action],
-        initial_context: Optional[Dict[str, Any]] = None,
-    ) -> "ChainExplorationResult":
+        initial_actions: list[Action],
+        initial_context: dict[str, Any] | None = None,
+    ) -> ChainExplorationResult:
         """
         Context-aware BFS exploration that passes context through the chain.
 
@@ -1479,17 +1474,17 @@ class ExplorationEngine:
         self.graph.initial_state = initial_state.id
 
         # Track chain states separately (with full context)
-        chain_states: Dict[StateID, ChainState] = {initial_state.id: initial_state}
+        chain_states: dict[StateID, ChainState] = {initial_state.id: initial_state}
 
         # BFS queue: (ChainState, ExplorationContext)
-        queue: Deque[Tuple[ChainState, ExplorationContext]] = deque()
+        queue: deque[tuple[ChainState, ExplorationContext]] = deque()
         queue.append((initial_state, context.copy()))
 
         # Track visited (state_id, action_key) to avoid loops
-        visited_actions: Set[Tuple[StateID, str]] = set()
+        visited_actions: set[tuple[StateID, str]] = set()
 
         # Track skipped actions for reporting
-        skipped_actions: List[Tuple[Action, str]] = []
+        skipped_actions: list[tuple[Action, str]] = []
 
         max_states = self.config.max_states
         max_depth = self.config.max_depth
@@ -1675,10 +1670,10 @@ class ExplorationEngine:
 
     def _generate_chain_state_id(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         endpoint: str,
         method: str,
-        status_code: Optional[int],
+        status_code: int | None,
     ) -> StateID:
         """
         Generate a unique state ID based on context and request.
@@ -1719,12 +1714,12 @@ class ExplorationEngine:
 
     def _get_actions_for_state(
         self,
-        response_data: Dict[str, Any],
+        response_data: dict[str, Any],
         endpoint: str,
         method: str,
-        context: Dict[str, Any],
-        initial_actions: List[Action],
-    ) -> List[Action]:
+        context: dict[str, Any],
+        initial_actions: list[Action],
+    ) -> list[Action]:
         """
         Determine available actions for a state based on response and context.
 
@@ -1733,8 +1728,8 @@ class ExplorationEngine:
         2. Standard CRUD operations based on extracted IDs
         3. Initial actions that might now be resolvable
         """
-        actions: List[Action] = []
-        seen: Set[str] = set()
+        actions: list[Action] = []
+        seen: set[str] = set()
 
         def add_action(action: Action) -> None:
             key = f"{action.method}:{action.endpoint}"
@@ -1808,9 +1803,9 @@ class ChainExplorationResult:
     def __init__(
         self,
         graph: StateGraph,
-        chain_states: Dict[StateID, ChainState],
-        skipped_actions: List[Tuple[Action, str]],
-        issues: List[Issue],
+        chain_states: dict[StateID, ChainState],
+        skipped_actions: list[tuple[Action, str]],
+        issues: list[Issue],
         coverage: CoverageReport,
     ) -> None:
         self.graph = graph

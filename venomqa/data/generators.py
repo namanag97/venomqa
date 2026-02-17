@@ -38,11 +38,12 @@ import random
 import re
 import string
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Iterator, TypeVar
+from typing import Any, TypeVar
 
 from faker import Faker
 from faker.providers import BaseProvider
@@ -527,7 +528,7 @@ class ContentDataProvider(BaseProvider):
     def article_body_markdown(self, sections: int = 3) -> str:
         """Generate an article body in Markdown format."""
         content = []
-        for i in range(sections):
+        for _i in range(sections):
             heading = self.generator.sentence(nb_words=4).rstrip(".")
             content.append(f"## {heading}\n")
             content.append(self.generator.paragraph(nb_sentences=5) + "\n")
@@ -744,7 +745,7 @@ class FakeDataGenerator:
         Faker.seed(seed)
         random.seed(seed)
 
-    def with_locale(self, locale: str) -> "FakeDataGenerator":
+    def with_locale(self, locale: str) -> FakeDataGenerator:
         """Create a new generator with a different locale.
 
         Args:
@@ -756,7 +757,7 @@ class FakeDataGenerator:
         return FakeDataGenerator(locale=locale, seed=self.seed)
 
     @contextmanager
-    def seeded(self, seed: int) -> Iterator["FakeDataGenerator"]:
+    def seeded(self, seed: int) -> Iterator[FakeDataGenerator]:
         """Context manager for temporarily using a different seed.
 
         Args:

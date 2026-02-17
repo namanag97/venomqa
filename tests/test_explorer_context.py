@@ -6,19 +6,18 @@ substitution in venomqa/explorer/context.py work correctly for state
 chain exploration.
 """
 
-import pytest
 
 from venomqa.explorer.context import (
     ExplorationContext,
-    extract_context_from_response,
-    substitute_path_params,
-    generate_state_name,
-    has_unresolved_placeholders,
-    get_required_placeholders,
-    can_resolve_endpoint,
-    _normalize_key,
-    _infer_context_key_from_endpoint,
     _flatten_dict,
+    _infer_context_key_from_endpoint,
+    _normalize_key,
+    can_resolve_endpoint,
+    extract_context_from_response,
+    generate_state_name,
+    get_required_placeholders,
+    has_unresolved_placeholders,
+    substitute_path_params,
 )
 
 

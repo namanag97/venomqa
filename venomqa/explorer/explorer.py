@@ -11,9 +11,13 @@ The StateExplorer is the primary entry point for users of this module.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from datetime import datetime
+from typing import Any
 
+from venomqa.explorer.detector import StateDetector
+from venomqa.explorer.discoverer import APIDiscoverer
+from venomqa.explorer.engine import ExplorationEngine, ExplorationStrategy
 from venomqa.explorer.models import (
     Action,
     CoverageReport,
@@ -23,11 +27,8 @@ from venomqa.explorer.models import (
     State,
     StateGraph,
 )
-from venomqa.explorer.discoverer import APIDiscoverer
-from venomqa.explorer.detector import StateDetector
-from venomqa.explorer.engine import ExplorationEngine, ExplorationStrategy
-from venomqa.explorer.visualizer import GraphVisualizer, OutputFormat
 from venomqa.explorer.reporter import ExplorationReporter, ReportFormat
+from venomqa.explorer.visualizer import GraphVisualizer, OutputFormat
 
 
 class StateExplorer:
@@ -87,7 +88,7 @@ class StateExplorer:
     def __init__(
         self,
         base_url: str,
-        config: Optional[ExplorationConfig] = None,
+        config: ExplorationConfig | None = None,
         strategy: ExplorationStrategy = ExplorationStrategy.BFS,
     ) -> None:
         """
@@ -110,18 +111,18 @@ class StateExplorer:
         self.reporter = ExplorationReporter()
 
         # State
-        self._initial_state: Optional[State] = None
-        self._result: Optional[ExplorationResult] = None
-        self._http_client: Optional[Any] = None
-        self._auth_token: Optional[str] = None
-        self._auth_headers: Dict[str, str] = {}
+        self._initial_state: State | None = None
+        self._result: ExplorationResult | None = None
+        self._http_client: Any | None = None
+        self._auth_token: str | None = None
+        self._auth_headers: dict[str, str] = {}
 
         # Hooks
-        self._pre_action_hooks: List[Callable[[Action], None]] = []
-        self._post_action_hooks: List[Callable[[Action, Any], None]] = []
+        self._pre_action_hooks: list[Callable[[Action], None]] = []
+        self._post_action_hooks: list[Callable[[Action, Any], None]] = []
 
         # Discovered actions cache
-        self._discovered_actions: List[Action] = []
+        self._discovered_actions: list[Action] = []
 
         # Initialize HTTP client (lazy - created on first use)
         import httpx
@@ -138,7 +139,7 @@ class StateExplorer:
 
     async def explore(
         self,
-        initial_actions: Optional[List[Action]] = None,
+        initial_actions: list[Action] | None = None,
     ) -> ExplorationResult:
         """
         Run the full exploration process.
@@ -161,7 +162,7 @@ class StateExplorer:
         """
         # Record start time
         started_at = datetime.now()
-        error_msg: Optional[str] = None
+        error_msg: str | None = None
         success = True
 
         try:
@@ -214,7 +215,7 @@ class StateExplorer:
 
         return self._result
 
-    async def discover_endpoints(self) -> List[Action]:
+    async def discover_endpoints(self) -> list[Action]:
         """
         Discover available API endpoints.
 
@@ -232,9 +233,9 @@ class StateExplorer:
 
     async def authenticate(
         self,
-        token: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-        login_action: Optional[Action] = None,
+        token: str | None = None,
+        headers: dict[str, str] | None = None,
+        login_action: Action | None = None,
     ) -> None:
         """
         Set up authentication for exploration.
@@ -306,7 +307,7 @@ class StateExplorer:
     async def execute_action(
         self,
         action: Action,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute a single action and return the response.
 
@@ -457,7 +458,7 @@ class StateExplorer:
         self.strategy = strategy
         self.engine.strategy = strategy
 
-    def get_result(self) -> Optional[ExplorationResult]:
+    def get_result(self) -> ExplorationResult | None:
         """
         Get the latest exploration result.
 
@@ -466,7 +467,7 @@ class StateExplorer:
         """
         return self._result
 
-    def get_graph(self) -> Optional[StateGraph]:
+    def get_graph(self) -> StateGraph | None:
         """
         Get the current state graph.
 
@@ -475,7 +476,7 @@ class StateExplorer:
         """
         return self._result.graph if self._result else None
 
-    def get_issues(self) -> List[Issue]:
+    def get_issues(self) -> list[Issue]:
         """
         Get all discovered issues.
 
@@ -484,7 +485,7 @@ class StateExplorer:
         """
         return self._result.issues if self._result else []
 
-    def get_coverage(self) -> Optional[CoverageReport]:
+    def get_coverage(self) -> CoverageReport | None:
         """
         Get the coverage report.
 
@@ -515,7 +516,7 @@ class StateExplorer:
         self._auth_token = None
         self._auth_headers.clear()
 
-    async def __aenter__(self) -> "StateExplorer":
+    async def __aenter__(self) -> StateExplorer:
         """Async context manager entry."""
         return self
 

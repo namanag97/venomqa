@@ -5,14 +5,21 @@ the ability to explore multiple branches from the same state
 by using checkpoint/rollback.
 """
 
-import pytest
 
 from venomqa.v1 import (
-    World, Agent, BFS, DFS, CoverageGuided,
-    Action, ActionResult, HTTPRequest, HTTPResponse,
-    Invariant, Severity,
+    BFS,
+    DFS,
+    Action,
+    ActionResult,
+    Agent,
+    CoverageGuided,
+    HTTPRequest,
+    HTTPResponse,
+    Invariant,
+    Severity,
+    World,
 )
-from venomqa.v1.adapters import MockQueue, MockMail, MockStorage
+from venomqa.v1.adapters import MockMail, MockQueue, MockStorage
 
 
 class MockApi:
@@ -250,7 +257,7 @@ class TestRollbackExploration:
         ]
 
         agent = Agent(world=world, actions=actions, strategy=DFS(), max_steps=10)
-        result = agent.explore()
+        agent.explore()
 
         # DFS should explore - exact order depends on implementation
         # but all should be explored
@@ -284,7 +291,7 @@ class TestRollbackExploration:
             strategy=CoverageGuided(),
             max_steps=10,
         )
-        result = agent.explore()
+        agent.explore()
 
         # Both actions should be explored
         assert action_counts["rare"] >= 1

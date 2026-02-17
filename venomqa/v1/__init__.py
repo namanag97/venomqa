@@ -7,80 +7,97 @@ Example:
     from venomqa.v1 import State, Action, Graph, World, Agent, Invariant, explore
 """
 
-from venomqa.v1.core.state import State, Observation
-from venomqa.v1.core.context import Context
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse, precondition_has_context
-from venomqa.v1.core.transition import Transition
-from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import (
-    Invariant,
-    Violation,
-    Severity,
-    InvariantTiming,
-    ResponseAssertion,
-)
-from venomqa.v1.core.result import ExplorationResult
-
-from venomqa.v1.world import World
-from venomqa.v1.world.rollbackable import Rollbackable
-from venomqa.v1.world.checkpoint import Checkpoint, SystemCheckpoint
-
+from venomqa.v1.adapters.http import HttpClient
 from venomqa.v1.agent import Agent, Scheduler
 from venomqa.v1.agent.strategies import (
-    Strategy, BFS, DFS, Random, CoverageGuided, Weighted, DimensionNoveltyStrategy
+    BFS,
+    DFS,
+    CoverageGuided,
+    DimensionNoveltyStrategy,
+    Random,
+    Strategy,
+    Weighted,
 )
+from venomqa.v1.core.action import (
+    Action,
+    ActionResult,
+    HTTPRequest,
+    HTTPResponse,
+    precondition_has_context,
+)
+from venomqa.v1.core.constraints import (
+    DEFAULT_CONSTRAINTS,
+    AnonHasNoRole,
+    AuthHasRole,
+    FreeCannotExceedUsage,
+    LambdaConstraint,
+    StateConstraint,
+    constraint,
+)
+from venomqa.v1.core.context import Context
+from venomqa.v1.core.coverage import DimensionAxisCoverage, DimensionCoverage
 
 # Hypergraph / multi-dimensional state space
 from venomqa.v1.core.dimensions import (
-    AuthStatus, UserRole, EntityStatus, CountClass, UsageClass, PlanType,
     BUILTIN_DIMENSIONS,
+    AuthStatus,
+    CountClass,
+    EntityStatus,
+    PlanType,
+    UsageClass,
+    UserRole,
 )
+from venomqa.v1.core.graph import Graph
 from venomqa.v1.core.hyperedge import Hyperedge
 from venomqa.v1.core.hypergraph import Hypergraph
-from venomqa.v1.core.constraints import (
-    StateConstraint, AnonHasNoRole, AuthHasRole, FreeCannotExceedUsage,
-    LambdaConstraint, constraint, DEFAULT_CONSTRAINTS,
-)
-from venomqa.v1.core.coverage import DimensionCoverage, DimensionAxisCoverage
-from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
-
-from venomqa.v1.dsl import Journey, Step
-from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
-from venomqa.v1.dsl import Branch, Path
-from venomqa.v1.dsl.decorators import action, invariant
-from venomqa.v1.dsl.compiler import compile as compile_journey
-
-from venomqa.v1.adapters.http import HttpClient
-
-# Recording
-from venomqa.v1.recording import RequestRecorder, RecordedRequest, generate_journey_code
-
-# Reporters
-from venomqa.v1.reporters.console import ConsoleReporter
-from venomqa.v1.reporters.markdown import MarkdownReporter
-from venomqa.v1.reporters.json import JSONReporter
-from venomqa.v1.reporters.junit import JUnitReporter
-from venomqa.v1.reporters.html_trace import HTMLTraceReporter
-
-# Validation
-from venomqa.v1.validation import (
-    SchemaValidator,
-    validate_response,
-    has_fields,
-    is_list,
-    matches_type,
+from venomqa.v1.core.invariant import (
+    Invariant,
+    InvariantTiming,
+    ResponseAssertion,
+    Severity,
+    Violation,
 )
 
 # Observation helpers
 from venomqa.v1.core.observers import (
+    COMMON_QUERIES,
+    aggregate,
+    column_value,
+    combine_observers,
     has_rows,
     latest_row,
     row_with_status,
-    column_value,
-    aggregate,
-    combine_observers,
-    COMMON_QUERIES,
 )
+from venomqa.v1.core.result import ExplorationResult
+from venomqa.v1.core.state import Observation, State
+from venomqa.v1.core.transition import Transition
+from venomqa.v1.dsl import Branch, Journey, Path, Step
+from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
+from venomqa.v1.dsl.compiler import compile as compile_journey
+from venomqa.v1.dsl.decorators import action, invariant
+
+# Recording
+from venomqa.v1.recording import RecordedRequest, RequestRecorder, generate_journey_code
+
+# Reporters
+from venomqa.v1.reporters.console import ConsoleReporter
+from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
+from venomqa.v1.reporters.html_trace import HTMLTraceReporter
+from venomqa.v1.reporters.json import JSONReporter
+from venomqa.v1.reporters.junit import JUnitReporter
+from venomqa.v1.reporters.markdown import MarkdownReporter
+
+# Validation
+from venomqa.v1.validation import (
+    SchemaValidator,
+    has_fields,
+    is_list,
+    matches_type,
+    validate_response,
+)
+from venomqa.v1.world import World
+from venomqa.v1.world.checkpoint import Checkpoint, SystemCheckpoint
+from venomqa.v1.world.rollbackable import Rollbackable
 
 # Type aliases
 StateID = str

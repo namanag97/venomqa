@@ -52,7 +52,7 @@ class DimensionCoverage:
         cls,
         hg: Hypergraph,
         known_dimensions: dict[str, type[Enum]] | None = None,
-    ) -> "DimensionCoverage":
+    ) -> DimensionCoverage:
         """Build a coverage report from a Hypergraph.
 
         Args:

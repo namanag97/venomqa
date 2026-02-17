@@ -24,7 +24,6 @@ from venomqa.preflight.checks import (
     CRUDCheck,
     HealthCheck,
     ListCheck,
-    OpenAPICheck,
     SmokeTestResult,
 )
 from venomqa.preflight.smoke import SmokeTest, SmokeTestReport
@@ -346,7 +345,7 @@ class AutoPreflight:
         Returns:
             SmokeTestReport with all results.
         """
-        smoke = SmokeTest(
+        SmokeTest(
             base_url=self.base_url,
             token=self.token,
             timeout=self.timeout,

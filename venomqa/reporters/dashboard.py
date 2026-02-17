@@ -83,7 +83,7 @@ class DashboardReporter(BaseReporter):
         failed = total - passed
 
         stats = {
-            "total_journeys": len(set(r.journey_name for r in results)),
+            "total_journeys": len({r.journey_name for r in results}),
             "total_runs": total,
             "total_passed": passed,
             "total_failed": failed,
@@ -546,7 +546,7 @@ class DashboardReporter(BaseReporter):
         trend_data: list[dict[str, Any]],
     ) -> str:
         """Render the charts section."""
-        return f"""
+        return """
         <div class="charts-grid">
             <div class="card">
                 <div class="card-header">Pass Rate Trend</div>
@@ -677,7 +677,7 @@ class DashboardReporter(BaseReporter):
         # Prepare trend data
         dates = [d.get("date", "") for d in trend_data]
         pass_rates = [d.get("pass_rate", 100) for d in trend_data]
-        total_runs = [d.get("total_runs", 0) for d in trend_data]
+        [d.get("total_runs", 0) for d in trend_data]
         passed_runs = [d.get("passed_runs", 0) for d in trend_data]
         failed_runs = [d.get("failed_runs", 0) for d in trend_data]
 

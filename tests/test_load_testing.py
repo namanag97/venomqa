@@ -8,11 +8,12 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from venomqa.core.models import Journey, JourneyResult, Step, StepResult
+from tests.conftest import MockClient, MockHTTPResponse
+from venomqa.core.models import Journey, Step
 from venomqa.performance.load_tester import (
     LoadPattern,
     LoadTestAssertions,
@@ -25,7 +26,6 @@ from venomqa.performance.load_tester import (
     benchmark_journey,
     run_quick_load_test,
 )
-from tests.conftest import MockClient, MockHTTPResponse
 
 
 class TestLoadTestConfig:
@@ -192,7 +192,7 @@ class TestLoadTestMetrics:
         """Test getting a metrics snapshot."""
         metrics = LoadTestMetrics()
 
-        for i in range(5):
+        for _i in range(5):
             sample = RequestSample(
                 timestamp=time.time(),
                 duration_ms=100.0,
@@ -647,7 +647,7 @@ class TestLoadTester:
             sample_interval=0.2,
         )
         tester = LoadTester(config, progress_callback=progress_callback)
-        result = tester.run(journey, lambda: JourneyRunner(client=mock_client))
+        tester.run(journey, lambda: JourneyRunner(client=mock_client))
 
         # Should have received some progress updates
         assert len(progress_updates) > 0

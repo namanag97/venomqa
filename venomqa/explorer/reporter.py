@@ -16,14 +16,11 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from venomqa.explorer.models import (
-    CoverageReport,
     ExplorationResult,
-    Issue,
     IssueSeverity,
-    StateGraph,
 )
 from venomqa.explorer.visualizer import GraphVisualizer, OutputFormat
 
@@ -66,8 +63,8 @@ class ExplorationReporter:
 
     def __init__(
         self,
-        result: Optional[ExplorationResult] = None,
-        options: Optional[Dict[str, Any]] = None,
+        result: ExplorationResult | None = None,
+        options: dict[str, Any] | None = None,
     ) -> None:
         """
         Initialize the exploration reporter.
@@ -193,7 +190,7 @@ class ExplorationReporter:
             raise ValueError("Result is not set. Call set_result() first.")
 
         summary = self._get_summary()
-        issue_summary = self._get_issue_summary_by_severity()
+        self._get_issue_summary_by_severity()
         recommendations = self._generate_recommendations()
         title = self.options.get("title", self._default_options["title"])
 
@@ -378,7 +375,7 @@ class ExplorationReporter:
 """
         return html
 
-    def generate_json(self) -> Dict[str, Any]:
+    def generate_json(self) -> dict[str, Any]:
         """
         Generate a JSON report.
 
@@ -411,7 +408,7 @@ class ExplorationReporter:
             raise ValueError("Result is not set. Call set_result() first.")
 
         summary = self._get_summary()
-        issue_summary = self._get_issue_summary_by_severity()
+        self._get_issue_summary_by_severity()
         recommendations = self._generate_recommendations()
         title = self.options.get("title", self._default_options["title"])
 
@@ -516,7 +513,7 @@ Coverage: {summary.get('coverage_percent', 0):.1f}%
         # Convert to string with proper XML declaration
         return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(testsuite, encoding="unicode")
 
-    def generate_sarif(self) -> Dict[str, Any]:
+    def generate_sarif(self) -> dict[str, Any]:
         """
         Generate a SARIF report for security tooling.
 
@@ -554,7 +551,7 @@ Coverage: {summary.get('coverage_percent', 0):.1f}%
 
         return sarif
 
-    def _generate_sarif_rules(self) -> List[Dict[str, Any]]:
+    def _generate_sarif_rules(self) -> list[dict[str, Any]]:
         """Generate SARIF rule definitions."""
         rules = []
         seen_categories = set()
@@ -574,11 +571,11 @@ Coverage: {summary.get('coverage_percent', 0):.1f}%
 
         return rules
 
-    def _generate_sarif_results(self) -> List[Dict[str, Any]]:
+    def _generate_sarif_results(self) -> list[dict[str, Any]]:
         """Generate SARIF results from issues."""
         results = []
 
-        for i, issue in enumerate(self.result.issues if self.result else []):
+        for _i, issue in enumerate(self.result.issues if self.result else []):
             category = issue.category or "general"
             result = {
                 "ruleId": f"VENOMQA-{category.upper()}",
@@ -670,7 +667,7 @@ Generated at: {datetime.now().isoformat()}
 """
         return text
 
-    def _get_summary(self) -> Dict[str, Any]:
+    def _get_summary(self) -> dict[str, Any]:
         """
         Generate summary statistics.
 
@@ -698,7 +695,7 @@ Generated at: {datetime.now().isoformat()}
             "success": self.result.success,
         }
 
-    def _get_issue_summary_by_severity(self) -> Dict[str, int]:
+    def _get_issue_summary_by_severity(self) -> dict[str, int]:
         """
         Get issue counts by severity.
 
@@ -708,14 +705,14 @@ Generated at: {datetime.now().isoformat()}
         if not self.result:
             return {}
 
-        summary: Dict[str, int] = {}
+        summary: dict[str, int] = {}
         for severity in IssueSeverity:
             count = len(self.result.get_issues_by_severity(severity))
             if count > 0:
                 summary[severity.value] = count
         return summary
 
-    def _generate_recommendations(self) -> List[str]:
+    def _generate_recommendations(self) -> list[str]:
         """
         Generate actionable recommendations based on results.
 
@@ -725,7 +722,7 @@ Generated at: {datetime.now().isoformat()}
         if not self.result:
             return []
 
-        recommendations: List[str] = []
+        recommendations: list[str] = []
 
         # Analyze issues
         critical_count = len([i for i in self.result.issues if i.severity == IssueSeverity.CRITICAL])

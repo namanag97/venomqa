@@ -29,9 +29,9 @@ Example:
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass, field
-from typing import Any, Hashable
+from typing import Any
 
 from venomqa.combinatorial.dimensions import Combination
 

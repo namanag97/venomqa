@@ -35,9 +35,8 @@ from __future__ import annotations
 import itertools
 import logging
 import random
-from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Hashable
+from collections.abc import Hashable
+from dataclasses import dataclass
 
 from venomqa.combinatorial.constraints import ConstraintSet
 from venomqa.combinatorial.dimensions import Combination, DimensionSpace
@@ -281,7 +280,7 @@ class CoveringArrayGenerator:
 
             # For each combination of values for these dimensions
             for values in itertools.product(*value_lists):
-                tuples.append(dict(zip(names, values)))
+                tuples.append(dict(zip(names, values, strict=False)))
 
         return tuples
 

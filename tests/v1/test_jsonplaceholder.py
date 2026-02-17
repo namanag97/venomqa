@@ -2,13 +2,12 @@
 
 import httpx
 
-from venomqa.v1 import Agent, BFS
+from venomqa.v1 import BFS, Agent
 from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
 from venomqa.v1.core.invariant import Invariant, Severity
 from venomqa.v1.core.state import Observation
 from venomqa.v1.world import World
 from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
-
 
 BASE_URL = "https://jsonplaceholder.typicode.com"
 

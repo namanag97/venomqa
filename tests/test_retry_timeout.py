@@ -10,11 +10,7 @@ This module tests:
 
 from __future__ import annotations
 
-import asyncio
 import time
-from collections.abc import Callable
-from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -24,11 +20,10 @@ from venomqa.errors import (
     CircuitBreakerRegistry,
     CircuitOpenError,
     CircuitState,
-    CircuitStats,
+    ResilientClient,
     RetryConfig,
     RetryExhaustedError,
     RetryPolicy,
-    ResilientClient,
     StepTimeoutError,
     WaitTimeoutError,
     create_default_circuit_breaker,

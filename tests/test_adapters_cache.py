@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-
 import pytest
 
-from venomqa.ports.cache import CacheStats
 from venomqa.adapters.cache import MockCacheAdapter
 
 

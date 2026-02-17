@@ -51,16 +51,17 @@ Usage:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import yaml
 
 from venomqa.core.graph import (
-    StateGraph,
-    Severity,
     ActionCallable,
     InvariantChecker,
+    Severity,
+    StateGraph,
 )
 
 logger = logging.getLogger(__name__)

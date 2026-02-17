@@ -81,7 +81,7 @@ class TestExplorationNodeInvariants:
 
         # Count expected paths: branching^depth for a complete tree
         # But our tree might not be complete, so we count leaves
-        expected_leaves = branching ** (depth - 1) if depth > 1 else 1
+        branching ** (depth - 1) if depth > 1 else 1
 
         # We should find all paths (may be fewer if max_depth limits)
         assert len(results) >= 1, "Should find at least one path"
@@ -114,7 +114,7 @@ class TestExplorationNodeInvariants:
 
         # Should get same paths in same order
         assert len(results1) == len(results2)
-        for r1, r2 in zip(results1, results2):
+        for r1, r2 in zip(results1, results2, strict=False):
             assert r1.path == r2.path
 
     def _create_linear_graph(self, depth: int) -> StateGraph:
@@ -145,7 +145,7 @@ class TestExplorationNodeInvariants:
         for level in range(1, depth):
             nodes_at_level[level] = []
             for parent in nodes_at_level[level - 1]:
-                for b in range(branching):
+                for _b in range(branching):
                     node_id = f"L{level}_N{node_count}"
                     node_count += 1
                     graph.add_node(node_id)
@@ -208,7 +208,7 @@ class TestMemoryInvariants:
         gc.collect()
         tracemalloc.start()
 
-        results = list(graph.explore_iter(client=None, max_depth=depth + 1))
+        list(graph.explore_iter(client=None, max_depth=depth + 1))
 
         current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()

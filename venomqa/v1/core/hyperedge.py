@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from venomqa.v1.core.state import State, Observation
+    from venomqa.v1.core.state import Observation, State
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ class Hyperedge:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_observation(cls, observation: "Observation") -> "Hyperedge":
+    def from_observation(cls, observation: Observation) -> Hyperedge:
         """Infer dimensions from a single Observation's data dict.
 
         Looks for well-known keys in the observation data and maps them to
@@ -56,7 +56,12 @@ class Hyperedge:
         ``Hyperedge.from_state``) for application-specific mappings.
         """
         from venomqa.v1.core.dimensions import (
-            AuthStatus, UserRole, EntityStatus, CountClass, UsageClass, PlanType,
+            AuthStatus,
+            CountClass,
+            EntityStatus,
+            PlanType,
+            UsageClass,
+            UserRole,
         )
         dims: dict[str, Any] = {}
         data = observation.data
@@ -124,7 +129,7 @@ class Hyperedge:
         return cls(dimensions=dims, partial=len(dims) == 0)
 
     @classmethod
-    def from_state(cls, state: "State") -> "Hyperedge":
+    def from_state(cls, state: State) -> Hyperedge:
         """Merge dimension inferences from all observations in a state."""
         merged: dict[str, Any] = {}
         for obs in state.observations.values():
@@ -141,7 +146,7 @@ class Hyperedge:
     def get(self, dimension: str, default: Any = None) -> Any:
         return self.dimensions.get(dimension, default)
 
-    def hamming_distance(self, other: "Hyperedge") -> int:
+    def hamming_distance(self, other: Hyperedge) -> int:
         """Count dimensions that differ between two hyperedges."""
         all_keys = set(self.dimensions) | set(other.dimensions)
         return sum(

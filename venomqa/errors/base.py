@@ -28,7 +28,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-
 # Base documentation URL
 DOCS_BASE_URL = "https://venomqa.dev/docs"
 

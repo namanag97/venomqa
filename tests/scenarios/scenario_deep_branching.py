@@ -16,7 +16,6 @@ from typing import Any
 from venomqa import Branch, Checkpoint, Journey, Path, Step
 from venomqa.core.context import ExecutionContext
 
-
 # =============================================================================
 # Level 1 Actions - User Management
 # =============================================================================
