@@ -378,7 +378,12 @@ class Action:
     _accepts_context: bool | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
-        """Detect context parameter and resolve string precondition shorthand."""
+        """Detect context parameter and resolve precondition shorthands."""
+        # Handle single precondition= shorthand: merge into preconditions list
+        if self.precondition is not None:
+            self.preconditions = [self.precondition] + list(self.preconditions)
+            self.precondition = None  # Clear to avoid confusion
+
         # Resolve string shorthand: preconditions=["create_connection"] becomes
         # preconditions=[precondition_action_ran("create_connection")]
         # This matches the natural LLM/user intuition for action dependencies.
@@ -386,6 +391,24 @@ class Action:
         for p in self.preconditions:
             if isinstance(p, str):
                 resolved.append(precondition_action_ran(p))
+            elif callable(p):
+                # Wrap context-based lambdas into State-compatible preconditions
+                # Check if the callable accepts 'context' or 'ctx' (not State)
+                try:
+                    sig = inspect.signature(p)
+                    params = list(sig.parameters.keys())
+                    # If single param and it looks like context, wrap it
+                    if len(params) == 1 and params[0] in ("context", "ctx", "c"):
+                        # This is a context-based precondition lambda
+                        original = p
+                        def wrap(state: State, fn: Callable = original) -> bool:  # noqa: ARG001
+                            return True  # Actual check in can_execute_with_context
+                        wrap._context_precondition = original  # type: ignore[attr-defined]
+                        resolved.append(wrap)
+                        continue
+                except (ValueError, TypeError):
+                    pass
+                resolved.append(p)
             else:
                 resolved.append(p)
         self.preconditions = resolved
