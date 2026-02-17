@@ -2015,27 +2015,35 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
 
     console.print(f"\n[bold green]VenomQA project initialized in '{base}/'[/bold green]")
 
-    # CRITICAL: Database setup warning
-    console.print("\n" + "=" * 70)
-    console.print("[bold red]CRITICAL: Database Setup Required[/bold red]")
-    console.print("=" * 70)
-    console.print("""
-VenomQA explores state graphs by ROLLING BACK the database.
-This is NOT a normal test framework - it needs access to the
-SAME database your API writes to.
+    # Show setup options (skip in update mode)
+    if not update:
+        console.print("\n" + "=" * 70)
+        console.print("[bold]State Exploration Setup[/bold]")
+        console.print("=" * 70)
+        console.print("""
+VenomQA needs to distinguish states. Choose ONE:
 
-Without database rollback, VenomQA can only test one linear path.
+[bold green]Option 1: state_from_context (easiest, no DB required)[/bold green]
+  Track context keys to distinguish states. When values change,
+  VenomQA sees a new state and explores downstream actions.
 
-[bold yellow]Option 1: PostgreSQL (recommended)[/bold yellow]
-  $ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres \\
-      -p 5432:5432 postgres:15
-  $ export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/yourdb"
+  world = World(
+      api=HttpClient("http://localhost:8000"),
+      state_from_context=["connection_id", "user_id", "item_count"],
+  )
 
-[bold yellow]Option 2: SQLite (simpler)[/bold yellow]
-  Your API must use SQLite, then point VenomQA at the same .db file:
-    db = SQLiteAdapter("/path/to/your/api.db")
+[bold yellow]Option 2: PostgreSQL (full DB rollback)[/bold yellow]
+  VenomQA checkpoints and rolls back the database between branches.
+  Must be the SAME database your API writes to.
+
+  $ export DATABASE_URL="postgresql://user:pass@localhost:5432/yourdb"
+  db = PostgresAdapter(os.environ["DATABASE_URL"])
+  world = World(api=api, systems={"db": db})
+
+[bold yellow]Option 3: SQLite (simpler DB rollback)[/bold yellow]
+  world = World(api=api, systems={"db": SQLiteAdapter("/path/to/api.db")})
 """)
-    console.print("=" * 70)
+        console.print("=" * 70)
 
     console.print("\n[bold]Next steps:[/bold]")
     console.print("  [bold red]1. Set up database rollback first![/bold red] (see above)")
