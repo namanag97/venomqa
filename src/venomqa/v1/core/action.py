@@ -82,10 +82,24 @@ class ActionResult:
 
     @property
     def status_code(self) -> int:
-        """HTTP status code of the response (proxy for result.response.status_code)."""
+        """HTTP status code of the response (proxy for result.response.status_code).
+
+        Returns 0 if the request failed (timeout, connection refused, etc.).
+        This allows safe checks like `if resp.status_code == 500:` without crashing.
+        """
         if self.response is None:
-            raise AttributeError("ActionResult has no response (request errored)")
+            return 0  # Network error, timeout, etc.
         return self.response.status_code
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """Response headers (proxy for result.response.headers).
+
+        Returns empty dict if the request failed. Useful for checking content-type.
+        """
+        if self.response is None:
+            return {}
+        return self.response.headers
 
     @property
     def ok(self) -> bool:
