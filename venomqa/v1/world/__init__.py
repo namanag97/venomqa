@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from venomqa.v1.core.state import State, Observation
 from venomqa.v1.core.action import Action, ActionResult
 from venomqa.v1.core.context import Context
-from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
+from venomqa.v1.core.state import Observation, State
 from venomqa.v1.world.checkpoint import Checkpoint
+from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
 
 if TYPE_CHECKING:
     from venomqa.v1.adapters.http import HttpClient
@@ -35,7 +34,7 @@ class World:
 
     def __init__(
         self,
-        api: "HttpClient",
+        api: HttpClient,
         systems: dict[str, Rollbackable] | None = None,
         context: Context | None = None,
     ) -> None:
