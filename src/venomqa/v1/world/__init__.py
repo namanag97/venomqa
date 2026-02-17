@@ -67,6 +67,7 @@ class World:
         # Context keys whose values are included in state identity.
         # When these values change, VenomQA sees a new state — no DB adapter needed.
         self._state_from_context: list[str] = state_from_context or []
+        self._last_action_result: Any | None = None  # set by act(), read by invariants
 
     def run_teardown(self) -> None:
         """Run the teardown function, if one was provided.
