@@ -229,7 +229,5 @@ class TestDimensionCoverageReporter:
         reporter = DimensionCoverageReporter(file=buf, color=False)
         reporter.report(cov)
         output = buf.getvalue()
-        # Every bar should be BAR_WIDTH chars wide
-        bar_width = DimensionCoverageReporter.BAR_WIDTH
         # Check that we see the expected bar characters
         assert "█" in output or "░" in output
