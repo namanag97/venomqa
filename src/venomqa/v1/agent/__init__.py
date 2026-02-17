@@ -359,6 +359,25 @@ class Agent:
         )
         self.graph.add_transition(transition)
 
+        # ── LOOP DETECTION ─────────────────────────────────────────────────
+        # If this action didn't change state (from_state == to_state), track it.
+        # After N repetitions, warn and mark this (state, action) as a loop.
+        if from_state.id == to_state.id:
+            key = (from_state.id, action.name)
+            self._noop_counts[key] = self._noop_counts.get(key, 0) + 1
+            count = self._noop_counts[key]
+            if count == self._max_noop_per_action:
+                warnings.warn(
+                    f"Loop detected: '{action.name}' from state {from_state.id[:8]} "
+                    f"has been called {count} times without changing state. "
+                    "This action likely needs a precondition= guard to prevent "
+                    "re-execution when it has no effect. The action will be "
+                    "skipped from this state in future picks.",
+                    stacklevel=3,
+                )
+                # Mark this (state, action) as explored to prevent future picks
+                self.graph.mark_noop(from_state.id, action.name)
+
         # Check POST-ACTION invariants (pass action_result for richer violation info)
         self._check_invariants_with_timing(
             to_state, action, transition, InvariantTiming.POST_ACTION,
