@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from venomqa.v1.core.action import Action
-    from venomqa.v1.core.state import State
-    from venomqa.v1.core.graph import Graph
-    from venomqa.v1.core.hypergraph import Hypergraph
     from venomqa.v1.core.constraints import StateConstraint
+    from venomqa.v1.core.graph import Graph
+    from venomqa.v1.core.hypergraph import Hyperedge, Hypergraph
+    from venomqa.v1.core.state import State
 
 
 class DimensionNoveltyStrategy:
@@ -32,8 +32,8 @@ class DimensionNoveltyStrategy:
 
     def __init__(
         self,
-        hypergraph: "Hypergraph | None" = None,
-        constraints: "list[StateConstraint] | None" = None,
+        hypergraph: Hypergraph | None = None,
+        constraints: list[StateConstraint] | None = None,
     ) -> None:
         self._hypergraph = hypergraph
         self._constraints = constraints or []
@@ -43,7 +43,7 @@ class DimensionNoveltyStrategy:
     # Strategy protocol
     # ------------------------------------------------------------------
 
-    def pick(self, graph: "Graph") -> "tuple[State, Action] | None":
+    def pick(self, graph: Graph) -> tuple[State, Action] | None:
         """Pick the next (state, action) pair to explore."""
         # get_unexplored() returns (State, Action) tuples for unexplored pairs
         unexplored = graph.get_unexplored()
@@ -56,7 +56,7 @@ class DimensionNoveltyStrategy:
 
         # Score each candidate by novelty (Hamming distance to centroid)
         best_score = -1
-        best_pair: "tuple[State, Action] | None" = None
+        best_pair: tuple[State, Action] | None = None
         for state, action in unexplored:
             edge = self._hypergraph.get_hyperedge(state.id)
             if edge is None:
@@ -70,11 +70,11 @@ class DimensionNoveltyStrategy:
 
         return best_pair
 
-    def enqueue(self, state: "State", actions: list["Action"]) -> None:
+    def enqueue(self, state: State, actions: list[Action]) -> None:
         """Called by the Agent when a new state is discovered (BFS hook)."""
         pass  # Dimension strategy recalculates every pick()
 
-    def push(self, state: "State", actions: list["Action"]) -> None:
+    def push(self, state: State, actions: list[Action]) -> None:
         """Called by the Agent when a new state is discovered (DFS hook)."""
         pass
 
@@ -82,7 +82,7 @@ class DimensionNoveltyStrategy:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _novelty_score(self, edge: "Hyperedge") -> int:  # type: ignore[name-defined]
+    def _novelty_score(self, edge: Hyperedge) -> int:  # type: ignore[name-defined]
         """Score an edge by how different it is from the most-common edge.
 
         Higher score = more novel = prefer picking this state.
@@ -107,5 +107,5 @@ class DimensionNoveltyStrategy:
         centroid = Hyperedge(dimensions=centroid_dims)
         return edge.hamming_distance(centroid)
 
-    def _passes_constraints(self, edge: "Hyperedge") -> bool:
+    def _passes_constraints(self, edge: Hyperedge) -> bool:
         return all(c.is_valid(edge) for c in self._constraints)
