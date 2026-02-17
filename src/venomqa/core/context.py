@@ -3,19 +3,17 @@
 The ExecutionContext provides a type-safe way to share data between steps
 in a journey, supporting snapshots for rollback scenarios.
 
+Also re-exports the v1 Context class for convenience.
+
 Example:
-    >>> from venomqa.core import ExecutionContext
-    >>>
-    >>> ctx = ExecutionContext()
-    >>> ctx.set("user_id", 123)
-    >>> ctx.store_step_result("create_user", {"id": 123, "name": "test"})
-    >>>
-    >>> # Later in another step
-    >>> user_id = ctx.get_required("user_id")
-    >>> create_result = ctx.get_step_result("create_user")
+    >>> from venomqa.core.context import Context  # v1 exploration context
+    >>> from venomqa.core.context import ExecutionContext  # v0 step context
 """
 
 from __future__ import annotations
+
+# Re-export the v1 Context for new-style imports
+from venomqa.v1.core.context import Context
 
 from copy import deepcopy
 from dataclasses import dataclass, field
