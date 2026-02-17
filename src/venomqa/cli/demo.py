@@ -211,10 +211,15 @@ def demo(port: int, verbose: bool) -> None:
     After the demo, try it on YOUR API:
         venomqa init --with-sample
     """
+    import logging
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
     from rich import box
+
+    # Suppress httpx logging unless verbose
+    if not verbose:
+        logging.getLogger("httpx").setLevel(logging.WARNING)
 
     console = Console()
     console.print()
