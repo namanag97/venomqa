@@ -52,7 +52,7 @@ class TestWorldObserve:
 
     def test_observe_no_systems(self):
         api = MagicMock()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
         state = world.observe()
         assert state.observations == {}
 
@@ -80,14 +80,14 @@ class TestWorldCheckpointRollback:
 
     def test_rollback_unknown_checkpoint_raises(self):
         api = MagicMock()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         with pytest.raises(ValueError, match="Unknown checkpoint"):
             world.rollback("nonexistent")
 
     def test_rollback_restores_context(self):
         api = MagicMock()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         # Set value, checkpoint, modify, rollback — value should be restored
         world.context.set("key", "original")
@@ -100,7 +100,7 @@ class TestWorldCheckpointRollback:
 
     def test_has_checkpoint(self):
         api = MagicMock()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         assert not world.has_checkpoint("x")
         state = world.observe_and_checkpoint("cp")
@@ -113,7 +113,7 @@ class TestWorldAct:
             return _make_http_result(200)
 
         api = MagicMock()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
         action = Action(name="my_action", execute=my_action)
 
         result = world.act(action)
@@ -126,7 +126,7 @@ class TestWorldAct:
             return _make_http_result(201)
 
         api = MagicMock()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
         action = Action(name="my_action", execute=my_action)
 
         result = world.act(action)
@@ -136,7 +136,7 @@ class TestWorldAct:
 
     def test_register_system(self):
         api = MagicMock()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
         sys1 = _make_mock_system()
 
         world.register_system("new_sys", sys1)
@@ -164,7 +164,7 @@ class TestWorldMultiClient:
 
     def test_clients_empty_by_default(self) -> None:
         api = self._make_fake_client("default")
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
         assert world.clients == {}
 
     def test_context_get_client_returns_registered_client(self) -> None:
