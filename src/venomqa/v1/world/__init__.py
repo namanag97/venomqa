@@ -59,6 +59,11 @@ class World:
         for name, client in self.clients.items():
             self.context._register_client(name, client)
         self._teardown_fn = teardown
+        # If auth= is provided, wrap api with AuthHttpClient so every request
+        # gets the token injected automatically from context.
+        if auth is not None:
+            from venomqa.v1.auth import AuthHttpClient
+            self.api = AuthHttpClient(api, auth, self.context)
         # Context keys whose values are included in state identity.
         # When these values change, VenomQA sees a new state — no DB adapter needed.
         self._state_from_context: list[str] = state_from_context or []
