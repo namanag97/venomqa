@@ -319,12 +319,24 @@ class Agent:
         Returns:
             The transition taken, or None if exploration is complete.
         """
-        # Pick next unexplored (state, action) pair
-        pick = self.strategy.pick(self.graph)
-        if pick is None:
-            return None
+        # Pick next unexplored (state, action) pair.
+        # Loop to skip picks whose context preconditions fail at execution time.
+        # (Strategies pick without live context access; we re-check here.)
+        while True:
+            pick = self.strategy.pick(self.graph)
+            if pick is None:
+                return None
 
-        from_state, action = pick
+            from_state, action = pick
+
+            # Re-check context preconditions: strategy lacks context access.
+            if not action.can_execute_with_context(
+                from_state, self.world.context, self.graph.used_action_names
+            ):
+                self.graph.mark_explored(from_state.id, action.name)
+                continue  # try next pick; don't count as a step
+
+            break  # valid pick — proceed
 
         # CRITICAL: Roll back to the from_state before executing
         self._rollback_to(from_state)
