@@ -197,7 +197,8 @@ def run_demo_exploration(base_url: str) -> dict[str, Any]:
 
 @click.command()
 @click.option("--port", "-p", default=8000, help="Port for demo server")
-def demo(port: int) -> None:
+@click.option("--verbose", "-v", is_flag=True, help="Show HTTP requests")
+def demo(port: int, verbose: bool) -> None:
     """See VenomQA find a real bug that unit tests miss.
 
     This demo runs a mock Order API with a hidden bug:
