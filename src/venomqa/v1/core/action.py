@@ -477,6 +477,13 @@ class Action:
                     return False
                 continue
 
+            # Handle context-based lambda preconditions (precondition=lambda ctx: ...)
+            context_fn = getattr(p, "_context_precondition", None)
+            if context_fn is not None:
+                if not context_fn(context):
+                    return False
+                continue
+
             if not p(state):
                 return False
         return True
