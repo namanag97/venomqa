@@ -362,6 +362,14 @@ __all__ = [
     # Adapters
     "HttpClient",
     "SQLiteAdapter",
+    # ResourceGraph
+    "ResourceGraph",
+    "ResourceSchema",
+    "ResourceType",
+    "schema_from_openapi",
+    # Generators
+    "generate_actions",
+    "generate_schema_and_actions",
     # Recording
     "RequestRecorder",
     "RecordedRequest",
