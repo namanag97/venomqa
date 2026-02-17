@@ -221,6 +221,7 @@ class Agent:
         action: Action,
         transition: Transition | None,
         timing: InvariantTiming,
+        action_result: "ActionResult | None" = None,
     ) -> None:
         """Check invariants with specified timing and record violations."""
         for inv in self.invariants:
@@ -242,6 +243,7 @@ class Agent:
                         state=state,
                         action=action,
                         reproduction_path=repro_path,
+                        action_result=action_result,
                     )
                     self._violations.append(violation)
             except Exception as e:
