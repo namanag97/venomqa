@@ -38,14 +38,27 @@ class GitHubObserver:
             repos = []
 
         open_issues_total = sum(r.get("open_issues_count", 0) for r in repos)
+        # Issue states per repo (used to distinguish "issue created" vs "issue closed")
+        closed_issues_total = sum(
+            len([i for i in self._fetch_issues(r["id"]) if i.get("state") == "closed"])
+            for r in repos
+        )
 
         return Observation(
             system="github",
             data={
                 "repo_count": len(repos),
                 "open_issues_total": open_issues_total,
+                "closed_issues_total": closed_issues_total,
             },
         )
+
+    def _fetch_issues(self, repo_id: str) -> list:
+        try:
+            resp = self._client.get(f"/repos/{repo_id}/issues", params={"state": "all"})
+            return resp.json() if resp.status_code == 200 else []
+        except Exception:
+            return []
 
     # ------------------------------------------------------------------ checkpoint / rollback
     def checkpoint(self, name: str) -> dict:
