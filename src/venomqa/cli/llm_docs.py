@@ -31,6 +31,46 @@ branches. Every path through the action graph starts from a clean state.
 
 ---
 
+## CRITICAL: Why You Need Database Access
+
+VenomQA explores state graphs by BRANCHING:
+
+    State S0 ──[create_order]──▶ S1
+       │                         │
+       │                    [cancel]──▶ S2 (branch A)
+       │                         │
+       │                    [refund]──▶ S3 (branch B) ← BUG FOUND!
+       │
+       └──[list_orders]──▶ S4 (branch C)
+
+To explore both branch A and B from S1, VenomQA must:
+  1. Execute create_order → reach S1
+  2. Execute cancel → reach S2
+  3. ROLLBACK DATABASE TO S1 ← This is why you need DB access!
+  4. Execute refund → reach S3 (finds the bug)
+
+WITHOUT database rollback, VenomQA can only test ONE linear path.
+
+### WHICH database to connect?
+
+The EXACT SAME database your API writes to:
+  - Your API uses postgresql://prod:5432/myapp? Connect VenomQA to that URL
+  - VenomQA wraps exploration in a transaction, rolls back when done
+  - NO data is permanently written
+
+### Database adapter choice:
+
+    | Your API's DB | VenomQA Adapter    | Strategy to use |
+    |---------------|--------------------|--------------------|
+    | PostgreSQL    | PostgresAdapter    | DFS() only         |
+    | SQLite        | SQLiteAdapter      | BFS() or DFS()     |
+    | No database   | state_from_context | BFS() (limited)    |
+
+PostgreSQL note: BFS/CoverageGuided don't work with PostgreSQL SAVEPOINTs.
+Always use DFS() with PostgresAdapter.
+
+---
+
 ## Installation
 
     python3 -m venv .venv
