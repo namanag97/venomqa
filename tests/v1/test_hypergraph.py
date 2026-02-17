@@ -374,8 +374,9 @@ class TestDimensionNoveltyStrategy:
         state = make_state()
         graph.add_state(state)
 
-        # Mark as explored
-        transition = Transition.create(state.id, "dummy", state.id)
+        # Mark as explored by adding a transition
+        ar = ActionResult.from_response(HTTPRequest("GET", "/"), HTTPResponse(200))
+        transition = Transition.create(state.id, "dummy", state.id, result=ar)
         graph.add_transition(transition)
 
         strategy = DimensionNoveltyStrategy()
