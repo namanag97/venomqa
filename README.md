@@ -1,6 +1,6 @@
 # VenomQA
 
-**Test APIs like a human QA would** - State-based testing that catches what unit tests miss.
+**Autonomous QA agent that exhaustively explores APIs** — define actions and invariants, let VenomQA find every bug sequence your linear tests miss.
 
 [![PyPI version](https://badge.fury.io/py/venomqa.svg)](https://pypi.org/project/venomqa/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://pypi.org/project/venomqa/)
@@ -8,315 +8,183 @@
 
 ---
 
-## Install & Run in 60 Seconds
+## Install
 
 ```bash
-# Install
 pip install venomqa
-
-# Try the built-in demo (no setup needed)
-venomqa demo --explain
-```
-
-That's it. You'll see VenomQA testing a sample API with state graphs, journeys, and invariants.
-
----
-
-## Add to Your Project
-
-```bash
-# In your project directory
-venomqa init --with-sample
-
-# Configure (edit venomqa.yaml)
-base_url: "http://localhost:8000"
-
-# Run
-venomqa smoke-test  # Quick health check
-venomqa run         # Full test suite
 ```
 
 ---
 
-## Why VenomQA?
+## How It Works
 
-Traditional tests check endpoints in isolation. Real bugs happen when features **interact**:
+Instead of writing linear test scripts, you give VenomQA:
 
+1. **Actions** — things that can happen (create issue, close issue, create refund…)
+2. **Invariants** — rules that must always hold (open issues never contain closed ones, refund ≤ payment)
+
+VenomQA explores every reachable state sequence using BFS, checkpointing and rolling back state between branches so each path starts clean.
+
+---
+
+## Quickstart (v1 API)
+
+```python
+from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
+from venomqa.v1.adapters.http import HttpClient
+
+# 1. Define actions
+def create_todo(ctx, api):
+    resp = api.post("/todos", json={"title": "Test"})
+    ctx["todo_id"] = resp.json()["id"]
+    return resp
+
+def delete_todo(ctx, api):
+    return api.delete(f"/todos/{ctx['todo_id']}")
+
+def list_todos(ctx, api):
+    resp = api.get("/todos")
+    ctx["todos"] = resp.json()
+    return resp
+
+# 2. Define invariants (rules that must always be true)
+def count_matches(state, ctx):
+    api_count = len(ctx.get("todos", []))
+    db_count = state.get_observation("db").data.get("count", 0)
+    return api_count == db_count
+
+invariant = Invariant(
+    name="count_matches_db",
+    check=count_matches,
+    description="API list count must match DB",
+    severity=Severity.CRITICAL,
+)
+
+# 3. Explore
+api = HttpClient("http://localhost:8000")
+world = World(api=api)
+
+agent = Agent(
+    world=world,
+    actions=[
+        Action(name="create_todo", execute=create_todo),
+        Action(name="delete_todo", execute=delete_todo),
+        Action(name="list_todos",  execute=list_todos),
+    ],
+    invariants=[invariant],
+    strategy=BFS(),
+    max_steps=200,
+)
+
+result = agent.explore()
+print(f"States: {result.states_visited}, Violations: {len(result.violations)}")
+for v in result.violations:
+    print(f"  [{v.severity.value.upper()}] {v.invariant_name}: {v.message}")
 ```
-User uploads file → Does it appear in listing?
-                  → Did storage usage increase?
-                  → Can search find it?
-                  → Did quota decrease?
-```
-
-VenomQA tests these **cross-feature effects** automatically.
 
 ---
 
 ## Core Concepts
 
-### 1. State Graphs
-Model your app as states and transitions. VenomQA explores **all paths**:
-
-```python
-graph = StateGraph(name="my_app")
-graph.add_node("empty", initial=True)
-graph.add_node("has_data")
-graph.add_edge("empty", "has_data", action=create_item)
-graph.add_edge("has_data", "empty", action=delete_item)
-
-result = graph.explore(client)  # Tests all possible paths
-```
-
-### 2. Invariants
-Rules that must **always** be true:
-
-```python
-graph.add_invariant("counts_match",
-    check=lambda c, db, ctx: ctx["api_count"] == ctx["db_count"],
-    description="API must match database")
-```
-
-### 3. Journeys
-Chain steps with automatic context:
-
-```python
-journey = Journey(name="crud", steps=[
-    Step(name="create", action=create_item),
-    Step(name="verify", action=get_item),
-])
-```
+| Concept | What it is |
+|---------|-----------|
+| `Action` | A callable that mutates or reads API state |
+| `Invariant` | A rule checked after every action |
+| `World` | Sandbox that owns HTTP client + rollbackable systems (DB, Redis, queues) |
+| `Agent` | Orchestrates exploration using a strategy (BFS, DFS, Random…) |
+| `Violation` | A recorded invariant failure with severity + context |
 
 ---
 
-## Key Features
+## Rollback / Branching
 
-### State Graph Testing
-Model your app as states and transitions. VenomQA explores **all possible paths** automatically.
+VenomQA checkpoints and rolls back state between paths. Adapters that support rollback:
 
-```
-┌─────────┐  create   ┌──────────┐  complete  ┌───────────┐
-│  empty  │──────────▶│ has_data │───────────▶│ completed │
-└─────────┘           └──────────┘            └───────────┘
-     ▲                      │                       │
-     └──────── delete ──────┴───────────────────────┘
-```
-
-### Invariants
-Define rules that must hold after **every** action:
+| System | Mechanism |
+|--------|-----------|
+| PostgreSQL | `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` |
+| Redis | `DUMP` + `FLUSHALL` + `RESTORE` |
+| In-memory (queue, mail, storage) | Copy + restore |
+| Custom | Subclass `MockHTTPServer` (3-method interface) |
 
 ```python
-graph.add_invariant("usage_accurate",
-    check=lambda c, db, ctx: ctx["api_usage"] == ctx["db_usage"],
-    description="Storage usage must be accurate")
-```
+from venomqa.v1.adapters.postgres import PostgresAdapter
+from venomqa.v1.adapters.redis import RedisAdapter
 
-### Journey Testing
-Chain steps together with automatic context flow:
-
-```python
-from venomqa import Journey, Step
-
-def health_check(client, context):
-    return client.get("/health")
-
-def create_item(client, context):
-    response = client.post("/items", json={"name": "Test", "price": 9.99})
-    context["item_id"] = response.json()["id"]
-    return response
-
-def get_item(client, context):
-    return client.get(f"/items/{context['item_id']}")
-
-journey = Journey(
-    name="crud_test",
-    steps=[
-        Step(name="health", action=health_check),
-        Step(name="create", action=create_item),
-        Step(name="verify", action=get_item),
-    ]
+world = World(
+    api=HttpClient("http://localhost:8000"),
+    systems={
+        "db":    PostgresAdapter("postgresql://localhost/mydb"),
+        "cache": RedisAdapter("redis://localhost:6379"),
+    },
 )
 ```
 
-Run with: `venomqa run crud_test`
+---
 
-### Cross-Feature Consistency
-Test that changes in one feature reflect correctly everywhere:
+## Exploration Strategies
 
 ```python
-# After file upload, verify:
-# - File appears in listing
-# - Usage increased
-# - Quota decreased
-# - Search can find it
+from venomqa.v1 import BFS, DFS, Random, CoverageGuided, Weighted
+
+agent = Agent(..., strategy=BFS())           # breadth-first (default, best for bug finding)
+agent = Agent(..., strategy=DFS())           # depth-first
+agent = Agent(..., strategy=CoverageGuided()) # maximize state coverage
 ```
 
 ---
 
-## Installation
+## Reporters
+
+```python
+from venomqa.v1 import ConsoleReporter, HTMLTraceReporter, JSONReporter
+
+reporter = ConsoleReporter()
+reporter.report(result)
+
+html = HTMLTraceReporter()
+html.report(result, path="trace.html")   # D3 force-graph of the state space
+```
+
+---
+
+## Working Example
+
+`examples/github_stripe_qa/` contains a full multi-API example with two deliberately planted bugs that VenomQA catches automatically:
 
 ```bash
-# Basic
-pip install venomqa
-
-# With PostgreSQL
-pip install "venomqa[postgres]"
-
-# With all features
-pip install "venomqa[all]"
-```
-
-**Requirements:** Python 3.10+
-
----
-
-## Examples
-
-### Test a REST API
-
-```python
-from venomqa import Client, StateGraph
-
-graph = StateGraph(name="todo_api")
-graph.add_node("empty", initial=True)
-graph.add_node("has_todos")
-
-def create_todo(client, ctx):
-    resp = client.post("/todos", json={"title": "Test"})
-    ctx["todo_id"] = resp.json()["id"]
-    return resp
-
-def delete_todo(client, ctx):
-    return client.delete(f"/todos/{ctx['todo_id']}")
-
-graph.add_edge("empty", "has_todos", action=create_todo)
-graph.add_edge("has_todos", "empty", action=delete_todo)
-
-graph.add_invariant("api_matches_db", check_api_db_consistency)
-
-result = graph.explore(Client(base_url="http://localhost:8000"))
-```
-
-### Test Multiple User Paths
-
-```python
-# User can: view posts, view todos, view albums
-# From posts: select post, view comments
-# From todos: select todo, mark complete
-# VenomQA explores ALL combinations
-
-graph.add_node("start", initial=True)
-graph.add_node("viewing_posts")
-graph.add_node("viewing_todos")
-graph.add_node("viewing_comments")
-
-graph.add_edge("start", "viewing_posts", action=view_posts)
-graph.add_edge("start", "viewing_todos", action=view_todos)
-graph.add_edge("viewing_posts", "viewing_comments", action=select_post)
-# ... etc
-
-result = graph.explore(client, max_depth=5)
-# Explores all paths up to depth 5
+cd examples/github_stripe_qa
+python main.py
 ```
 
 ---
 
-## Preflight Smoke Tests
-
-Before running a full test suite, validate that your API is functional:
+## Development Setup
 
 ```bash
-# Quick check
-venomqa smoke-test http://localhost:8000 --token $API_TOKEN
+git clone https://github.com/namanagarwal/venomQA
+cd venomQA
+pip install -e ".[dev]"
 
-# With configuration file
-venomqa smoke-test --config preflight.yaml
+make test          # all unit tests
+make lint          # ruff
+make typecheck     # mypy --strict
+make ci            # lint + typecheck + coverage
 ```
-
-**Output:**
-```
-VenomQA Preflight Smoke Test
-==================================================
-  [PASS] Health check 200 (42ms)
-  [PASS] Auth check 200 (18ms)
-  [PASS] Create resource 201 (35ms)
-  [PASS] List resources 200 (22ms)
-
-All 4 checks passed. API is ready for testing. (117ms)
-```
-
-**Configure via YAML:**
-```yaml
-# preflight.yaml
-base_url: "${API_URL:http://localhost:8000}"
-
-auth:
-  token_env_var: "API_TOKEN"
-
-health_checks:
-  - path: /health
-    expected_json: { status: "healthy" }
-
-crud_checks:
-  - path: /api/v1/items
-    payload: { name: "Test ${RANDOM}" }
-```
-
-Supports environment variable substitution (`${VAR}`, `${VAR:default}`), special placeholders (`${RANDOM}`, `${UUID}`, `${TIMESTAMP}`), and multiple check types.
-
-See [Preflight Configuration](docs/preflight-configuration.md) for full documentation.
 
 ---
 
 ## CLI
 
 ```bash
-venomqa init           # Create new project
-venomqa run            # Run all tests
-venomqa run --verbose  # With detailed output
-venomqa list           # List journeys
-venomqa validate       # Check configuration
-venomqa smoke-test     # Run preflight checks
+venomqa run        # run explorations
+venomqa doctor     # system diagnostics
+venomqa record     # record HTTP traffic → generate test code
+venomqa --help
 ```
-
----
-
-## Reporting
-
-- **HTML** - Visual reports with diagrams
-- **JSON** - For CI/CD pipelines
-- **JUnit XML** - For Jenkins/GitHub Actions
-- **Slack/Discord** - Notifications
-
----
-
-## CLI Commands
-
-| Command | What it does |
-|---------|-------------|
-| `venomqa demo` | Run built-in demo |
-| `venomqa init` | Create new project |
-| `venomqa run` | Execute all journeys |
-| `venomqa smoke-test` | Quick API health check |
-| `venomqa list` | Show discovered journeys |
-| `venomqa validate` | Check configuration |
-| `venomqa doctor` | System diagnostics |
-
----
-
-## Documentation
-
-| Guide | Description |
-|-------|-------------|
-| [SETUP.md](SETUP.md) | Complete setup guide |
-| [docs/getting-started/](docs/getting-started/) | Tutorials |
-| [examples/](examples/) | Working examples |
-| [docs/reference/](docs/reference/) | API reference |
 
 ---
 
 ## License
 
-MIT - [LICENSE](LICENSE)
-
-Built by [Naman Agarwal](https://github.com/namanagarwal)
+MIT — built by [Naman Agarwal](https://github.com/namanagarwal)
