@@ -1230,7 +1230,7 @@ class EnvironmentManager:
                         difference_type="added",
                     )
                 )
-            elif type(val1) != type(val2):
+            elif type(val1) is not type(val2):
                 differences.append(
                     ResponseDifference(
                         path=current_path,
