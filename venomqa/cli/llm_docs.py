@@ -396,7 +396,11 @@ Custom mock server: subclass MockHTTPServer, implement 3 methods:
    BAD:  state.get_observation("queue:orders")   # 'queue:orders' is Observation.system metadata
    GOOD: state.get_observation("queue")          # use the systems dict KEY you passed to World
 
-10. Using python instead of python3 on macOS:
+10. Action missing return statement:
+   BAD:  def my_action(api, context): api.post("/items")  → TypeError at runtime
+   GOOD: def my_action(api, context): return api.post("/items")
+
+11. Using python instead of python3 on macOS:
    BAD:  python main.py
    GOOD: python3 main.py
 
