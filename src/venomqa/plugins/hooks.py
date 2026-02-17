@@ -36,7 +36,7 @@ from venomqa.plugins.types import (
 )
 
 if TYPE_CHECKING:
-    pass
+    from venomqa.plugins.base import VenomQAPlugin
 
 # Import VenomQAPlugin at runtime to avoid circular imports
 # but we need it for method comparison
