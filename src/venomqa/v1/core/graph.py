@@ -122,6 +122,18 @@ class Graph:
         """
         self._explored.add((state_id, action_name))
 
+    def mark_noop(self, state_id: str, action_name: str) -> None:
+        """Mark a (state, action) pair as a no-op loop.
+
+        This is called when an action from a state has been executed multiple
+        times without changing the state. Future strategy picks will skip this
+        pair since it's already marked as explored.
+
+        The action likely needs a precondition= guard to prevent re-execution.
+        """
+        # Just mark as explored so strategy won't pick it again
+        self._explored.add((state_id, action_name))
+
     def get_valid_actions(
         self,
         state: State,
