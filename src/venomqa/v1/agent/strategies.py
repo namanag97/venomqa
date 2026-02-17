@@ -153,6 +153,10 @@ class DFS(BaseStrategy):
         for action in reversed(actions):
             self._stack.append((state.id, action.name))
 
+    def notify(self, state: State, actions: list[Action]) -> None:
+        """Notify strategy of a new state (alias for push)."""
+        self.push(state, actions)
+
 
 class Random(BaseStrategy):
     """Random exploration strategy.
