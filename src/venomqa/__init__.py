@@ -19,36 +19,18 @@ from __future__ import annotations
 import importlib
 import sys
 
-# =============================================================================
-# MAIN API - Import these directly: from venomqa import Action, State, ...
-# =============================================================================
+# Adapters
+from venomqa.v1.adapters.http import HttpClient
 
-# Core types
-from venomqa.v1.core.action import (
-    Action,
-    ActionResult,
-    HTTPRequest,
-    HTTPResponse,
-    precondition_action_ran,
-    precondition_has_context,
+# Backwards compatibility alias
+Client = HttpClient
+from venomqa.v1.adapters.resource_graph import (
+    ResourceGraph,
+    ResourceSchema,
+    ResourceType,
+    schema_from_openapi,
 )
-from venomqa.v1.core.state import Observation, State
-from venomqa.v1.core.context import Context
-from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.transition import Transition
-from venomqa.v1.core.invariant import (
-    Invariant,
-    InvariantTiming,
-    ResponseAssertion,
-    Severity,
-    Violation,
-)
-from venomqa.v1.core.result import ExplorationResult
-
-# World (sandbox with checkpoint/rollback)
-from venomqa.v1.world import World
-from venomqa.v1.world.checkpoint import Checkpoint, SystemCheckpoint
-from venomqa.v1.world.rollbackable import Rollbackable
+from venomqa.v1.adapters.sqlite import SQLiteAdapter
 
 # Agent (exploration engine)
 from venomqa.v1.agent import Agent, Scheduler
@@ -62,24 +44,21 @@ from venomqa.v1.agent.strategies import (
     Weighted,
 )
 
-# Adapters
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.sqlite import SQLiteAdapter
-from venomqa.v1.adapters.resource_graph import (
-    ResourceGraph,
-    ResourceSchema,
-    ResourceType,
-    schema_from_openapi,
-)
-
-# Generators (OpenAPI action generation)
-from venomqa.v1.generators.openapi_actions import (
-    generate_actions,
-    generate_schema_and_actions,
-)
-
 # Auth helpers
 from venomqa.v1.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
+
+# =============================================================================
+# MAIN API - Import these directly: from venomqa import Action, State, ...
+# =============================================================================
+# Core types
+from venomqa.v1.core.action import (
+    Action,
+    ActionResult,
+    HTTPRequest,
+    HTTPResponse,
+    precondition_action_ran,
+    precondition_has_context,
+)
 
 # Constraints
 from venomqa.v1.core.constraints import (
@@ -91,6 +70,7 @@ from venomqa.v1.core.constraints import (
     StateConstraint,
     constraint,
 )
+from venomqa.v1.core.context import Context
 
 # Coverage
 from venomqa.v1.core.coverage import DimensionAxisCoverage, DimensionCoverage
@@ -105,8 +85,16 @@ from venomqa.v1.core.dimensions import (
     UsageClass,
     UserRole,
 )
+from venomqa.v1.core.graph import Graph
 from venomqa.v1.core.hyperedge import Hyperedge
 from venomqa.v1.core.hypergraph import Hypergraph
+from venomqa.v1.core.invariant import (
+    Invariant,
+    InvariantTiming,
+    ResponseAssertion,
+    Severity,
+    Violation,
+)
 
 # Observation helpers
 from venomqa.v1.core.observers import (
@@ -118,12 +106,21 @@ from venomqa.v1.core.observers import (
     latest_row,
     row_with_status,
 )
+from venomqa.v1.core.result import ExplorationResult
+from venomqa.v1.core.state import Observation, State
+from venomqa.v1.core.transition import Transition
 
 # DSL (Journey definition)
 from venomqa.v1.dsl import Branch, Journey, Path, Step
 from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
 from venomqa.v1.dsl.compiler import compile as compile_journey
 from venomqa.v1.dsl.decorators import action, invariant
+
+# Generators (OpenAPI action generation)
+from venomqa.v1.generators.openapi_actions import (
+    generate_actions,
+    generate_schema_and_actions,
+)
 
 # Built-in invariants
 from venomqa.v1.invariants import OpenAPISchemaInvariant
@@ -162,6 +159,11 @@ from venomqa.v1.validation import (
     matches_type,
     validate_response,
 )
+
+# World (sandbox with checkpoint/rollback)
+from venomqa.v1.world import World
+from venomqa.v1.world.checkpoint import Checkpoint, SystemCheckpoint
+from venomqa.v1.world.rollbackable import Rollbackable
 
 # Type aliases
 StateID = str
