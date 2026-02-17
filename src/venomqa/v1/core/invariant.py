@@ -173,3 +173,34 @@ class Violation:
     @property
     def is_critical(self) -> bool:
         return self.severity == Severity.CRITICAL
+
+    @property
+    def reproduction_steps(self) -> list[str]:
+        """Human-readable reproduction steps as a list of strings.
+
+        Each entry describes one HTTP request in the sequence that reproduces
+        the bug, e.g. ``'POST /todos {"title": "test"}'``.
+        """
+        import json as _json
+
+        steps = []
+        for transition in self.reproduction_path:
+            result = transition.result
+            if result and result.request:
+                req = result.request
+                body_str = ""
+                if req.body:
+                    try:
+                        body_str = " " + _json.dumps(req.body, default=str)
+                    except Exception:
+                        body_str = f" {req.body}"
+                url = req.url
+                if "://" in url:
+                    parts = url.split("://", 1)
+                    after_scheme = parts[1]
+                    slash_idx = after_scheme.find("/")
+                    url = after_scheme[slash_idx:] if slash_idx != -1 else "/"
+                steps.append(f"{req.method} {url}{body_str}")
+            else:
+                steps.append(f"[{transition.action_name}]")
+        return steps
