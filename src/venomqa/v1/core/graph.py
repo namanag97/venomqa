@@ -209,6 +209,17 @@ class Graph:
         return len(self.used_action_names)
 
     @property
+    def unused_action_names(self) -> list[str]:
+        """List of action names that have never been executed.
+
+        Useful for debugging coverage issues - shows which actions DFS/BFS
+        never reached, even after many steps.
+        """
+        all_names = {a.name for a in self.actions}
+        used = self.used_action_names
+        return sorted(all_names - used)
+
+    @property
     def explored_count(self) -> int:
         return len(self._explored)
 
