@@ -195,6 +195,9 @@ def run_exploration(max_steps: int = 50) -> bool:
     print("=" * 60)
     print(f"  States visited    : {result.states_visited}")
     print(f"  Transitions taken : {result.transitions_taken}")
+    used = result.graph.used_action_count
+    total = result.actions_total
+    print(f"  Actions used      : {used}/{total} ({result.action_coverage_percent:.0f}%)")
     print(f"  Duration          : {result.duration_ms:.0f} ms")
     print(f"  Violations found  : {len(result.violations)}")
 
