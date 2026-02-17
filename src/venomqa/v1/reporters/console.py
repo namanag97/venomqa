@@ -89,8 +89,6 @@ class ConsoleReporter:
         # ═══════════════════════════════════════════════════════════════
         # SUMMARY (compact)
         # ═══════════════════════════════════════════════════════════════
-        used = result.graph.used_action_count
-        total = result.actions_total
         coverage_pct = result.action_coverage_percent
         coverage_color = self.GREEN if coverage_pct >= 80 else (self.YELLOW if coverage_pct >= 50 else self.RED)
 
@@ -103,7 +101,7 @@ class ConsoleReporter:
         self._line(f"  {self._c('Summary:', self.BOLD)} {' │ '.join(summary_parts)}")
 
         if result.truncated_by_max_steps:
-            self._line(self._c(f"  ⚠ Truncated at max_steps limit", self.YELLOW))
+            self._line(self._c("  ⚠ Truncated at max_steps limit", self.YELLOW))
         self._newline()
 
         # ═══════════════════════════════════════════════════════════════
