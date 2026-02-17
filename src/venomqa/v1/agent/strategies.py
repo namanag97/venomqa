@@ -214,6 +214,10 @@ class CoverageGuided(BaseStrategy):
         """No-op for coverage guided (it recalculates each pick)."""
         pass
 
+    def notify(self, state: State, actions: list[Action]) -> None:
+        """No-op for coverage guided (it recalculates each pick)."""
+        pass
+
 
 class Weighted(BaseStrategy):
     """Weighted random exploration strategy.
