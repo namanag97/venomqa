@@ -389,7 +389,32 @@ Custom mock server: subclass MockHTTPServer, implement 3 methods:
     result = agent.explore()
     for v in result.violations:
         print(f"[{v.severity.value.upper()}] {v.invariant_name}: {v.message}")
-    print(f"Done. States={result.states_visited}, Violations={len(result.violations)}")
+    print(f"Done. States={result.states_visited}, Coverage={result.action_coverage_percent:.0f}%")
+    if result.truncated_by_max_steps:
+        print("WARNING: Exploration was truncated by max_steps limit")
+
+---
+
+## CLI commands
+
+V1 stateful exploration (recommended entry points):
+
+    venomqa explore  journey.py --base-url http://localhost:8000
+    venomqa validate journey.py
+    venomqa record   journey.py --base-url http://localhost:8000
+
+    Options for explore:
+      --strategy [bfs|dfs|random]   default: bfs
+      --max-steps INTEGER           default: 1000
+      --format [console|json|markdown|junit]
+      --output FILE                 write report to file instead of stdout
+      --db-url TEXT                 PostgreSQL URL for DB rollback
+      --redis-url TEXT              Redis URL for Redis rollback
+
+General commands:
+    venomqa doctor     # system diagnostics
+    venomqa llm-docs   # this document
+    venomqa --help
 
 ---
 
