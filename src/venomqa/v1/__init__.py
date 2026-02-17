@@ -9,6 +9,7 @@ Example:
 
 from venomqa.v1.adapters.http import HttpClient
 from venomqa.v1.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
+from venomqa.v1.invariants import OpenAPISchemaInvariant
 from venomqa.v1.agent import Agent, Scheduler
 from venomqa.v1.agent.strategies import (
     BFS,
