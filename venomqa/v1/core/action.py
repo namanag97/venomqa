@@ -185,9 +185,17 @@ class Action:
         It handles both context-aware and simple actions.
         """
         if self._accepts_context:
-            return self.execute(api, context)
+            result = self.execute(api, context)
         else:
-            return self.execute(api)
+            result = self.execute(api)
+
+        if result is None:
+            raise TypeError(
+                f"Action '{self.name}' returned None. "
+                "Actions must return an ActionResult. "
+                "Did you forget 'return resp'?"
+            )
+        return result
 
     def can_execute(self, state: State) -> bool:
         """Check if all preconditions are satisfied."""
