@@ -271,6 +271,40 @@ curl -X POST localhost:8000/orders/1/checkout
 # Verify the bug exists
 ```
 
+## Performance: Avoid Slow Invariants
+
+Invariants are checked after **every action**. If an invariant makes HTTP calls,
+it can slow exploration significantly.
+
+**Slow (HTTP call per check):**
+```python
+def list_shows_only_open(world):
+    resp = world.api.get("/issues?state=open")  # HTTP call every check!
+    issues = resp.json()
+    return all(i["state"] == "open" for i in issues)
+```
+
+**Fast (use context instead):**
+```python
+# Action stores data in context
+def list_open_issues(api, context):
+    resp = api.get("/issues?state=open")
+    context.set("open_issues", resp.json())
+    return resp
+
+# Invariant reads from context (no HTTP call)
+def list_shows_only_open(world):
+    issues = world.context.get("open_issues")
+    if not issues:
+        return True  # Not fetched yet
+    return all(i["state"] == "open" for i in issues)
+```
+
+**Rule of thumb:**
+- Store API responses in context via actions
+- Invariants should read from context, not call APIs
+- Exception: Cross-reference checks that MUST call the API
+
 ## Quick Reference
 
 | Question | Answer |
