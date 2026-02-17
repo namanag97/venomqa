@@ -399,9 +399,25 @@ def cli(ctx: click.Context, verbose: bool, config: str | None, profile: str | No
         setup_logging(verbose)
         return
 
-    # Show help if no command given
+    # Show friendly intro if no command given (not just help wall)
     if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
+        from rich.console import Console
+        from rich.panel import Panel
+
+        console = Console()
+        console.print()
+        console.print(Panel.fit(
+            "[bold cyan]VenomQA[/bold cyan] — Find bugs that only appear in API sequences\n\n"
+            "[white]Your unit tests check endpoints one at a time.[/white]\n"
+            "[white]VenomQA tests [bold]sequences[/bold] like: create → update → delete → get[/white]\n\n"
+            "[bold]Get Started:[/bold]\n"
+            "  [green]venomqa demo[/green]              See it find a real bug (30 seconds)\n"
+            "  [green]venomqa init --with-sample[/green] Set up your project\n"
+            "  [green]venomqa doctor[/green]            Check your environment\n\n"
+            "[dim]Run 'venomqa --help' for all commands[/dim]",
+            border_style="cyan",
+        ))
+        console.print()
         return
 
     try:
