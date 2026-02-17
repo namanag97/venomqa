@@ -9,7 +9,7 @@ Example:
 
 from venomqa.v1.core.state import State, Observation
 from venomqa.v1.core.context import Context
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse, precondition_has_context
 from venomqa.v1.core.transition import Transition
 from venomqa.v1.core.graph import Graph
 from venomqa.v1.core.invariant import (
