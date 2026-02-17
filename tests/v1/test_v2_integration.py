@@ -9,25 +9,22 @@ These tests verify the complete flow:
 """
 
 import pytest
-
-from venomqa.v1 import (
-    Action,
-    ActionResult,
-    Agent,
-    BFS,
-    DFS,
-    Invariant,
-    World,
-)
-from venomqa.v1.adapters.resource_graph import (
+from venomqa.adapters.resource_graph import (
     ResourceGraph,
     ResourceSchema,
     ResourceType,
-    schema_from_openapi,
 )
-from venomqa.v1.core.action import HTTPRequest, HTTPResponse
-from venomqa.v1.core.context import Context
-from venomqa.v1.generators.openapi_actions import generate_actions, generate_schema_and_actions
+from venomqa.core.action import HTTPRequest, HTTPResponse
+from venomqa.generators.openapi_actions import generate_actions, generate_schema_and_actions
+
+from venomqa import (
+    DFS,
+    Action,
+    ActionResult,
+    Agent,
+    Invariant,
+    World,
+)
 
 
 class MockHttpClient:
@@ -397,9 +394,6 @@ class TestCrossContaminationBug:
 
 def agent_valid_actions(world: World, actions: list[Action]) -> list[Action]:
     """Get valid actions using the same logic as Agent._get_valid_actions."""
-    from venomqa.v1.core.state import State
-
-    state = world.observe()
     graph = world.resources
     bindings = world.context.to_dict()
 
