@@ -560,7 +560,18 @@ def run_health_checks(
     is_flag=True,
     help="Output results as JSON",
 )
-def doctor(verbose: bool, output_json: bool) -> None:
+@click.option(
+    "--skip-connectivity",
+    is_flag=True,
+    help="Skip database connectivity checks (faster)",
+)
+@click.option(
+    "--fix",
+    "show_fixes",
+    is_flag=True,
+    help="Show fix suggestions for failed checks",
+)
+def doctor(verbose: bool, output_json: bool, skip_connectivity: bool, show_fixes: bool) -> None:
     """Run system health checks and diagnostics.
 
     This command checks that all required dependencies are installed
@@ -569,10 +580,15 @@ def doctor(verbose: bool, output_json: bool) -> None:
     Exit codes:
         0 - All required checks passed
         1 - One or more required checks failed
+
+    Examples:
+        venomqa doctor              # Full health check
+        venomqa doctor --fix        # Show fix suggestions
+        venomqa doctor --skip-connectivity  # Skip DB checks (faster)
     """
     import json as json_module
 
-    checks = get_health_checks()
+    checks = get_health_checks(include_connectivity=not skip_connectivity)
 
     if output_json:
         results = []
@@ -603,6 +619,13 @@ def doctor(verbose: bool, output_json: bool) -> None:
 
     passed, failed_required, failed_optional = run_health_checks(checks, verbose)
 
+    # Collect failed check names for fix suggestions
+    failed_names = set()
+    for check in checks:
+        success, _ = check.run()
+        if not success:
+            failed_names.add(check.name.lower())
+
     if failed_required == 0:
         if failed_optional > 0:
             console.print(
@@ -611,13 +634,62 @@ def doctor(verbose: bool, output_json: bool) -> None:
             )
         else:
             console.print("[green]All checks passed - Ready to use![/green]")
+
+        # Show tips even when passing
+        if show_fixes and failed_optional > 0:
+            _show_fix_suggestions(failed_names)
+
         raise SystemExit(0)
     else:
         console.print(f"[red]{failed_required} required dependencies missing[/red]")
-        console.print("\n[bold]To fix:[/bold]")
-        console.print("  1. Install missing Python packages: pip install venomqa[all]")
-        console.print("  2. Install and start Docker: https://docs.docker.com/get-docker/")
+
+        if show_fixes:
+            _show_fix_suggestions(failed_names)
+        else:
+            console.print("\n[dim]Run 'venomqa doctor --fix' for detailed fix suggestions[/dim]")
+
         raise SystemExit(1)
+
+
+def _show_fix_suggestions(failed_names: set[str]) -> None:
+    """Show fix suggestions based on failed checks."""
+    console.print()
+
+    suggestions_shown = set()
+
+    # PostgreSQL fixes
+    if "postgresql" in failed_names or "postgres" in "".join(failed_names):
+        if "psycopg3" in failed_names:
+            if "psycopg_missing" not in suggestions_shown:
+                console.print(Panel(FIXES["psycopg_missing"], title="Install psycopg3"))
+                suggestions_shown.add("psycopg_missing")
+        else:
+            if "postgres_not_running" not in suggestions_shown:
+                console.print(Panel(FIXES["postgres_not_running"], title="Fix PostgreSQL"))
+                suggestions_shown.add("postgres_not_running")
+
+    # Redis fixes
+    if "redis" in "".join(failed_names):
+        if "redis-py" in failed_names:
+            if "redis_py_missing" not in suggestions_shown:
+                console.print(Panel(FIXES["redis_py_missing"], title="Install redis-py"))
+                suggestions_shown.add("redis_py_missing")
+        else:
+            if "redis_not_running" not in suggestions_shown:
+                console.print(Panel(FIXES["redis_not_running"], title="Fix Redis"))
+                suggestions_shown.add("redis_not_running")
+
+    # Environment variable fixes
+    if "environment" in "".join(failed_names) or "env" in "".join(failed_names):
+        if "env_vars_missing" not in suggestions_shown:
+            console.print(Panel(FIXES["env_vars_missing"], title="Set Environment Variables"))
+            suggestions_shown.add("env_vars_missing")
+
+    # Generic fix for other failures
+    if not suggestions_shown:
+        console.print("\n[bold]To fix:[/bold]")
+        console.print("  1. Install missing Python packages: pip install 'venomqa[all]'")
+        console.print("  2. Install and start Docker: https://docs.docker.com/get-docker/")
 
 
 if __name__ == "__main__":
