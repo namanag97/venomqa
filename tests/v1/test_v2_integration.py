@@ -276,8 +276,8 @@ class TestAgentWithResourceGraph:
 
         # Should have explored both actions
         assert result.states_visited >= 2
-        assert "create_workspace" in result.used_action_names
-        assert "create_upload" in result.used_action_names
+        assert "create_workspace" in result.used_actions
+        assert "create_upload" in result.used_actions
 
 
 class TestOpenAPIActionGeneration:
