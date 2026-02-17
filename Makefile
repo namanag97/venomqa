@@ -105,16 +105,16 @@ test-docker:
 	$(DOCKER_COMPOSE) -f docker/docker-compose.test.yml up --build --abort-on-container-exit
 
 lint:
-	ruff check venomqa tests
+	ruff check src/venomqa tests
 
 typecheck:
-	mypy venomqa --strict
+	mypy src/venomqa --strict
 
 format:
-	black venomqa tests
+	black src/venomqa tests
 
 format-check:
-	black --check venomqa tests
+	black --check src/venomqa tests
 
 build: clean
 	$(PYTHON) -m build
