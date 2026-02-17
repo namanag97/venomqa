@@ -1232,9 +1232,9 @@ from typing import Any
                         )
                     return method_fn(path, **kwargs)
 
-                action.__name__ = f"action_{ep.operation_id}"
-                action.__doc__ = f"{ep.method} {ep.path}: {ep.summary}"
-                return action
+                action.__name__ = f"action_{ep.operation_id}"  # noqa: B023
+                action.__doc__ = f"{ep.method} {ep.path}: {ep.summary}"  # noqa: B023
+                return action  # noqa: B023
 
             action = _make_action(endpoint)
 
