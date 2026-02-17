@@ -115,7 +115,7 @@ class Agent:
         # CRITICAL: Roll back to the from_state before executing
         self._rollback_to(from_state)
 
-        # Check PRE-ACTION invariants
+        # Check PRE-ACTION invariants (no action_result yet)
         self._check_invariants_with_timing(
             from_state, action, None, InvariantTiming.PRE_ACTION
         )
@@ -141,9 +141,10 @@ class Agent:
         )
         self.graph.add_transition(transition)
 
-        # Check POST-ACTION invariants
+        # Check POST-ACTION invariants (pass action_result for richer violation info)
         self._check_invariants_with_timing(
-            to_state, action, transition, InvariantTiming.POST_ACTION
+            to_state, action, transition, InvariantTiming.POST_ACTION,
+            action_result=action_result,
         )
 
         # Tell strategy about the new state's valid actions
