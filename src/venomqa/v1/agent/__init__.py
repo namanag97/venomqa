@@ -268,6 +268,34 @@ class Agent:
             from venomqa.v1.core.coverage import DimensionCoverage
             result.dimension_coverage = DimensionCoverage.from_hypergraph(self._hypergraph)
 
+        # ── CRITICAL: Warn about unused actions ──────────────────────────────
+        # If exploration was truncated AND actions were never executed,
+        # this is a silent coverage failure that users need to know about.
+        unused = result.unused_actions
+        if result.truncated_by_max_steps and unused:
+            used_count = len(self.graph.actions) - len(unused)
+            total_count = len(self.graph.actions)
+            coverage_pct = (used_count / total_count * 100) if total_count else 100
+
+            # Print loud warning to stderr
+            import sys
+            print("\n" + "=" * 70, file=sys.stderr)
+            print("COVERAGE WARNING: Actions never executed", file=sys.stderr)
+            print("=" * 70, file=sys.stderr)
+            print(f"  {len(unused)}/{total_count} actions ({100 - coverage_pct:.0f}%) were NEVER run:", file=sys.stderr)
+            # Show first 10 unused actions
+            for name in unused[:10]:
+                print(f"    - {name}", file=sys.stderr)
+            if len(unused) > 10:
+                print(f"    ... and {len(unused) - 10} more", file=sys.stderr)
+            print(file=sys.stderr)
+            print("Possible fixes:", file=sys.stderr)
+            print("  1. Use CoverageGuided() strategy instead of DFS()", file=sys.stderr)
+            print("  2. Add state_from_context=['connection_id', ...] to World", file=sys.stderr)
+            print("     (When these context keys change, VenomQA sees new states)", file=sys.stderr)
+            print("  3. Add preconditions to chain actions: Action(preconditions=['create_x'])", file=sys.stderr)
+            print("=" * 70 + "\n", file=sys.stderr)
+
         return result
 
     def _step(self) -> Transition | None:
