@@ -60,6 +60,7 @@ class Agent:
         self.max_steps = max_steps
         self.coverage_target = coverage_target  # 0.0–1.0; stop when action coverage >= this
         self.progress_every = progress_every    # print progress line every N steps (0 = off)
+        self.shrink = shrink                    # if True, shrink violation paths after finding them
         self._violations: list[Violation] = []
         self._step_count = 0
 
