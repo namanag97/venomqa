@@ -100,7 +100,7 @@ def load_config(config_path: str | Path | None = None) -> QAConfig:
 def _configure_fake_generator(config: QAConfig) -> None:
     """Configure the global fake data generator from config."""
     try:
-        from venomqa.data import fake, set_global_seed
+        from venomqa.data import set_global_seed
 
         # Set locale if different from default
         if config.data_locale != "en_US":
