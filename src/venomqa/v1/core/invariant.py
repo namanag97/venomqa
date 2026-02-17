@@ -156,13 +156,14 @@ class Violation:
         action: Action | None = None,
         reproduction_path: list[Transition] | None = None,
         action_result: ActionResult | None = None,
+        message_override: str = "",
     ) -> Violation:
         """Create a violation from an invariant and state."""
         return cls(
             id=f"v_{uuid.uuid4().hex[:12]}",
             invariant_name=invariant.name,
             state=state,
-            message=invariant.message,
+            message=message_override or invariant.message,
             severity=invariant.severity,
             action=action,
             action_result=action_result,
