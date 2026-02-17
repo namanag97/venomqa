@@ -92,7 +92,7 @@ def clean_state():
 def world(servers, clean_state):
     """Provide a freshly configured World with both API clients."""
     github_api = HttpClient(f"http://localhost:{GITHUB_PORT}")
-    stripe_api = HttpClient(f"http://localhost:{STRIPE_PORT}")
+    stripe_api = StripeProxy(f"http://localhost:{STRIPE_PORT}")
     webhook_queue = MockQueue(name="github_webhooks")
 
     w = World(api=github_api, systems={"webhooks": webhook_queue})
