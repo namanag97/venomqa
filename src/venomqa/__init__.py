@@ -65,6 +65,18 @@ from venomqa.v1.agent.strategies import (
 # Adapters
 from venomqa.v1.adapters.http import HttpClient
 from venomqa.v1.adapters.sqlite import SQLiteAdapter
+from venomqa.v1.adapters.resource_graph import (
+    ResourceGraph,
+    ResourceSchema,
+    ResourceType,
+    schema_from_openapi,
+)
+
+# Generators (OpenAPI action generation)
+from venomqa.v1.generators.openapi_actions import (
+    generate_actions,
+    generate_schema_and_actions,
+)
 
 # Auth helpers
 from venomqa.v1.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
