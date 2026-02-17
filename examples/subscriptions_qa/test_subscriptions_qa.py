@@ -469,7 +469,7 @@ class TestAdapters:
         assert r3.status_code == 200
 
         sent     = mail.get_sent()
-        subjects = [m["subject"] for m in sent]
+        subjects = [m["subject"] if isinstance(m, dict) else m.subject for m in sent]
 
         assert any("Welcome"    in s for s in subjects), f"No welcome email in {subjects}"
         assert any("Subscribed" in s for s in subjects), f"No subscription email in {subjects}"
