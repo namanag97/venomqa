@@ -42,10 +42,11 @@ def reset_state() -> None:
 
 
 def get_state_snapshot() -> dict[str, Any]:
-    """Return a shallow copy of state for invariant inspection."""
+    """Return a deep-copyable copy of state for checkpoint/rollback."""
     with _lock:
         return {
             "users": dict(_state["users"]),
+            "_issue_counters": dict(_state["_issue_counters"]),
             "repos": dict(_state["repos"]),
             "issues": {k: list(v) for k, v in _state["issues"].items()},
         }
