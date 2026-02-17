@@ -3709,3 +3709,92 @@ def cleanup(
             traceback.print_exc()
         sys.exit(1)
 
+
+# ── V1 bridge commands ──────────────────────────────────────────────────────
+
+
+@cli.command("explore")
+@click.argument("journey_file", type=click.Path(exists=True))
+@click.option("--base-url", "-u", required=True, help="Base URL of API")
+@click.option("--db-url", default=None, help="PostgreSQL connection string")
+@click.option("--redis-url", default=None, help="Redis connection string")
+@click.option(
+    "--strategy",
+    type=click.Choice(["bfs", "dfs", "random"]),
+    default="bfs",
+    show_default=True,
+)
+@click.option("--max-steps", type=int, default=1000, show_default=True)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["console", "json", "markdown", "junit"]),
+    default="console",
+    show_default=True,
+)
+@click.option("--output", "-o", default=None, help="Output file (default: stdout)")
+def explore_v1(
+    journey_file: str,
+    base_url: str,
+    db_url: str | None,
+    redis_url: str | None,
+    strategy: str,
+    max_steps: int,
+    output_format: str,
+    output: str | None,
+) -> None:
+    """Run stateful V1 exploration against an API."""
+    import types
+
+    from venomqa.v1.cli.main import cmd_explore
+
+    args = types.SimpleNamespace(
+        journey_file=journey_file,
+        base_url=base_url,
+        db_url=db_url,
+        redis_url=redis_url,
+        strategy=strategy,
+        max_steps=max_steps,
+        format=output_format,
+        output=output,
+    )
+    sys.exit(cmd_explore(args))
+
+
+@cli.command("validate")
+@click.argument("journey_file", type=click.Path(exists=True))
+def validate_v1(journey_file: str) -> None:
+    """Validate V1 journey syntax without running it."""
+    import types
+
+    from venomqa.v1.cli.main import cmd_validate
+
+    args = types.SimpleNamespace(journey_file=journey_file)
+    sys.exit(cmd_validate(args))
+
+
+@cli.command("record")
+@click.argument("journey_file")
+@click.option("--base-url", "-u", required=True, help="Base URL of API to record")
+@click.option("--output", "-o", default=None, help="Output file for generated code (default: stdout)")
+@click.option("--name", default="recorded_journey", show_default=True, help="Journey name in generated code")
+def record_v1(
+    journey_file: str,
+    base_url: str,
+    output: str | None,
+    name: str,
+) -> None:
+    """Proxy HTTP calls and generate a V1 Journey skeleton."""
+    import types
+
+    from venomqa.v1.cli.main import cmd_record
+
+    args = types.SimpleNamespace(
+        journey_file=journey_file,
+        base_url=base_url,
+        output=output,
+        name=name,
+    )
+    sys.exit(cmd_record(args))
+
