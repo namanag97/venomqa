@@ -346,8 +346,10 @@ class TestRealHttpUAT:
         assert "truncated_by_max_steps" in summary
         assert "success" in summary
 
-    def test_console_reporter_truncation_warning(self, server, capsys):
+    def test_console_reporter_truncation_warning(self, server):
         """ConsoleReporter shows truncation warning when max_steps is hit."""
+        import io
+
         global _items, _next_id
         _items = {}
         _next_id = 1
@@ -367,6 +369,9 @@ class TestRealHttpUAT:
         )
 
         result = agent.explore()
-        ConsoleReporter().report(result)
-        captured = capsys.readouterr()
-        assert "truncated" in captured.out.lower() or "max_steps" in captured.out.lower()
+        buf = io.StringIO()
+        ConsoleReporter(file=buf, color=False).report(result)
+        output = buf.getvalue()
+        assert "truncated" in output.lower() or "max_steps" in output.lower(), (
+            f"Expected truncation warning in output, got:\n{output}"
+        )
