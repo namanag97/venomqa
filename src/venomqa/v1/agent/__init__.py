@@ -320,8 +320,12 @@ class Agent:
             The transition taken, or None if exploration is complete.
         """
         # Pick next unexplored (state, action) pair.
-        # Loop to skip picks whose context preconditions fail at execution time.
-        # (Strategies pick without live context access; we re-check here.)
+        # Roll back to the candidate state FIRST, then re-check context
+        # preconditions with the RESTORED context. Strategies pick without live
+        # context access, so a pick that looks valid before rollback may be
+        # invalid once context is actually restored (e.g. a key was checkpointed
+        # as absent for that state). Looping here avoids executing guarded
+        # actions in states where their required context keys don't exist.
         while True:
             pick = self.strategy.pick(self.graph)
             if pick is None:
@@ -329,17 +333,20 @@ class Agent:
 
             from_state, action = pick
 
-            # Re-check context preconditions: strategy lacks context access.
+            # Roll back to from_state so context is in its correct state
+            # for this pick before we evaluate preconditions.
+            self._rollback_to(from_state)
+
+            # Re-check context preconditions with the restored context.
             if not action.can_execute_with_context(
                 from_state, self.world.context, self.graph.used_action_names
             ):
                 self.graph.mark_explored(from_state.id, action.name)
-                continue  # try next pick; don't count as a step
+                continue  # skip; try next pick without counting as a step
 
-            break  # valid pick — proceed
+            break  # valid pick with correct restored context — proceed
 
-        # CRITICAL: Roll back to the from_state before executing
-        self._rollback_to(from_state)
+        # from_state has already been rolled back to above.
 
         # Check PRE-ACTION invariants (no action_result yet)
         self._check_invariants_with_timing(
