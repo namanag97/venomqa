@@ -450,32 +450,55 @@ def check_journeys_directory() -> tuple[bool, str]:
     return True, f"Found {len(journey_files)} journey file(s)"
 
 
-def get_health_checks() -> list[HealthCheck]:
+def get_health_checks(include_connectivity: bool = True) -> list[HealthCheck]:
     """Return the list of health checks to run.
+
+    Args:
+        include_connectivity: If True, include database connectivity checks.
 
     Returns:
         List of HealthCheck instances ordered by importance.
     """
-    return [
-        # Required checks
+    checks = [
+        # Required checks - Core Python environment
         HealthCheck("Python Version", check_python_version, required=True),
-        HealthCheck("Docker", check_docker, required=True),
-        HealthCheck("Docker Compose", check_docker_compose, required=True),
         HealthCheck("httpx", lambda: check_package("httpx"), required=True),
         HealthCheck("pydantic", lambda: check_package("pydantic"), required=True),
         HealthCheck("rich", lambda: check_package("rich"), required=True),
         HealthCheck("pyyaml", lambda: check_package("yaml"), required=True),
         HealthCheck("click", lambda: check_package("click"), required=True),
-        # Optional checks
+        # v1 Module check
+        HealthCheck("v1 Module", check_v1_quick_start, required=True),
+        # Docker checks (optional for v1 mocks)
+        HealthCheck("Docker", check_docker, required=False),
+        HealthCheck("Docker Compose", check_docker_compose, required=False),
+        # Database packages
+        HealthCheck("psycopg3", check_psycopg3, required=False),
+        HealthCheck("redis-py", check_redis_client, required=False),
+    ]
+
+    if include_connectivity:
+        checks.extend([
+            # Environment checks
+            HealthCheck("Environment Vars", check_environment_vars, required=False),
+            # Connectivity checks (these actually try to connect)
+            HealthCheck("PostgreSQL", check_postgres_connection, required=False),
+            HealthCheck("Redis", check_redis_connection, required=False),
+        ])
+
+    checks.extend([
+        # Project structure checks
         HealthCheck("Config File", check_config_file, required=False),
         HealthCheck("Journeys Directory", check_journeys_directory, required=False),
+        # System checks
         HealthCheck("Graphviz", check_graphviz, required=False),
         HealthCheck("PostgreSQL Client", check_postgresql_client, required=False),
-        HealthCheck("Redis Client", check_redis_client, required=False),
         HealthCheck("Git", check_git, required=False),
         HealthCheck("Disk Space", check_disk_space, required=False),
         HealthCheck("Port Scan", check_common_ports, required=False),
-    ]
+    ])
+
+    return checks
 
 
 def run_health_checks(
