@@ -438,6 +438,100 @@ class Agent:
                 timestamp=result.timestamp,
             ))
 
+    def _shrink_violation(self, violation: Violation) -> Violation:
+        """Delta-debug the violation's reproduction path to find the minimal sequence.
+
+        Iteratively removes steps from the path and re-tests whether the same
+        invariant still fires. Repeats until no further reduction is possible.
+
+        The world is saved/restored around the entire shrink process so that
+        exploration can resume from exactly where it left off.
+
+        Returns the original violation if shrinking is impossible or fails.
+        """
+        original_path = list(violation.reproduction_path)
+        if len(original_path) <= 1:
+            return violation
+
+        # Save world state so we can restore after shrinking
+        try:
+            save_cp = self.world.checkpoint("_shrink_save")
+        except Exception:
+            return violation  # can't checkpoint → skip shrinking
+
+        try:
+            path = original_path
+            changed = True
+            while changed and len(path) > 1:
+                changed = False
+                for i in range(len(path)):
+                    candidate = path[:i] + path[i + 1:]
+                    if candidate and self._test_path_fires(candidate, violation.invariant_name):
+                        path = candidate
+                        changed = True
+                        break  # restart inner loop with shorter path
+
+            if len(path) == len(original_path):
+                return violation  # no reduction achieved
+
+            # Rebuild violation with shorter path
+            from dataclasses import replace
+            shrunk = replace(
+                violation,
+                reproduction_path=path,
+                message=(
+                    violation.message
+                    + f"  [Path shrunk from {len(original_path)} → {len(path)} step(s)]"
+                ),
+            )
+            return shrunk
+
+        except Exception:
+            return violation  # shrinking failed — return original
+
+        finally:
+            # Always restore world so exploration can continue
+            try:
+                self.world.rollback(save_cp)
+            except Exception:
+                pass
+
+    def _test_path_fires(self, transitions: list[Transition], inv_name: str) -> bool:
+        """Execute a sequence of transitions and check if the named invariant fires.
+
+        Rolls back to the initial state before replaying. Used by _shrink_violation.
+
+        Returns True if the invariant returns False (i.e. violation triggered).
+        """
+        # Roll back to initial state
+        initial = self.graph.get_state(self.graph.initial_state_id or "")
+        if initial is None or initial.checkpoint_id is None:
+            return False
+        try:
+            self.world.rollback(initial.checkpoint_id)
+        except Exception:
+            return False
+
+        # Replay each action in the candidate path
+        for t in transitions:
+            action = self.graph.get_action(t.action_name)
+            if action is None:
+                return False
+            try:
+                self.world.act(action)
+            except Exception:
+                return False
+
+        # Check if the named invariant fires
+        for inv in self.invariants:
+            if inv.name == inv_name:
+                try:
+                    return not inv.check(self.world)
+                except Exception:
+                    return False
+
+        return False
+
     def _register_hyperedge(self, state: State) -> None:
         """Infer and register a state's hyperedge in the Hypergraph."""
         if self._hypergraph is None:
