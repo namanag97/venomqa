@@ -439,6 +439,42 @@ Custom mock server: subclass MockHTTPServer, implement 3 methods:
    BAD:  python main.py
    GOOD: python3 main.py
 
+12. CRITICAL - Actions that silently no-op:
+   BAD:  def my_action(api, ctx):
+           if not ctx.has("id"):
+               return api.get("/noop")  # silently does nothing!
+   GOOD: Use preconditions on the Action:
+         Action(name="my_action", execute=..., preconditions=[lambda s: s.context.has("id")])
+
+13. CRITICAL - Actions that don't validate responses:
+   BAD:  def create_user(api, ctx):
+           resp = api.post("/users", json={"name": "test"})
+           ctx.set("user_id", resp.json()["id"])  # assumes success!
+           return resp
+   GOOD: def create_user(api, ctx):
+           resp = api.post("/users", json={"name": "test"})
+           if resp.status_code != 201:
+               raise AssertionError(f"Expected 201: {resp.text}")
+           data = resp.json()
+           if "id" not in data:
+               raise AssertionError(f"Missing 'id': {data}")
+           ctx.set("user_id", data["id"])
+           return resp
+
+14. CRITICAL - No database connection (most common setup error):
+   BAD:  world = World(api=HttpClient("http://localhost:8000"))
+         # No database → VenomQA can't rollback → only ONE linear path tested
+   GOOD: from venomqa.v1.adapters.postgres import PostgresAdapter
+         world = World(
+             api=HttpClient("http://localhost:8000"),
+             systems={"db": PostgresAdapter("postgresql://user:pass@localhost/mydb")}
+         )
+
+15. CRITICAL - Using wrong database (not the one your API writes to):
+   BAD:  Setting up a separate test database that the API doesn't use
+   GOOD: Connect to the SAME database your API writes to.
+         VenomQA checkpoints and rolls back THAT database.
+
 ---
 
 ## Minimal working example (copy-paste ready)
