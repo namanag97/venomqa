@@ -404,44 +404,81 @@ journey = Journey(
 - [API Reference](https://venomqa.dev/docs/api)
 '''
 
-SAMPLE_JOURNEY_PY = '''"""Sample journey for your QA tests.
+SAMPLE_JOURNEY_PY = '''"""Sample VenomQA exploration (v1 API).
 
-This journey demonstrates basic CRUD operations.
-Modify it for your specific API.
+Demonstrates basic CRUD exploration — VenomQA tries every sequence of
+actions and checks the invariants after each step.
 
-Run with: venomqa run sample_journey
-Or from project root: python -m journeys.sample_journey
+Run with: python3 sample_journey.py
 """
 
-from venomqa import Journey, Step, Checkpoint
+from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
+from venomqa.v1.adapters.http import HttpClient
 
-from actions.sample_actions import health_check, get_items, create_item
+from actions.sample_actions import health_check, list_items, create_item, delete_item
 
 
-# Define the journey
-journey = Journey(
-    name="sample_journey",
-    description="Sample CRUD journey",
-    steps=[
-        Step(
-            name="health_check",
-            action=health_check,
-            description="Verify API is healthy",
-        ),
-        Step(
-            name="list_items",
-            action=get_items,
-            description="List existing items",
-        ),
-        Step(
-            name="create_item",
-            action=create_item,
-            args={"name": "My Test Item"},
-            description="Create a new item",
-        ),
-        Checkpoint(name="item_created"),
-    ],
-)
+# --- Invariants: rules that must always hold -----------------------------------
+
+def list_is_always_a_list(world):
+    """GET /api/items must always return a JSON array."""
+    items = world.context.get("items")
+    if items is None:
+        return True   # list_items hasn\'t run yet — nothing to check
+    return isinstance(items, list)
+
+
+def item_id_is_set_after_create(world):
+    """After create_item succeeds, item_id must be in context."""
+    # Only check if create has run
+    if not world.context.has("item_id"):
+        return True
+    return world.context.get("item_id") is not None
+
+
+# --- Run exploration -----------------------------------------------------------
+
+if __name__ == "__main__":
+    api = HttpClient("http://localhost:8000")   # ← change to your API URL
+    world = World(api=api)
+
+    agent = Agent(
+        world=world,
+        actions=[
+            Action(name="health_check", execute=health_check, expected_status=[200]),
+            Action(name="list_items",   execute=list_items,   expected_status=[200]),
+            Action(name="create_item",  execute=create_item,  expected_status=[200, 201]),
+            Action(name="delete_item",  execute=delete_item),
+        ],
+        invariants=[
+            Invariant(
+                name="list_is_list",
+                check=list_is_always_a_list,
+                message="GET /api/items must always return a JSON array",
+                severity=Severity.CRITICAL,
+            ),
+            Invariant(
+                name="item_id_set",
+                check=item_id_is_set_after_create,
+                message="item_id must be present after create_item",
+                severity=Severity.HIGH,
+            ),
+        ],
+        strategy=BFS(),
+        max_steps=200,
+    )
+
+    result = agent.explore()
+
+    print(f"States visited : {result.states_visited}")
+    print(f"Transitions    : {result.transitions_taken}")
+    print(f"Violations     : {len(result.violations)}")
+
+    for v in result.violations:
+        print(f"  [{v.severity.value.upper()}] {v.invariant_name}: {v.message}")
+
+    if not result.violations:
+        print("All invariants passed.")
 '''
 
 
