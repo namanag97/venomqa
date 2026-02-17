@@ -1856,7 +1856,7 @@ def _send_notifications(
 
 
 @cli.command()
-@click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
+@click.option("--force", "-f", is_flag=True, help="Overwrite ALL files (including your actions/journeys)")
 @click.option(
     "--path", "-p", "base_path", default="venomqa", help="Base path for QA directory (default: venomqa)"
 )
@@ -1866,8 +1866,11 @@ def _send_notifications(
 @click.option(
     "--skip-checks", is_flag=True, help="Skip preflight checks"
 )
+@click.option(
+    "--update", "-u", is_flag=True, help="Update framework files only (llm-context.md, README.md) — preserves your actions/journeys"
+)
 @click.pass_context
-def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, skip_checks: bool) -> None:
+def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, skip_checks: bool, update: bool) -> None:
     """Initialize a new VenomQA project.
 
     \b
@@ -1881,10 +1884,16 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
       └── reports/            Generated HTML/JSON reports
 
     \b
+    File preservation:
+      - YOUR FILES (never touched without --force): actions/, journeys/, fixtures/
+      - FRAMEWORK FILES (safe to update): llm-context.md, README.md
+
+    \b
     Examples:
       venomqa init                    Minimal scaffold (creates venomqa/)
       venomqa init --with-sample      Scaffold + working sample exploration
       venomqa init -p myproject       Use a different directory name
+      venomqa init --update           Update framework files (preserves your code)
     """
     from rich.console import Console
 
