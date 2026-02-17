@@ -11,6 +11,8 @@
 ## Install
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install venomqa
 ```
 
@@ -33,30 +35,29 @@ VenomQA explores every reachable state sequence using BFS, checkpointing and rol
 from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
 from venomqa.v1.adapters.http import HttpClient
 
-# 1. Define actions
-def create_todo(ctx, api):
+# 1. Define actions — signature is always (api, context)
+def create_todo(api, context):
     resp = api.post("/todos", json={"title": "Test"})
-    ctx["todo_id"] = resp.json()["id"]
+    context.set("todo_id", resp.json()["id"])
     return resp
 
-def delete_todo(ctx, api):
-    return api.delete(f"/todos/{ctx['todo_id']}")
+def delete_todo(api, context):
+    return api.delete(f"/todos/{context.get('todo_id')}")
 
-def list_todos(ctx, api):
+def list_todos(api, context):
     resp = api.get("/todos")
-    ctx["todos"] = resp.json()
+    context.set("todos", resp.json())
     return resp
 
-# 2. Define invariants (rules that must always be true)
-def count_matches(state, ctx):
-    api_count = len(ctx.get("todos", []))
-    db_count = state.get_observation("db").data.get("count", 0)
-    return api_count == db_count
+# 2. Define invariants — check() receives the World object
+def count_is_non_negative(world):
+    todos = world.context.get("todos") or []
+    return len(todos) >= 0
 
 invariant = Invariant(
-    name="count_matches_db",
-    check=count_matches,
-    description="API list count must match DB",
+    name="count_non_negative",
+    check=count_is_non_negative,
+    message="Todo count must never be negative",
     severity=Severity.CRITICAL,
 )
 
@@ -88,11 +89,63 @@ for v in result.violations:
 
 | Concept | What it is |
 |---------|-----------|
-| `Action` | A callable that mutates or reads API state |
-| `Invariant` | A rule checked after every action |
-| `World` | Sandbox that owns HTTP client + rollbackable systems (DB, Redis, queues) |
+| `Action` | A callable `(api, context) -> response` that mutates or reads API state |
+| `Invariant` | A rule `(world) -> bool` checked after every action |
+| `World` | Sandbox owning the HTTP client + rollbackable systems + shared context |
 | `Agent` | Orchestrates exploration using a strategy (BFS, DFS, Random…) |
-| `Violation` | A recorded invariant failure with severity + context |
+| `Context` | Key-value store shared across actions — use `.set()` / `.get()` |
+| `Violation` | A recorded invariant failure with severity + reproduction path |
+
+---
+
+## Action Signatures
+
+Actions always receive `(api, context)` in that order:
+
+```python
+# Minimal — no context needed
+def health_check(api, context):
+    return api.get("/health")
+
+# Read from context (set by a previous action)
+def get_item(api, context):
+    item_id = context.get("item_id")
+    return api.get(f"/items/{item_id}")
+
+# Write to context for downstream actions
+def create_item(api, context):
+    resp = api.post("/items", json={"name": "Test"})
+    context.set("item_id", resp.json()["id"])
+    return resp
+```
+
+> **Note:** `context` is a `Context` object, not a dict. Use `context.set(key, val)` and `context.get(key)` — not `context[key]`.
+
+---
+
+## Invariant Signatures
+
+Invariants receive a single `World` argument:
+
+```python
+# Access shared context
+def ids_are_set(world):
+    return world.context.has("user_id") and world.context.has("item_id")
+
+# Access the API client directly
+def api_is_reachable(world):
+    resp = world.api.get("/health")
+    return resp.status_code == 200
+
+invariant = Invariant(
+    name="ids_set",
+    check=ids_are_set,
+    message="user_id and item_id must be set",   # 'message', not 'description'
+    severity=Severity.HIGH,
+)
+```
+
+> **Note:** The field is `message=`, not `description=`.
 
 ---
 
@@ -127,8 +180,8 @@ world = World(
 ```python
 from venomqa.v1 import BFS, DFS, Random, CoverageGuided, Weighted
 
-agent = Agent(..., strategy=BFS())           # breadth-first (default, best for bug finding)
-agent = Agent(..., strategy=DFS())           # depth-first
+agent = Agent(..., strategy=BFS())            # breadth-first (default, best for bug finding)
+agent = Agent(..., strategy=DFS())            # depth-first
 agent = Agent(..., strategy=CoverageGuided()) # maximize state coverage
 ```
 
@@ -139,11 +192,13 @@ agent = Agent(..., strategy=CoverageGuided()) # maximize state coverage
 ```python
 from venomqa.v1 import ConsoleReporter, HTMLTraceReporter, JSONReporter
 
-reporter = ConsoleReporter()
-reporter.report(result)
+# Console output
+ConsoleReporter().report(result)
 
+# HTML — report() returns a string, write it yourself
 html = HTMLTraceReporter()
-html.report(result, path="trace.html")   # D3 force-graph of the state space
+with open("trace.html", "w") as f:
+    f.write(html.report(result))   # D3 force-graph of the state space
 ```
 
 ---
@@ -154,7 +209,7 @@ html.report(result, path="trace.html")   # D3 force-graph of the state space
 
 ```bash
 cd examples/github_stripe_qa
-python main.py
+python3 main.py
 ```
 
 ---
@@ -162,8 +217,8 @@ python main.py
 ## Development Setup
 
 ```bash
-git clone https://github.com/namanagarwal/venomQA
-cd venomQA
+git clone https://github.com/namanag97/venomqa
+cd venomqa
 pip install -e ".[dev]"
 
 make test          # all unit tests
@@ -179,12 +234,18 @@ make ci            # lint + typecheck + coverage
 ```bash
 venomqa run        # run explorations
 venomqa doctor     # system diagnostics
-venomqa record     # record HTTP traffic → generate test code
+venomqa llm-docs   # print LLM context document (paste into any AI assistant)
 venomqa --help
 ```
 
 ---
 
+## Using with an AI Assistant
+
+Run `venomqa llm-docs` to get a complete context document you can paste into ChatGPT, Claude, Cursor, or any AI assistant. It includes all correct API signatures, patterns, and examples so the AI can help you write VenomQA tests accurately.
+
+---
+
 ## License
 
-MIT — built by [Naman Agarwal](https://github.com/namanagarwal)
+MIT — built by [Naman Agarwal](https://github.com/namanag97)
