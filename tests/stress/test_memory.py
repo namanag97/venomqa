@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import gc
 import sys
-from typing import Any
 
-import pytest
-
+from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (
     Branch,
@@ -21,7 +19,6 @@ from venomqa.core.models import (
     StepResult,
 )
 from venomqa.runner import JourneyRunner
-from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 
 
 def get_memory_usage() -> int:
@@ -276,7 +273,8 @@ class TestRunnerMemory:
 
         assert len(result.issues) == 10
 
-        runner._issues.clear()
+        # get_issues() returns a copy, so use formatter.clear() to clear internal state
+        runner._formatter.clear()
         assert len(runner.get_issues()) == 0
 
 
