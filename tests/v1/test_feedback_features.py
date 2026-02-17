@@ -259,7 +259,7 @@ class TestWorldTeardown:
 
     def test_teardown_none_by_default(self):
         api = _make_mock_api()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
         world.run_teardown()  # must not raise
 
     def test_teardown_errors_do_not_crash_explore(self):
@@ -325,7 +325,7 @@ class TestStateFromContext:
 
     def test_no_ctx_observation_when_not_configured(self):
         api = _make_mock_api()
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
         state = world.observe()
         assert "_ctx" not in state.observations
 
