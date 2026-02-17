@@ -200,27 +200,19 @@ class ConsoleReporter:
             self._line(f"  {self._c('Fix the violations above and re-run.', self.YELLOW)}")
         self._newline()
 
-    def _header(self, text: str) -> None:
-        self._line(self._c(f"=== {text} ===", self.BOLD))
-
-    def _section(self, text: str) -> None:
-        self._line(self._c(f"--- {text} ---", self.BLUE))
-
-    def _kv(self, key: str, value: str) -> None:
-        self._line(f"  {key}: {value}")
-
     def _line(self, text: str) -> None:
         print(text, file=self.file)
 
     def _newline(self) -> None:
         print(file=self.file)
 
-    def _truncate(self, body: object, max_chars: int = 200) -> str:
-        """Render a response/request body, capping at max_chars."""
-        text = repr(body) if not isinstance(body, str) else body
+    def _truncate(self, text: str, max_chars: int = 200) -> str:
+        """Truncate text to max_chars."""
+        if not isinstance(text, str):
+            text = str(text)
         if len(text) <= max_chars:
             return text
-        return text[:max_chars] + f"  … (+{len(text) - max_chars} chars)"
+        return text[:max_chars - 3] + "..."
 
     def _severity_color(self, severity: Severity) -> str:
         if severity == Severity.CRITICAL:
@@ -229,4 +221,4 @@ class ConsoleReporter:
             return self.RED
         elif severity == Severity.MEDIUM:
             return self.YELLOW
-        return ""
+        return self.DIM
