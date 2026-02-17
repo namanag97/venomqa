@@ -1611,7 +1611,7 @@ def _send_notifications(
 @cli.command()
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
 @click.option(
-    "--path", "-p", "base_path", default="qa", help="Base path for QA directory (default: qa)"
+    "--path", "-p", "base_path", default="venomqa", help="Base path for QA directory (default: venomqa)"
 )
 @click.option(
     "--with-sample", "-s", is_flag=True, help="Include sample journey and actions"
