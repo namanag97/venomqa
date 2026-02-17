@@ -554,23 +554,27 @@ Documentation: https://github.com/namanag97/venomqa
 @click.version_option(version=None, prog_name="VenomQA", message=get_version())
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, config: str | None, profile: str | None) -> None:
-    """VenomQA - Enterprise-Grade Stateful API Testing Framework.
+    """Autonomous API QA agent — exhaustively explore every action sequence.
 
-    VenomQA enables comprehensive API testing with state management,
-    branching execution paths, and automatic issue detection.
+    Define actions (what to call) and invariants (rules that must hold), then
+    let VenomQA find every bug sequence your linear tests miss.
 
     \b
     Quick Start:
-      1. venomqa init          Create project structure
-      2. Edit venomqa.yaml     Configure your API URL
-      3. venomqa run           Execute test journeys
+      venomqa demo                    See it in action (no setup needed)
+      venomqa init --with-sample      Create a project with sample files
+      venomqa llm-docs                Get AI assistant context doc
+      venomqa doctor                  Check your environment
 
     Run 'venomqa COMMAND --help' for command-specific help.
     """
     ctx.ensure_object(dict)
 
-    # Don't load config for commands that don't need it
-    if ctx.invoked_subcommand in ("init", "doctor", "smoke-test", "demo"):
+    # Skip config loading for commands that don't need it, and whenever
+    # --help is requested (config errors must never block help text).
+    help_requested = "--help" in sys.argv or "-h" in sys.argv
+    no_config_commands = {"init", "doctor", "smoke-test", "demo", "llm-docs"}
+    if ctx.invoked_subcommand in no_config_commands or help_requested:
         ctx.obj["verbose"] = verbose
         setup_logging(verbose)
         return
