@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import Violation, Severity
+from venomqa.v1.core.invariant import Severity, Violation
 
 if TYPE_CHECKING:
     from venomqa.v1.core.coverage import DimensionCoverage
@@ -22,7 +22,7 @@ class ExplorationResult:
     started_at: datetime = field(default_factory=datetime.now)
     finished_at: datetime | None = None
     duration_ms: float = 0.0
-    dimension_coverage: "DimensionCoverage | None" = None
+    dimension_coverage: DimensionCoverage | None = None
 
     @property
     def states_visited(self) -> int:
@@ -46,11 +46,40 @@ class ExplorationResult:
 
     @property
     def coverage_percent(self) -> float:
-        """Percentage of reachable (state, action) pairs explored."""
+        """Percentage of reachable (state, action) pairs explored.
+
+        Note: This metric can never reach 100% in growing state spaces because
+        each new state adds N new (state, action) pairs to explore. Use
+        action_coverage_percent for a more meaningful metric.
+        """
         total_possible = self.states_visited * self.actions_total
         if total_possible == 0:
             return 100.0
         return (self.explored_count / total_possible) * 100
+
+    @property
+    def action_coverage_percent(self) -> float:
+        """Percentage of actions that have been executed at least once.
+
+        This is a more meaningful metric than coverage_percent because it
+        answers: "Have we tried every action at least once?"
+        """
+        if self.actions_total == 0:
+            return 100.0
+        used_actions = self.graph.used_action_count
+        return (used_actions / self.actions_total) * 100
+
+    @property
+    def exploration_efficiency(self) -> float:
+        """Ratio of unique states discovered per transition.
+
+        Higher is better. A value of 1.0 means every transition discovered
+        a new state (no repeated states). Lower values indicate more
+        backtracking/rollback (which is normal for BFS).
+        """
+        if self.transitions_taken == 0:
+            return 1.0
+        return self.states_visited / self.transitions_taken
 
     @property
     def success(self) -> bool:
