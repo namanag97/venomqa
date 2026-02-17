@@ -7,8 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from unittest.mock import MagicMock
 
-import pytest
-
+from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (
     Branch,
@@ -19,7 +18,6 @@ from venomqa.core.models import (
     Step,
 )
 from venomqa.runner import JourneyRunner
-from tests.conftest import MockClient, MockHTTPResponse, MockStateManager
 
 
 class TestConcurrentJourneyExecution:
@@ -156,6 +154,7 @@ class TestConcurrentBranchExecution:
     def test_parallel_branch_paths(self) -> None:
         mock_client = MockClient()
         mock_client.set_responses([MockHTTPResponse(status_code=200, json_data={})] * 20)
+        mock_state_manager = MockStateManager()
 
         checkpoint = Checkpoint(name="initial")
         branch = Branch(
@@ -174,7 +173,7 @@ class TestConcurrentBranchExecution:
 
         journey = Journey(name="parallel_branches", steps=[checkpoint, branch])
 
-        runner = JourneyRunner(client=mock_client, parallel_paths=4)
+        runner = JourneyRunner(client=mock_client, state_manager=mock_state_manager, parallel_paths=4)
         result = runner.run(journey)
 
         assert result.success is True
@@ -387,8 +386,9 @@ class TestResourceCleanup:
     """Tests for resource cleanup under load."""
 
     def test_client_disconnect_under_load(self) -> None:
-        from venomqa.http import Client
         from unittest.mock import patch
+
+        from venomqa.http import Client
 
         with patch("venomqa.http.rest.httpx.Client") as mock_httpx:
             mock_instance = MagicMock()
