@@ -1,0 +1,22 @@
+#!/bin/sh
+# VenomQA CLI wrapper - finds Python at runtime for maximum compatibility
+# This script uses the Python in your PATH, not a hardcoded path
+
+# Try to find venomqa as a module
+for python in python3 python; do
+    if command -v "$python" >/dev/null 2>&1; then
+        if "$python" -c "import venomqa" 2>/dev/null; then
+            exec "$python" -m venomqa "$@"
+        fi
+    fi
+done
+
+# If we get here, venomqa isn't installed for any Python
+echo "Error: venomqa package not found"
+echo ""
+echo "Install with:"
+echo "  pip install venomqa"
+echo ""
+echo "Or use the bootstrap script:"
+echo "  curl -fsSL https://venomqa.dev/install.py | python3 - init"
+exit 1
