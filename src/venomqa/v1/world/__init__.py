@@ -132,7 +132,19 @@ class World:
 
         Uses Action.invoke() which auto-detects if the action accepts context.
         """
-        return action.invoke(self.api, self.context)
+        result = action.invoke(self.api, self.context)
+        self._last_action_result = result
+        return result
+
+    @property
+    def last_action_result(self) -> Any | None:
+        """The ActionResult from the most recent action execution.
+
+        Available inside invariant check functions. Useful for invariants
+        that need to inspect the HTTP request/response that just fired,
+        such as OpenAPISchemaInvariant.
+        """
+        return self._last_action_result
 
     def observe(self) -> State:
         """Get current state from all systems.
