@@ -252,6 +252,11 @@ __all__ = [
     "action",
     "invariant",
     "compile_journey",
+    # Auth helpers
+    "BearerTokenAuth",
+    "ApiKeyAuth",
+    "MultiRoleAuth",
+    "AuthHttpClient",
     # Adapters
     "HttpClient",
     # Recording
