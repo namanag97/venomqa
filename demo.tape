@@ -6,37 +6,32 @@ Set Shell "zsh"
 Set FontSize 14
 Set FontFamily "JetBrains Mono"
 Set Width 900
-Set Height 550
+Set Height 560
 Set Theme "Catppuccin Mocha"
-Set Padding 20
-Set TypingSpeed 35ms
+Set Padding 24
+Set TypingSpeed 50ms
 Set PlaybackSpeed 1.0
 Set CursorBlink false
 
-# ── Navigate to project and set env ──────────────────────────────────────────
+# Navigate to project
 Sleep 300ms
-
 Type "cd ~/venomQA && export PYTHONPATH=src"
 Enter
-Sleep 500ms
+Sleep 600ms
 
-# ── Comments to set the scene ─────────────────────────────────────────────────
-Type "# VenomQA: finds bugs that unit tests miss"
+# Explain what VenomQA does using echo
+Type `echo "VenomQA — finds sequence bugs no unit test will catch"`
 Enter
-Sleep 800ms
+Sleep 700ms
 
-Type "# Explores every sequence of API calls, checks invariants after each step"
+Type `echo "Exploring 12 actions x 60 steps against mock GitHub + Stripe..."`
 Enter
-Sleep 800ms
+Sleep 700ms
 
-Type "# Demo: mock GitHub + Stripe APIs with 2 planted bugs"
-Enter
-Sleep 1s
-
-# ── Run ───────────────────────────────────────────────────────────────────────
+# Run the demo
 Type "python3 demo.py"
-Sleep 400ms
+Sleep 300ms
 Enter
 
-# Wait for servers to start + full exploration to complete (~8s)
-Sleep 12s
+# Wait for full run to complete
+Sleep 13s
