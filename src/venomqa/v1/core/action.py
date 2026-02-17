@@ -111,6 +111,110 @@ class ActionResult:
         body = self.response.body
         return body if isinstance(body, str) else str(body) if body is not None else ""
 
+    # ── Validation helpers — make it easy to write correct actions ──
+
+    def expect_status(self, *expected: int) -> "ActionResult":
+        """Assert the response has one of the expected status codes.
+
+        Raises AssertionError if status doesn't match. Returns self for chaining.
+
+        Example::
+
+            def create_item(api, context):
+                resp = api.post("/items", json={"name": "widget"})
+                resp.expect_status(201)  # raises if not 201
+                context.set("item_id", resp.json()["id"])
+                return resp
+        """
+        if self.response is None:
+            raise AssertionError(f"Request failed (no response): {self.error}")
+        if self.response.status_code not in expected:
+            expected_str = ", ".join(str(s) for s in expected)
+            raise AssertionError(
+                f"Expected status [{expected_str}], got {self.response.status_code}: {self.text}"
+            )
+        return self
+
+    def expect_success(self) -> "ActionResult":
+        """Assert the response is successful (2xx/3xx).
+
+        Raises AssertionError if not successful. Returns self for chaining.
+
+        Example::
+
+            def get_items(api, context):
+                resp = api.get("/items")
+                resp.expect_success()  # raises if not 2xx/3xx
+                return resp
+        """
+        if not self.ok:
+            raise AssertionError(
+                f"Request failed: {self.status_code if self.response else 'no response'} - {self.text}"
+            )
+        return self
+
+    def expect_json(self) -> Any:
+        """Assert the response is valid JSON and return the parsed body.
+
+        Raises AssertionError if response is not JSON. Returns parsed body.
+
+        Example::
+
+            def list_items(api, context):
+                resp = api.get("/items")
+                resp.expect_status(200)
+                items = resp.expect_json()  # raises if not JSON
+                context.set("items", items)
+                return resp
+        """
+        if self.response is None:
+            raise AssertionError(f"Request failed (no response): {self.error}")
+        body = self.response.body
+        if not isinstance(body, (dict, list)):
+            raise AssertionError(f"Expected JSON response, got: {type(body).__name__}")
+        return body
+
+    def expect_json_field(self, *fields: str) -> dict[str, Any]:
+        """Assert the response JSON has required fields and return it.
+
+        Raises AssertionError if any field is missing. Returns the JSON body.
+
+        Example::
+
+            def create_item(api, context):
+                resp = api.post("/items", json={"name": "widget"})
+                resp.expect_status(201)
+                data = resp.expect_json_field("id", "name")  # raises if missing
+                context.set("item_id", data["id"])
+                return resp
+        """
+        data = self.expect_json()
+        if not isinstance(data, dict):
+            raise AssertionError(f"Expected JSON object, got {type(data).__name__}: {data}")
+        missing = [f for f in fields if f not in data]
+        if missing:
+            raise AssertionError(f"Response missing fields {missing}: {data}")
+        return data
+
+    def expect_json_list(self) -> list[Any]:
+        """Assert the response is a JSON array and return it.
+
+        Raises AssertionError if response is not a list. Returns the list.
+
+        Example::
+
+            def list_items(api, context):
+                resp = api.get("/items")
+                resp.expect_status(200)
+                items = resp.expect_json_list()  # raises if not array
+                context.set("items", items)
+                return resp
+        """
+        data = self.expect_json()
+        if not isinstance(data, list):
+            raise AssertionError(f"Expected JSON array, got {type(data).__name__}: {data}")
+        return data
+
 
 # Type alias for action preconditions
 Precondition = Callable[["State"], bool]
