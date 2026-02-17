@@ -51,6 +51,7 @@ class Agent:
         hypergraph: bool = False,
         coverage_target: float | None = None,
         progress_every: int = 0,
+        shrink: bool = False,
     ) -> None:
         self.world = world
         self.graph = Graph(actions)
