@@ -4,18 +4,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from venomqa.v1.core.state import State
+from venomqa.v1.agent.scheduler import RunResult, ScheduledRun, Scheduler
+from venomqa.v1.agent.strategies import BFS, DFS, CoverageGuided, Random, Strategy, Weighted
 from venomqa.v1.core.action import Action, ActionResult
-from venomqa.v1.core.transition import Transition
 from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import Invariant, Violation, InvariantTiming, Severity
+from venomqa.v1.core.invariant import Invariant, InvariantTiming, Severity, Violation
 from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.agent.strategies import Strategy, BFS, DFS, Random, CoverageGuided, Weighted
-from venomqa.v1.agent.scheduler import Scheduler, ScheduledRun, RunResult
+from venomqa.v1.core.state import State
+from venomqa.v1.core.transition import Transition
 
 if TYPE_CHECKING:
-    from venomqa.v1.world import World
     from venomqa.v1.core.hypergraph import Hypergraph
+    from venomqa.v1.world import World
 
 
 class Agent:
@@ -42,7 +42,7 @@ class Agent:
 
     def __init__(
         self,
-        world: "World",
+        world: World,
         actions: list[Action],
         invariants: list[Invariant] | None = None,
         strategy: Strategy | None = None,
@@ -59,7 +59,7 @@ class Agent:
 
         # Hypergraph support (opt-in)
         self._use_hypergraph = hypergraph
-        self._hypergraph: "Hypergraph | None" = None
+        self._hypergraph: Hypergraph | None = None
         if hypergraph:
             from venomqa.v1.core.hypergraph import Hypergraph as HG
             self._hypergraph = HG()
@@ -84,29 +84,39 @@ class Agent:
         """
         result = ExplorationResult(graph=self.graph)
 
-        # Observe initial state WITH checkpoint (critical for rollback)
-        initial_state = self.world.observe_and_checkpoint("initial")
-        # add_state returns canonical state (may be deduplicated)
-        initial_state = self.graph.add_state(initial_state)
+        try:
+            # Observe initial state WITH checkpoint (critical for rollback)
+            initial_state = self.world.observe_and_checkpoint("initial")
+            # add_state returns canonical state (may be deduplicated)
+            initial_state = self.graph.add_state(initial_state)
 
-        # Register initial state in hypergraph if enabled
-        if self._hypergraph is not None:
-            self._register_hyperedge(initial_state)
+            # Register initial state in hypergraph if enabled
+            if self._hypergraph is not None:
+                self._register_hyperedge(initial_state)
 
-        # Initialize strategy with initial state's valid actions
-        valid_actions = self.graph.get_valid_actions(initial_state)
-        if hasattr(self.strategy, "enqueue"):
-            self.strategy.enqueue(initial_state, valid_actions)
-        elif hasattr(self.strategy, "push"):
-            self.strategy.push(initial_state, valid_actions)
+            # Initialize strategy with initial state's valid actions
+            valid_actions = self.graph.get_valid_actions(initial_state)
+            if hasattr(self.strategy, "enqueue"):
+                self.strategy.enqueue(initial_state, valid_actions)
+            elif hasattr(self.strategy, "push"):
+                self.strategy.push(initial_state, valid_actions)
 
-        # Exploration loop
-        self._step_count = 0
-        while self._step_count < self.max_steps:
-            transition = self._step()
-            if transition is None:
-                break  # No more unexplored pairs
-            self._step_count += 1
+            # Exploration loop
+            self._step_count = 0
+            while self._step_count < self.max_steps:
+                transition = self._step()
+                if transition is None:
+                    break  # No more unexplored pairs
+                self._step_count += 1
+
+        finally:
+            # Close registered systems (DB connections, etc.) even if exploration crashes
+            for name, system in self.world.systems.items():
+                if hasattr(system, "close"):
+                    try:
+                        system.close()
+                    except Exception:
+                        pass  # Best-effort cleanup; don't mask the original error
 
         result.violations = list(self._violations)
         result.finish()
@@ -245,7 +255,7 @@ class Agent:
         action: Action,
         transition: Transition | None,
         timing: InvariantTiming,
-        action_result: "ActionResult | None" = None,
+        action_result: ActionResult | None = None,
     ) -> None:
         """Check invariants with specified timing and record violations."""
         for inv in self.invariants:
@@ -287,7 +297,7 @@ class Agent:
         self,
         state: State,
         action: Action,
-        result: "ActionResult",
+        result: ActionResult,
     ) -> None:
         """Check action's response assertions and record violations."""
         from venomqa.v1.core.action import ActionResult
@@ -315,7 +325,7 @@ class Agent:
         self._hypergraph.add(state.id, edge)
 
     @property
-    def hypergraph(self) -> "Hypergraph | None":
+    def hypergraph(self) -> Hypergraph | None:
         """The Hypergraph instance, if hypergraph mode is enabled."""
         return self._hypergraph
 
