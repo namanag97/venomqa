@@ -297,13 +297,17 @@ def format_error_for_cli(error: Exception) -> str:
 
 # Import templates from separate module to keep this file focused on commands
 from venomqa.cli.templates import (
-    VENOMQA_YAML_TEMPLATE as VENVOMQA_YAML_TEMPLATE,  # backwards compat alias
-    DOCKER_COMPOSE_QA_TEMPLATE,
     ACTIONS_INIT_PY,
+    DOCKER_COMPOSE_QA_TEMPLATE,
     FIXTURES_INIT_PY,
     JOURNEYS_INIT_PY,
     SAMPLE_ACTION_PY,
     SAMPLE_JOURNEY_PY,
+)
+from venomqa.cli.templates import (
+    VENOMQA_YAML_TEMPLATE as VENVOMQA_YAML_TEMPLATE,  # backwards compat alias
+)
+from venomqa.cli.templates import (
     get_readme_template as _get_readme_template,
 )
 
@@ -1426,8 +1430,8 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
         elif not force:
             console.print(f"[yellow]Directory '{base}' already exists.[/yellow]")
             console.print("\nRun one of:")
-            console.print(f"  [cyan]venomqa init --update[/cyan]  Update framework files (preserves your code)")
-            console.print(f"  [cyan]venomqa init --force[/cyan]   Overwrite ALL files (deletes your code!)")
+            console.print("  [cyan]venomqa init --update[/cyan]  Update framework files (preserves your code)")
+            console.print("  [cyan]venomqa init --force[/cyan]   Overwrite ALL files (deletes your code!)")
             sys.exit(1)
         else:
             console.print(f"[bold]Reinitializing VenomQA project in '{base}/'[/bold]\n")
@@ -1558,7 +1562,7 @@ the same starting point, it must ROLLBACK the database between branches.
     console.print("  [bold red]1. Set up database rollback first![/bold red] (see above)")
     console.print(f"  2. Edit [cyan]{base}/venomqa.yaml[/cyan] — set base_url and db_url")
     console.print(f"  3. Write actions in [cyan]{base}/actions/[/cyan]")
-    console.print(f"  4. Write invariants and run [cyan]Agent.explore()[/cyan]")
+    console.print("  4. Write invariants and run [cyan]Agent.explore()[/cyan]")
 
     if with_sample:
         console.print("\n[bold]Run the sample exploration:[/bold]")
@@ -3585,7 +3589,7 @@ def explore_v1(
     """Run stateful V1 exploration against an API."""
     import types
 
-    from venomqa.v1.cli.main import cmd_explore
+    from venomqa.cli.main import cmd_explore
 
     args = types.SimpleNamespace(
         journey_file=journey_file,
