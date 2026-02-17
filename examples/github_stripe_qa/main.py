@@ -213,7 +213,9 @@ def run_exploration(max_steps: int = 50) -> bool:
     github_server.shutdown()
     stripe_server.shutdown()
     github_api.close()
-    stripe_api.close()  # type: ignore[attr-defined]
+    stripe_api.close()
+    github_obs.close()
+    stripe_obs.close()
 
     return len(result.violations) == 0
 
