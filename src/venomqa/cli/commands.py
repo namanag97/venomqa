@@ -1434,6 +1434,19 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
     else:
         console.print(f"[bold]Initializing VenomQA project in '{base}/'[/bold]\n")
 
+    # Run interactive setup unless --yes flag is used or in update mode
+    setup_config = None
+    if not yes and not update:
+        setup_config = _run_interactive_setup(console)
+
+    # Generate config files based on interactive setup
+    if setup_config:
+        yaml_content = _generate_yaml_config(setup_config)
+        docker_content = _generate_docker_compose(setup_config)
+    else:
+        yaml_content = VENVOMQA_YAML_TEMPLATE
+        docker_content = DOCKER_COMPOSE_QA_TEMPLATE
+
     dirs_to_create = [
         base,
         base / "actions",
@@ -1454,8 +1467,8 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
     ]
 
     user_files = [
-        (base / "venomqa.yaml", VENVOMQA_YAML_TEMPLATE),
-        (base / "docker-compose.qa.yml", DOCKER_COMPOSE_QA_TEMPLATE),
+        (base / "venomqa.yaml", yaml_content),
+        (base / "docker-compose.qa.yml", docker_content),
         (base / "actions" / "__init__.py", ACTIONS_INIT_PY),
         (base / "fixtures" / "__init__.py", FIXTURES_INIT_PY),
         (base / "journeys" / "__init__.py", JOURNEYS_INIT_PY),
