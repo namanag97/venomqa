@@ -1921,11 +1921,21 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
 
     base = Path(base_path)
 
-    if base.exists() and not force:
-        console.print(f"[red]Directory '{base}' already exists. Use --force to overwrite.[/red]")
-        sys.exit(1)
-
-    console.print(f"[bold]Initializing VenomQA project in '{base}/'[/bold]\n")
+    # Handle existing directory
+    if base.exists():
+        if update:
+            # Update mode: only update framework files
+            console.print(f"[bold]Updating VenomQA framework files in '{base}/'[/bold]\n")
+        elif not force:
+            console.print(f"[yellow]Directory '{base}' already exists.[/yellow]")
+            console.print("Options:")
+            console.print("  --update  Update framework files only (preserves your actions/journeys)")
+            console.print("  --force   Overwrite ALL files (will delete your actions/journeys!)")
+            sys.exit(1)
+        else:
+            console.print(f"[bold]Reinitializing VenomQA project in '{base}/'[/bold]\n")
+    else:
+        console.print(f"[bold]Initializing VenomQA project in '{base}/'[/bold]\n")
 
     dirs_to_create = [
         base,
@@ -1938,22 +1948,34 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
     # Generate llm-context.md content
     from venomqa.cli.llm_docs import LLM_CONTEXT
 
-    files_to_create = [
+    # Separate framework files from user files
+    # Framework files: safe to update anytime (generated, no user code)
+    # User files: only touch if --force or file doesn't exist
+    framework_files = [
+        (base / "llm-context.md", LLM_CONTEXT),
+        (base / "README.md", _get_readme_template(base_path)),
+    ]
+
+    user_files = [
         (base / "venomqa.yaml", VENVOMQA_YAML_TEMPLATE),
         (base / "docker-compose.qa.yml", DOCKER_COMPOSE_QA_TEMPLATE),
         (base / "actions" / "__init__.py", ACTIONS_INIT_PY),
         (base / "fixtures" / "__init__.py", FIXTURES_INIT_PY),
         (base / "journeys" / "__init__.py", JOURNEYS_INIT_PY),
-        (base / "README.md", _get_readme_template(base_path)),
-        (base / "llm-context.md", LLM_CONTEXT),
     ]
 
-    # Add sample files if requested
-    if with_sample:
-        files_to_create.extend([
+    # Add sample files if requested (only if not in update mode)
+    if with_sample and not update:
+        user_files.extend([
             (base / "actions" / "sample_actions.py", SAMPLE_ACTION_PY),
             (base / "journeys" / "sample_journey.py", SAMPLE_JOURNEY_PY),
         ])
+
+    # In update mode, only update framework files
+    if update:
+        files_to_create = framework_files
+    else:
+        files_to_create = framework_files + user_files
 
     # Create directories
     for dir_path in dirs_to_create:
