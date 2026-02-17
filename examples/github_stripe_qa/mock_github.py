@@ -157,6 +157,11 @@ class GitHubHandler(BaseHTTPRequestHandler):
                 _send_json(self, 200, _state["users"][login])
                 return
 
+            # GET /users  (list all users)
+            if path == "/users":
+                _send_json(self, 200, list(_state["users"].values()))
+                return
+
             # GET /repos  (optional ?owner=login filter)
             if path == "/repos":
                 owner = qs.get("owner", [None])[0]
