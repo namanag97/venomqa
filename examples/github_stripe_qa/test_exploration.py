@@ -29,6 +29,7 @@ from venomqa.v1.adapters.http import HttpClient
 from venomqa.v1.adapters.mock_queue import MockQueue
 from venomqa.v1.core.action import Action
 from venomqa.v1.agent.strategies import BFS, DFS
+from stripe_proxy import StripeProxy
 
 import mock_github
 import mock_stripe
