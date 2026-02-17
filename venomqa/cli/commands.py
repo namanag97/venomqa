@@ -1546,20 +1546,23 @@ def _send_notifications(
 )
 @click.pass_context
 def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, skip_checks: bool) -> None:
-    """Initialize a new VenomQA project structure.
+    """Initialize a new VenomQA project.
 
-    Creates the following structure:
-        qa/
-        ├── venomqa.yaml          # Configuration file
-        ├── docker-compose.qa.yml # Docker Compose for QA environment
-        ├── actions/
-        │   └── __init__.py       # Reusable actions
-        ├── fixtures/
-        │   └── __init__.py       # Test fixtures
-        └── journeys/
-            └── __init__.py       # Journey definitions
+    \b
+    Creates:
+      qa/
+      ├── venomqa.yaml        API URL and settings
+      ├── llm-context.md      Paste into any AI assistant for help
+      ├── actions/            Your action functions (api, context) -> response
+      ├── fixtures/           Shared test data
+      ├── journeys/           Exploration scripts using Agent.explore()
+      └── reports/            Generated HTML/JSON reports
 
-    Use --with-sample to also create sample actions and journeys.
+    \b
+    Examples:
+      venomqa init                    Minimal scaffold
+      venomqa init --with-sample      Scaffold + working sample exploration
+      venomqa init -p myproject       Use a different directory name
     """
     from rich.console import Console
 
