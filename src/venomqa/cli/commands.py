@@ -294,40 +294,100 @@ Each action has signature: (api, context)
   - api      : HttpClient — .get() .post() .put() .patch() .delete()
   - context  : Context   — .get(key) / .set(key, val)  ← NOT context[key]
 
+CRITICAL: Actions MUST validate responses. Don't assume success!
+    - Check status_code before using response body
+    - Raise AssertionError on unexpected status (VenomQA records the failure)
+    - Use Action(preconditions=[...]) instead of silent no-ops
+
 Modify these for your specific API, then register them in an Agent.
 """
 
 
 def health_check(api, context):
     """Check API health status."""
-    return api.get("/health")
+    resp = api.get("/health")
+    if resp.status_code != 200:
+        raise AssertionError(f"Health check failed: {resp.status_code}")
+    return resp
 
 
 def list_items(api, context):
-    """List all items and store in context."""
+    """List all items and store in context.
+
+    GOOD PATTERN: Validate the response before using it.
+    """
     resp = api.get("/api/items")
-    if resp.status_code == 200:
-        context.set("items", resp.json())
+    if resp.status_code != 200:
+        raise AssertionError(f"List items failed: {resp.status_code} - {resp.text}")
+
+    data = resp.json()
+    if not isinstance(data, list):
+        raise AssertionError(f"Expected list, got {type(data)}: {data}")
+
+    context.set("items", data)
+    context.set("item_count", len(data))
     return resp
 
 
 def create_item(api, context):
-    """Create a new item and store its ID in context."""
+    """Create a new item and store its ID in context.
+
+    GOOD PATTERN: Validate response status AND body fields.
+    """
     resp = api.post("/api/items", json={
         "name": "VenomQA Test Item",
         "description": "Created by VenomQA",
     })
-    if resp.status_code in (200, 201):
-        context.set("item_id", resp.json().get("id"))
+
+    if resp.status_code not in (200, 201):
+        raise AssertionError(f"Create failed: {resp.status_code} - {resp.text}")
+
+    data = resp.json()
+    if "id" not in data:
+        raise AssertionError(f"Response missing 'id' field: {data}")
+
+    context.set("item_id", data["id"])
+    return resp
+
+
+def get_item(api, context):
+    """Fetch a single item by ID.
+
+    GOOD PATTERN: Use Action(preconditions=["create_item"]) instead of
+    checking context.has() inside the action.
+    """
+    item_id = context.get("item_id")
+    resp = api.get(f"/api/items/{item_id}")
+
+    if resp.status_code != 200:
+        raise AssertionError(f"Get item failed: {resp.status_code}")
+
+    data = resp.json()
+    if data.get("id") != item_id:
+        raise AssertionError(f"Wrong item returned: expected {item_id}, got {data}")
+
     return resp
 
 
 def delete_item(api, context):
-    """Delete the item created by create_item."""
+    """Delete the item created by create_item.
+
+    GOOD PATTERN: This action should use preconditions=["create_item"]
+    so VenomQA only runs it after create_item has succeeded.
+
+    BAD PATTERN (DON'T DO THIS):
+        if item_id is None:
+            return api.get("/noop")   # Silent no-op - hides bugs!
+    """
     item_id = context.get("item_id")
-    if item_id is None:
-        return api.get("/api/items")   # no-op if nothing to delete
-    return api.delete(f"/api/items/{item_id}")
+    resp = api.delete(f"/api/items/{item_id}")
+
+    if resp.status_code not in (200, 204):
+        raise AssertionError(f"Delete failed: {resp.status_code}")
+
+    # Clean up context so we know item is gone
+    context.delete("item_id")
+    return resp
 '''
 
 def _get_readme_template(base_path: str) -> str:
