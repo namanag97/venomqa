@@ -109,7 +109,13 @@ def cmd_validate(args: Any) -> int:
 
     journey = load_journey(args.journey_file)
     if journey is None:
-        print(f"Error: Could not load journey from {args.journey_file}", file=sys.stderr)
+        print(
+            f"Error: No Journey found in {args.journey_file}.\n"
+            "  venomqa validate only works with DSL-style Journey files.\n"
+            "  Files using the flat Action/Agent API don't need validation —\n"
+            "  run them directly with: venomqa explore <file> --base-url <url>",
+            file=sys.stderr,
+        )
         return 1
 
     try:
