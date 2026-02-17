@@ -14,9 +14,16 @@ class MockTime:
     Implements Rollbackable protocol for checkpoint/restore.
     """
 
-    def __init__(self, start: datetime | None = None) -> None:
+    def __init__(self, start: datetime | None = None, frozen: bool | None = None) -> None:
+        """Initialize MockTime.
+
+        Args:
+            start: Starting time. If provided, auto-freezes at this time.
+            frozen: Explicit freeze state. If None, auto-freezes when start is provided.
+        """
         self._current = start or datetime.now()
-        self._frozen = False
+        # Auto-freeze when start time is provided (user expects frozen time)
+        self._frozen = frozen if frozen is not None else (start is not None)
 
     @property
     def now(self) -> datetime:
