@@ -38,13 +38,12 @@ from venomqa.core.models import (  # noqa: E402
     StepResult,
 )
 
-# Now set up submodule aliasing: allow `from venomqa.core.action import Action` etc.
-# For submodules that DON'T exist as real files in venomqa/core/,
-# this creates sys.modules entries pointing to venomqa.v1.core.X.
-# For context and graph that DO exist as real files, we override the
-# already-loaded module entry with the v1 version.
+# Submodule aliasing: allow `from venomqa.core.action import Action` etc.
+# Only alias submodules that DON'T already exist as real files in venomqa/core/.
+# context.py and graph.py exist as real v0 files and must not be overridden
+# because legacy code imports ExecutionContext from venomqa.core.context.
 _V1_CORE_SUBMODULES = [
-    "action", "state", "context", "graph", "transition",
+    "action", "state", "transition",
     "invariant", "result", "observers", "constraints",
     "coverage", "dimensions", "hyperedge", "hypergraph",
 ]
@@ -52,11 +51,12 @@ _V1_CORE_SUBMODULES = [
 for _submod in _V1_CORE_SUBMODULES:
     _v1_name = f"venomqa.v1.core.{_submod}"
     _alias_name = f"venomqa.core.{_submod}"
-    try:
-        _mod = importlib.import_module(_v1_name)
-        sys.modules[_alias_name] = _mod
-    except ImportError:
-        pass
+    if _alias_name not in sys.modules:
+        try:
+            _mod = importlib.import_module(_v1_name)
+            sys.modules[_alias_name] = _mod
+        except ImportError:
+            pass
 
 # Main API (from v1) - these now resolve through the aliases above
 from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse  # noqa: E402
