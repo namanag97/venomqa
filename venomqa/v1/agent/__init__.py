@@ -103,9 +103,11 @@ class Agent:
 
             # Exploration loop
             self._step_count = 0
+            _exhausted = False
             while self._step_count < self.max_steps:
                 transition = self._step()
                 if transition is None:
+                    _exhausted = True
                     break  # No more unexplored pairs
                 self._step_count += 1
 
