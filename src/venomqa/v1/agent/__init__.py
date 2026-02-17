@@ -206,9 +206,7 @@ class Agent:
                 self._register_hyperedge(initial_state)
 
             # Initialize strategy with initial state's valid actions
-            valid_actions = self.graph.get_valid_actions(
-                initial_state, self.world.context, self.graph.used_action_names
-            )
+            valid_actions = self._get_valid_actions(initial_state)
 
             # ── Sanity check #2: warn if all actions are valid from step 0 ──
             # This usually means context IDs were pre-seeded in setup() so
