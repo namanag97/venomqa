@@ -1,53 +1,61 @@
-"""HTTP-backed Rollbackable observers for the mock GitHub and Stripe servers.
+"""State observers for the mock GitHub and Stripe servers.
 
-VenomQA's state graph is built from observations. When the World's systems
-all return unchanged observations, VenomQA sees only one state and terminates.
+Both observers extend MockHTTPServer (from venomqa.v1.adapters.mock_http_server)
+which gives them REAL checkpoint/rollback support by directly snapshotting and
+restoring the module-level _state dicts — no HTTP round-trips required.
 
-These observers solve the problem by fetching LIVE state from the mock HTTP
-servers on every observe() call. As users, repos, issues and payments are
-created/deleted, the observations change, creating new distinct states in the
-exploration graph.
-
-Because real HTTP servers don't support SAVEPOINT-style rollback, checkpoint()
-and rollback() are no-ops here. The trade-off: exploration is sequential (no
-branching), but invariants are still checked after every action.
+Improvements over the old HTTPObserver approach:
+  - observe()      reads state dict directly — O(1), no network calls
+  - checkpoint()   deepcopies the state dict — fast, exact
+  - rollback()     restores state dict — enables TRUE branching exploration
+  - No StripeProxy needed — state dict is fully picklable
 """
 
 from __future__ import annotations
 
-import httpx
+from typing import Any
 
+import mock_github
+import mock_stripe
+
+from venomqa.v1.adapters.mock_http_server import MockHTTPServer
 from venomqa.v1.core.state import Observation
 
 
-class GitHubObserver:
-    """Observes mock GitHub API state for VenomQA."""
+class GitHubObserver(MockHTTPServer):
+    """Observes and rolls back mock GitHub server state without HTTP calls."""
 
-    def __init__(self, base_url: str) -> None:
-        self._base_url = base_url.rstrip("/")
-        self._client = httpx.Client(base_url=self._base_url, timeout=5.0)
-        self._checkpoints: dict[str, dict] = {}
+    def __init__(self) -> None:
+        super().__init__("github")
 
-    # ------------------------------------------------------------------ observe
-    def observe(self) -> Observation:
-        """Fetch current state from the GitHub mock server."""
-        try:
-            users_resp = self._client.get("/users")
-            users = users_resp.json() if users_resp.status_code == 200 else []
-        except Exception:
-            users = []
+    @staticmethod
+    def get_state_snapshot() -> dict[str, Any]:
+        return mock_github.get_state_snapshot()
 
-        try:
-            repos_resp = self._client.get("/repos")
-            repos = repos_resp.json() if repos_resp.status_code == 200 else []
-        except Exception:
-            repos = []
+    @staticmethod
+    def rollback_from_snapshot(snapshot: dict[str, Any]) -> None:
+        with mock_github._lock:
+            mock_github._state["users"].clear()
+            mock_github._state["users"].update(snapshot.get("users", {}))
+            mock_github._state["repos"].clear()
+            mock_github._state["repos"].update(snapshot.get("repos", {}))
+            mock_github._state["issues"].clear()
+            mock_github._state["issues"].update(snapshot.get("issues", {}))
+            mock_github._state["_issue_counters"].clear()
+            mock_github._state["_issue_counters"].update(snapshot.get("_issue_counters", {}))
 
-        open_issues_total = sum(r.get("open_issues_count", 0) for r in repos)
-        # Count closed issues to create distinct states when issues are closed
-        closed_issues_total = sum(
-            len([i for i in self._fetch_issues(r["id"]) if i.get("state") == "closed"])
-            for r in repos
+    def observe_from_state(self, state: dict[str, Any]) -> Observation:
+        users = state.get("users", {})
+        repos = state.get("repos", {})
+        issues_by_repo = state.get("issues", {})
+
+        open_count = sum(
+            1 for issues in issues_by_repo.values()
+            for i in issues if i.get("state") == "open"
+        )
+        closed_count = sum(
+            1 for issues in issues_by_repo.values()
+            for i in issues if i.get("state") == "closed"
         )
 
         return Observation(
@@ -55,72 +63,44 @@ class GitHubObserver:
             data={
                 "user_count": len(users),
                 "repo_count": len(repos),
-                "open_issues_total": open_issues_total,
-                "closed_issues_total": closed_issues_total,
+                "open_issues_total": open_count,
+                "closed_issues_total": closed_count,
             },
         )
 
-    def _fetch_issues(self, repo_id: str) -> list:
-        try:
-            resp = self._client.get(f"/repos/{repo_id}/issues", params={"state": "all"})
-            return resp.json() if resp.status_code == 200 else []
-        except Exception:
-            return []
 
-    # ------------------------------------------------------------------ checkpoint / rollback
-    def checkpoint(self, name: str) -> dict:
-        """Save current observation as a checkpoint (HTTP servers don't rollback)."""
-        snap = self.observe().data
-        self._checkpoints[name] = snap
-        return snap
+class StripeObserver(MockHTTPServer):
+    """Observes and rolls back mock Stripe server state without HTTP calls."""
 
-    def rollback(self, checkpoint: dict) -> None:
-        """No-op: HTTP server state cannot be rolled back via savepoints."""
-        pass  # Accepted limitation for external HTTP services
+    def __init__(self) -> None:
+        super().__init__("stripe")
 
-    # ------------------------------------------------------------------ cleanup
-    def close(self) -> None:
-        self._client.close()
+    @staticmethod
+    def get_state_snapshot() -> dict[str, Any]:
+        return mock_stripe.get_state_snapshot()
 
+    @staticmethod
+    def rollback_from_snapshot(snapshot: dict[str, Any]) -> None:
+        with mock_stripe._lock:
+            mock_stripe._state["customers"].clear()
+            mock_stripe._state["customers"].update(snapshot.get("customers", {}))
+            mock_stripe._state["payment_intents"].clear()
+            mock_stripe._state["payment_intents"].update(snapshot.get("payment_intents", {}))
+            mock_stripe._state["refunds"].clear()
+            mock_stripe._state["refunds"].update(snapshot.get("refunds", {}))
 
-class StripeObserver:
-    """Observes mock Stripe API state for VenomQA."""
-
-    def __init__(self, base_url: str) -> None:
-        self._base_url = base_url.rstrip("/")
-        self._client = httpx.Client(base_url=self._base_url, timeout=5.0)
-        self._checkpoints: dict[str, dict] = {}
-
-    # ------------------------------------------------------------------ observe
-    def observe(self) -> Observation:
-        """Fetch current state from the Stripe mock server."""
-        try:
-            pis_resp = self._client.get("/payment_intents")
-            pis = pis_resp.json() if pis_resp.status_code == 200 else []
-        except Exception:
-            pis = []
-
-        total_charged = sum(pi.get("amount", 0) for pi in pis if pi.get("status") == "succeeded")
+    def observe_from_state(self, state: dict[str, Any]) -> Observation:
+        pis = state.get("payment_intents", {}).values()
+        total_charged = sum(
+            pi.get("amount", 0) for pi in pis if pi.get("status") == "succeeded"
+        )
         total_refunded = sum(pi.get("refunded_amount", 0) for pi in pis)
 
         return Observation(
             system="stripe",
             data={
-                "payment_intent_count": len(pis),
+                "payment_intent_count": len(list(pis)),
                 "total_charged": total_charged,
                 "total_refunded": total_refunded,
             },
         )
-
-    # ------------------------------------------------------------------ checkpoint / rollback
-    def checkpoint(self, name: str) -> dict:
-        snap = self.observe().data
-        self._checkpoints[name] = snap
-        return snap
-
-    def rollback(self, checkpoint: dict) -> None:
-        pass  # No-op
-
-    # ------------------------------------------------------------------ cleanup
-    def close(self) -> None:
-        self._client.close()
