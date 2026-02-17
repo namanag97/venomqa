@@ -3605,7 +3605,21 @@ def explore_v1(
     output_format: str,
     output: str | None,
 ) -> None:
-    """Run stateful V1 exploration against an API."""
+    """Run exploration against an API using a journey file.
+
+    \b
+    A journey file defines actions (API calls) and invariants (rules to check).
+    VenomQA will test every sequence of actions and report violations.
+
+    \b
+    Example:
+      venomqa explore my_journey.py --base-url http://localhost:8000
+
+    \b
+    Don't have a journey file yet?
+      1. Run: venomqa init --with-sample
+      2. Then: python3 venomqa/journeys/sample_journey.py
+    """
     import types
 
     from venomqa.cli.main import cmd_explore
