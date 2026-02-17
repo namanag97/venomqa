@@ -232,7 +232,13 @@ make ci            # lint + typecheck + coverage
 ## CLI
 
 ```bash
-venomqa run        # run explorations
+# V1 stateful exploration (recommended)
+venomqa explore journey.py --base-url http://localhost:8000   # run exploration
+venomqa validate journey.py                                   # check journey syntax
+venomqa record   journey.py --base-url http://localhost:8000  # record + generate skeleton
+
+# General
+venomqa run        # run V0 journeys
 venomqa doctor     # system diagnostics
 venomqa llm-docs   # print LLM context document (paste into any AI assistant)
 venomqa --help
