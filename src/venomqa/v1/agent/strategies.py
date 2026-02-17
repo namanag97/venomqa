@@ -30,6 +30,19 @@ class Strategy(Protocol):
         """
         ...
 
+    def notify(self, state: State, actions: list[Action]) -> None:
+        """Notify strategy of a new state and its valid actions.
+
+        Called by Agent after each transition to inform the strategy
+        about newly discovered states. Strategies use this to update
+        their internal queues/stacks.
+
+        Args:
+            state: The newly observed state.
+            actions: Actions valid from this state.
+        """
+        ...
+
 
 class BaseStrategy(ABC):
     """Base class for strategy implementations."""
