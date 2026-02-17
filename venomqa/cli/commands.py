@@ -314,94 +314,104 @@ def _get_readme_template(base_path: str) -> str:
     """Generate README content for an initialized project."""
     return f'''# VenomQA Test Suite
 
-This directory contains your VenomQA test suite.
+Autonomous API exploration — define actions and invariants, let VenomQA find every bug sequence.
 
 ## Directory Structure
 
 ```
 {base_path}/
-|-- venomqa.yaml           # Configuration file
-|-- docker-compose.qa.yml  # Docker Compose for test infrastructure
-|-- actions/               # Reusable test actions
+|-- venomqa.yaml              # API URL and settings
+|-- llm-context.md            # Paste this into any AI assistant for help
+|-- actions/                  # Your action functions
 |   +-- __init__.py
-|-- fixtures/              # Test fixtures and data
+|   +-- sample_actions.py     # (if --with-sample)
+|-- journeys/                 # Exploration scripts
 |   +-- __init__.py
-|-- journeys/              # Journey definitions
+|   +-- sample_journey.py     # (if --with-sample)
+|-- fixtures/                 # Shared test data
 |   +-- __init__.py
-+-- reports/               # Generated test reports
++-- reports/                  # Generated reports
 ```
 
 ## Quick Start
 
-1. **Configure your environment**
-   Edit `venomqa.yaml` to set your API base URL and other settings.
-
-2. **Start test infrastructure** (if using Docker)
+1. **Edit `venomqa.yaml`** — set `base_url` to your API
+2. **Write actions** in `actions/` — signature: `def my_action(api, context)`
+3. **Run an exploration**:
    ```bash
-   docker compose -f docker-compose.qa.yml up -d
+   python3 journeys/sample_journey.py
    ```
 
-3. **Run preflight checks**
-   ```bash
-   venomqa preflight
-   ```
-
-4. **Run tests**
-   ```bash
-   venomqa run                    # Run all journeys
-   venomqa run journey_name       # Run specific journey
-   venomqa run --debug            # Run with debug logging
-   venomqa run --fail-fast        # Stop on first failure
-   ```
-
-5. **Generate reports**
-   ```bash
-   venomqa report -f html -o reports/report.html
-   ```
-
-## Creating Actions
-
-Actions are reusable functions that interact with your API.
-Create them in `actions/`:
+## Actions (v1 API)
 
 ```python
 # actions/my_actions.py
-def login(client, context, email, password):
-    """Log in a user."""
-    response = client.post("/api/auth/login", json=dict(
-        email=email,
-        password=password
-    ))
-    if response.status_code == 200:
-        context["token"] = response.json()["token"]
-    return response
+
+def create_user(api, context):
+    resp = api.post("/users", json={{"name": "Alice"}})
+    context.set("user_id", resp.json()["id"])   # ← .set(), not context["key"] =
+    return resp
+
+def get_user(api, context):
+    user_id = context.get("user_id")            # ← .get(), not context["key"]
+    return api.get(f"/users/{{user_id}}")
 ```
 
-## Creating Journeys
-
-Journeys define complete user scenarios. Create them in `journeys/`:
+## Invariants
 
 ```python
-# journeys/my_journey.py
-from venomqa import Journey, Step, Checkpoint
-from actions.my_actions import login, create_item
+from venomqa.v1 import Invariant, Severity
 
-journey = Journey(
-    name="my_journey",
-    description="Test user workflow",
-    steps=[
-        Step(name="login", action=login, args=dict(email="test@example.com")),
-        Checkpoint(name="authenticated"),
-        Step(name="create", action=create_item),
-    ],
+def user_id_is_set(world):          # receives World, not (state, ctx)
+    return world.context.has("user_id")
+
+Invariant(
+    name="user_id_set",
+    check=user_id_is_set,
+    message="user_id must exist after login",   # ← 'message', not 'description'
+    severity=Severity.CRITICAL,
 )
 ```
 
-## Documentation
+## Run an exploration
 
-- [VenomQA Documentation](https://venomqa.dev/docs)
-- [Getting Started Guide](https://venomqa.dev/docs/getting-started)
-- [API Reference](https://venomqa.dev/docs/api)
+```python
+from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
+from venomqa.v1.adapters.http import HttpClient
+from actions.my_actions import create_user, get_user
+
+agent = Agent(
+    world=World(api=HttpClient("http://localhost:8000")),
+    actions=[
+        Action(name="create_user", execute=create_user, expected_status=[201]),
+        Action(name="get_user",    execute=get_user,    expected_status=[200]),
+    ],
+    invariants=[...],
+    strategy=BFS(),
+    max_steps=200,
+)
+result = agent.explore()
+```
+
+## Using an AI assistant
+
+See `llm-context.md` in this directory — paste it into Claude, ChatGPT, or
+Cursor so the AI knows the exact VenomQA API and won\'t give you wrong code.
+
+Or regenerate it any time:
+```bash
+venomqa llm-docs -o llm-context.md
+```
+
+## Common mistakes
+
+| Wrong | Correct |
+|-------|---------|
+| `def action(ctx, api)` | `def action(api, context)` |
+| `context["key"] = val` | `context.set("key", val)` |
+| `Invariant(description=...)` | `Invariant(message=...)` |
+| `def check(state, ctx)` | `def check(world)` |
+| `reporter.report(result, path=...)` | `open(f).write(reporter.report(result))` |
 '''
 
 SAMPLE_JOURNEY_PY = '''"""Sample VenomQA exploration (v1 API).
