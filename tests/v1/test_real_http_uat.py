@@ -184,7 +184,7 @@ class TestRealHttpUAT:
         _next_id = 1
 
         api = HttpClient(server)
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         agent = Agent(
             world=world,
@@ -219,7 +219,7 @@ class TestRealHttpUAT:
         _next_id = 1
 
         api = HttpClient(server)
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         def list_from_buggy(api, context):
             resp = api.get("/items/buggy")
@@ -257,7 +257,7 @@ class TestRealHttpUAT:
         _next_id = 1
 
         api = HttpClient(server)
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         agent = Agent(
             world=world,
@@ -281,7 +281,7 @@ class TestRealHttpUAT:
         _next_id = 1
 
         api = HttpClient(server)
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         agent = Agent(
             world=world,
@@ -302,7 +302,7 @@ class TestRealHttpUAT:
     def test_action_missing_return_raises_clear_error(self, server):
         """Action that returns None raises TypeError with helpful message."""
         api = HttpClient(server)
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         def bad_action(api, context):
             api.get("/health")   # forgot return!
@@ -324,7 +324,7 @@ class TestRealHttpUAT:
         _next_id = 1
 
         api = HttpClient(server)
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         agent = Agent(
             world=world,
@@ -355,7 +355,7 @@ class TestRealHttpUAT:
         _next_id = 1
 
         api = HttpClient(server)
-        world = World(api=api)
+        world = World(api=api, state_from_context=[])
 
         agent = Agent(
             world=world,
