@@ -190,7 +190,7 @@ class HookManager:
             HookType.ON_TIMEOUT: "on_timeout",
         }
 
-        VenomQAPluginBase = _get_base_plugin_class()
+        plugin_base_class = _get_base_plugin_class()
 
         for hook_type, method_name in hook_mappings.items():
             handler = getattr(plugin, method_name, None)
@@ -198,7 +198,7 @@ class HookManager:
                 continue
 
             # Check if method is overridden
-            base_method = getattr(VenomQAPluginBase, method_name, None)
+            base_method = getattr(plugin_base_class, method_name, None)
             if base_method is not None:
                 # Compare function objects (unwrap bound methods)
                 if hasattr(handler, "__func__") and hasattr(base_method, "__func__"):
