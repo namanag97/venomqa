@@ -190,20 +190,22 @@ services:
     command: ["echo", "Add your services above"]
 """
 
-ACTIONS_INIT_PY = '''"""Reusable actions for QA tests.
+ACTIONS_INIT_PY = '''"""Reusable actions for VenomQA tests (v1 API).
 
-Actions are functions decorated with @action that can be reused across journeys.
-They receive (client, ctx, **args) as parameters.
+Actions are plain functions with signature (api, context).
+  - api      : HttpClient  — use .get() .post() .put() .patch() .delete()
+  - context  : Context     — use .get(key) / .set(key, val) — NOT context[key]
 
 Example:
-    from venomqa.plugins import action
+    from venomqa.v1 import Action
 
-    @action("cart.add_to_cart")
-    def add_to_cart(client, ctx, product_id: int, quantity: int = 1):
-        return client.post("/api/cart/items", json={
-            "product_id": product_id,
-            "quantity": quantity
-        })
+    def add_to_cart(api, context):
+        product_id = context.get("product_id")
+        resp = api.post("/api/cart/items", json={"product_id": product_id, "quantity": 1})
+        context.set("cart_id", resp.json()["id"])
+        return resp
+
+    action = Action(name="add_to_cart", execute=add_to_cart, expected_status=[201])
 """
 '''
 
