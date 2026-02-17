@@ -424,17 +424,31 @@ Autonomous API exploration — define actions and invariants, let VenomQA find e
 
 ## Actions (v1 API)
 
+Actions MUST validate responses. Don't assume success!
+
 ```python
 # actions/my_actions.py
 
 def create_user(api, context):
     resp = api.post("/users", json={{"name": "Alice"}})
-    context.set("user_id", resp.json()["id"])   # ← .set(), not context["key"] =
+
+    # GOOD: Validate before using response
+    if resp.status_code != 201:
+        raise AssertionError(f"Create failed: {{resp.status_code}} - {{resp.text}}")
+    data = resp.json()
+    if "id" not in data:
+        raise AssertionError(f"Missing 'id' in response: {{data}}")
+
+    context.set("user_id", data["id"])   # ← .set(), not context["key"] =
     return resp
 
 def get_user(api, context):
-    user_id = context.get("user_id")            # ← .get(), not context["key"]
-    return api.get(f"/users/{{user_id}}")
+    user_id = context.get("user_id")     # ← .get(), not context["key"]
+    resp = api.get(f"/users/{{user_id}}")
+
+    if resp.status_code != 200:
+        raise AssertionError(f"Get user failed: {{resp.status_code}}")
+    return resp
 ```
 
 ## Invariants
