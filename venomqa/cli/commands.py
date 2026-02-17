@@ -1605,6 +1605,9 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
         base / "reports",
     ]
 
+    # Generate llm-context.md content
+    from venomqa.cli.llm_docs import LLM_CONTEXT
+
     files_to_create = [
         (base / "venomqa.yaml", VENVOMQA_YAML_TEMPLATE),
         (base / "docker-compose.qa.yml", DOCKER_COMPOSE_QA_TEMPLATE),
@@ -1612,6 +1615,7 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
         (base / "fixtures" / "__init__.py", FIXTURES_INIT_PY),
         (base / "journeys" / "__init__.py", JOURNEYS_INIT_PY),
         (base / "README.md", _get_readme_template(base_path)),
+        (base / "llm-context.md", LLM_CONTEXT),
     ]
 
     # Add sample files if requested
@@ -1640,19 +1644,22 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
 
     console.print(f"\n[bold green]VenomQA project initialized in '{base}/'[/bold green]")
     console.print("\n[bold]Next steps:[/bold]")
-    console.print(f"  1. Edit [cyan]{base}/venomqa.yaml[/cyan] to configure your environment")
-    console.print(f"  2. Add actions in [cyan]{base}/actions/[/cyan]")
-    console.print(f"  3. Define fixtures in [cyan]{base}/fixtures/[/cyan]")
-    console.print(f"  4. Create journeys in [cyan]{base}/journeys/[/cyan]")
+    console.print(f"  1. Edit [cyan]{base}/venomqa.yaml[/cyan] — set base_url to your API")
+    console.print(f"  2. Write actions in [cyan]{base}/actions/[/cyan]  (signature: api, context)")
+    console.print(f"  3. Write invariants and run [cyan]Agent.explore()[/cyan] in {base}/journeys/")
 
     if with_sample:
-        console.print("\n[bold]Run your first test:[/bold]")
-        console.print(f"  cd {base} && venomqa run sample_journey")
+        console.print("\n[bold]Run the sample exploration:[/bold]")
+        console.print(f"  python3 {base}/journeys/sample_journey.py")
     else:
-        console.print("\n[bold]Or initialize with sample files:[/bold]")
+        console.print("\n[bold]Generate sample files:[/bold]")
         console.print(f"  venomqa init --force --with-sample -p {base}")
 
-    console.print("\n[bold]Check system status:[/bold]")
+    console.print(
+        f"\n[bold cyan]AI assistant?[/bold cyan] Paste [cyan]{base}/llm-context.md[/cyan] "
+        "into Claude, ChatGPT, or Cursor — it has all correct API signatures."
+    )
+    console.print("\n[bold]System check:[/bold]")
     console.print("  venomqa doctor")
 
 
