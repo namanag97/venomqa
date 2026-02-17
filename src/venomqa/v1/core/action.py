@@ -127,7 +127,7 @@ class ActionResult:
 
     # ── Validation helpers — make it easy to write correct actions ──
 
-    def expect_status(self, *expected: int) -> "ActionResult":
+    def expect_status(self, *expected: int) -> ActionResult:
         """Assert the response has one of the expected status codes.
 
         Raises AssertionError if status doesn't match. Returns self for chaining.
@@ -149,7 +149,7 @@ class ActionResult:
             )
         return self
 
-    def expect_success(self) -> "ActionResult":
+    def expect_success(self) -> ActionResult:
         """Assert the response is successful (2xx/3xx).
 
         Raises AssertionError if not successful. Returns self for chaining.
@@ -336,11 +336,38 @@ class Action:
             expect_failure=True,  # Expect 4xx/5xx
         )
 
+    Preconditions (guards) - three ways to specify:
+
+        # Single callable (shorthand)
+        Action(
+            name="delete_repo",
+            execute=delete_repo,
+            precondition=lambda ctx: ctx.get("repo_id") is not None,
+        )
+
+        # Multiple preconditions
+        Action(
+            name="merge_pr",
+            execute=merge_pr,
+            preconditions=[
+                lambda ctx: ctx.get("pr_id") is not None,
+                lambda ctx: ctx.get("repo_id") is not None,
+            ],
+        )
+
+        # String shorthand (requires another action to have run first)
+        Action(
+            name="get_connection",
+            execute=get_connection,
+            preconditions=["create_connection"],  # action name
+        )
+
     The framework automatically detects whether your action accepts context.
     """
 
     name: str
     execute: Callable[..., ActionResult]
+    precondition: Callable[[Any], bool] | None = None  # Single precondition (shorthand)
     preconditions: list[Precondition] = field(default_factory=list)
     description: str = ""
     tags: list[str] = field(default_factory=list)
