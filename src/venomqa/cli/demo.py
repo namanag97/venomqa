@@ -127,80 +127,166 @@ def start_demo_server(port: int = 8000) -> HTTPServer:
 
 
 def run_demo_journey(base_url: str) -> dict[str, Any]:
-    """Run a demo journey and return results."""
-    from venomqa import Client, Journey, Step
-    from venomqa.runner import JourneyRunner
+    """Run a demo exploration using v1 API and return results."""
+    from venomqa import Action, Agent, World, BFS, Invariant, Severity
+    from venomqa.adapters.http import HttpClient
 
     results: dict[str, Any] = {"steps": [], "success": True}
+    step_timings: list[dict[str, Any]] = []
 
-    def health_check(client: Any, ctx: dict) -> Any:
-        response = client.get("/health")
-        ctx["health_status"] = response.json().get("status")
-        return response
+    # --- Actions (v1 API: signature is (api, context)) ---
 
-    def list_items_empty(client: Any, ctx: dict) -> Any:
-        response = client.get("/items")
-        ctx["initial_count"] = len(response.json())
-        return response
+    def health_check(api: Any, context: Any) -> Any:
+        start = time.time()
+        resp = api.get("/health")
+        step_timings.append({
+            "name": "health_check",
+            "success": resp.status_code == 200,
+            "duration_ms": (time.time() - start) * 1000,
+        })
+        context.set("health_status", resp.json().get("status") if resp.status_code == 200 else None)
+        return resp
 
-    def create_item(client: Any, ctx: dict) -> Any:
-        response = client.post("/items", json={
+    def list_items(api: Any, context: Any) -> Any:
+        start = time.time()
+        resp = api.get("/items")
+        step_timings.append({
+            "name": "list_items",
+            "success": resp.status_code == 200,
+            "duration_ms": (time.time() - start) * 1000,
+        })
+        if resp.status_code == 200:
+            context.set("item_count", len(resp.json()))
+        return resp
+
+    def create_item(api: Any, context: Any) -> Any:
+        start = time.time()
+        resp = api.post("/items", json={
             "name": "VenomQA Demo Item",
             "description": "Created automatically by venomqa demo",
             "price": 29.99,
         })
-        if response.status_code == 201:
-            ctx["item_id"] = response.json()["id"]
-            ctx["item_name"] = response.json()["name"]
-        return response
+        step_timings.append({
+            "name": "create_item",
+            "success": resp.status_code == 201,
+            "duration_ms": (time.time() - start) * 1000,
+        })
+        if resp.status_code == 201:
+            data = resp.json()
+            context.set("item_id", data["id"])
+            context.set("item_name", data["name"])
+        return resp
 
-    def get_item(client: Any, ctx: dict) -> Any:
-        item_id = ctx.get("item_id", "1")
-        return client.get(f"/items/{item_id}")
+    def get_item(api: Any, context: Any) -> Any:
+        start = time.time()
+        item_id = context.get("item_id")
+        resp = api.get(f"/items/{item_id}")
+        step_timings.append({
+            "name": "get_item",
+            "success": resp.status_code == 200,
+            "duration_ms": (time.time() - start) * 1000,
+        })
+        return resp
 
-    def update_item(client: Any, ctx: dict) -> Any:
-        item_id = ctx.get("item_id", "1")
-        return client.put(f"/items/{item_id}", json={
+    def update_item(api: Any, context: Any) -> Any:
+        start = time.time()
+        item_id = context.get("item_id")
+        resp = api.put(f"/items/{item_id}", json={
             "name": "Updated Demo Item",
             "price": 39.99,
         })
+        step_timings.append({
+            "name": "update_item",
+            "success": resp.status_code == 200,
+            "duration_ms": (time.time() - start) * 1000,
+        })
+        return resp
 
-    def delete_item(client: Any, ctx: dict) -> Any:
-        item_id = ctx.get("item_id", "1")
-        return client.delete(f"/items/{item_id}")
+    def delete_item(api: Any, context: Any) -> Any:
+        start = time.time()
+        item_id = context.get("item_id")
+        resp = api.delete(f"/items/{item_id}")
+        step_timings.append({
+            "name": "delete_item",
+            "success": resp.status_code == 204,
+            "duration_ms": (time.time() - start) * 1000,
+        })
+        if resp.status_code == 204:
+            context.set("_deleted_id", item_id)
+            context.delete("item_id")
+        return resp
 
-    def verify_deleted(client: Any, ctx: dict) -> Any:
-        item_id = ctx.get("item_id", "1")
-        return client.get(f"/items/{item_id}")
+    def verify_deleted(api: Any, context: Any) -> Any:
+        start = time.time()
+        deleted_id = context.get("_deleted_id")
+        resp = api.get(f"/items/{deleted_id}")
+        # Success = 404 (item should be gone)
+        step_timings.append({
+            "name": "verify_deleted",
+            "success": resp.status_code == 404,
+            "duration_ms": (time.time() - start) * 1000,
+        })
+        return resp
 
-    journey = Journey(
-        name="demo_journey",
-        description="VenomQA Demo - CRUD Operations",
-        steps=[
-            Step(name="health_check", action=health_check, description="Check API health"),
-            Step(name="list_items", action=list_items_empty, description="List items (empty)"),
-            Step(name="create_item", action=create_item, description="Create a new item"),
-            Step(name="get_item", action=get_item, description="Retrieve the item"),
-            Step(name="update_item", action=update_item, description="Update the item"),
-            Step(name="delete_item", action=delete_item, description="Delete the item"),
-            Step(name="verify_deleted", action=verify_deleted, description="Verify deletion (expect 404)", expect_failure=True),
+    # --- Invariant ---
+
+    def items_list_is_array(world: Any) -> bool:
+        """GET /items must always return a JSON array."""
+        resp = world.api.get("/items")
+        if resp.status_code != 200:
+            return False
+        return isinstance(resp.json(), list)
+
+    # --- Run exploration ---
+
+    api = HttpClient(base_url)
+    world = World(api=api, state_from_context=["item_id", "item_count"])
+
+    agent = Agent(
+        world=world,
+        actions=[
+            Action(name="health_check", execute=health_check, expected_status=[200]),
+            Action(name="list_items", execute=list_items, expected_status=[200]),
+            Action(name="create_item", execute=create_item, expected_status=[201]),
+            Action(name="get_item", execute=get_item, expected_status=[200],
+                   preconditions=["create_item"]),
+            Action(name="update_item", execute=update_item, expected_status=[200],
+                   preconditions=["create_item"]),
+            Action(name="delete_item", execute=delete_item, expected_status=[204],
+                   preconditions=["create_item"]),
+            Action(name="verify_deleted", execute=verify_deleted, expected_status=[404],
+                   preconditions=["delete_item"]),
         ],
+        invariants=[
+            Invariant(
+                name="items_is_array",
+                check=items_list_is_array,
+                message="GET /items must return JSON array",
+                severity=Severity.CRITICAL,
+            ),
+        ],
+        strategy=BFS(),
+        max_steps=15,  # Small for demo
     )
 
-    client = Client(base_url=base_url)
-    runner = JourneyRunner(client=client)
-    result = runner.run(journey)
+    start_time = time.time()
+    result = agent.explore()
+    total_duration = (time.time() - start_time) * 1000
 
-    results["success"] = result.success
-    results["duration_ms"] = result.duration_ms
-    results["steps"] = [
-        {
-            "name": sr.step_name,
-            "success": sr.success,
-            "duration_ms": sr.duration_ms,
-        }
-        for sr in result.step_results
-    ]
+    # Build results in the expected format
+    results["success"] = result.success and len(result.violations) == 0
+    results["duration_ms"] = total_duration
+    results["states_visited"] = result.states_visited
+    results["transitions"] = result.transitions_taken
+
+    # Use step_timings if populated, otherwise create from transitions
+    if step_timings:
+        results["steps"] = step_timings
+    else:
+        # Fallback: create steps from the first few transitions
+        results["steps"] = [
+            {"name": "exploration", "success": result.success, "duration_ms": total_duration}
+        ]
 
     return results
 
