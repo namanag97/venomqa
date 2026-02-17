@@ -6,8 +6,9 @@ Supports JSON Schema, Pydantic models, and simple type checks.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from venomqa.v1.core.action import ActionResult
@@ -51,7 +52,7 @@ class SchemaValidator:
     check: Callable[[Any], bool]
     message: str = "Schema validation failed"
 
-    def validate(self, result: "ActionResult") -> tuple[bool, str]:
+    def validate(self, result: ActionResult) -> tuple[bool, str]:
         """Validate an ActionResult's response body.
 
         Returns:
@@ -69,7 +70,7 @@ class SchemaValidator:
             return False, f"Validation error: {e}"
 
     @classmethod
-    def from_json_schema(cls, schema: dict[str, Any]) -> "SchemaValidator":
+    def from_json_schema(cls, schema: dict[str, Any]) -> SchemaValidator:
         """Create validator from JSON Schema.
 
         Requires: pip install jsonschema
@@ -89,7 +90,7 @@ class SchemaValidator:
         return cls(check=check, message="JSON Schema validation failed")
 
     @classmethod
-    def from_pydantic(cls, model: Type[Any]) -> "SchemaValidator":
+    def from_pydantic(cls, model: type[Any]) -> SchemaValidator:
         """Create validator from Pydantic model.
 
         Requires: pip install pydantic
@@ -104,7 +105,7 @@ class SchemaValidator:
         return cls(check=check, message=f"Pydantic validation failed for {model.__name__}")
 
     @classmethod
-    def has_fields(cls, *fields: str) -> "SchemaValidator":
+    def has_fields(cls, *fields: str) -> SchemaValidator:
         """Create validator that checks for required fields."""
         def check(body: Any) -> bool:
             if not isinstance(body, dict):
@@ -117,7 +118,7 @@ class SchemaValidator:
         )
 
     @classmethod
-    def is_list(cls, min_length: int = 0) -> "SchemaValidator":
+    def is_list(cls, min_length: int = 0) -> SchemaValidator:
         """Create validator that checks for list response."""
         def check(body: Any) -> bool:
             return isinstance(body, list) and len(body) >= min_length
@@ -128,7 +129,7 @@ class SchemaValidator:
         )
 
     @classmethod
-    def matches_type(cls, expected_type: Type[Any]) -> "SchemaValidator":
+    def matches_type(cls, expected_type: type[Any]) -> SchemaValidator:
         """Create validator that checks response type."""
         def check(body: Any) -> bool:
             return isinstance(body, expected_type)
@@ -140,7 +141,7 @@ class SchemaValidator:
 
 
 def validate_response(
-    result: "ActionResult",
+    result: ActionResult,
     *validators: SchemaValidator,
 ) -> tuple[bool, list[str]]:
     """Run multiple validators on a response.
@@ -167,6 +168,6 @@ def is_list(min_length: int = 0) -> SchemaValidator:
     return SchemaValidator.is_list(min_length)
 
 
-def matches_type(expected_type: Type[Any]) -> SchemaValidator:
+def matches_type(expected_type: type[Any]) -> SchemaValidator:
     """Shortcut for SchemaValidator.matches_type()."""
     return SchemaValidator.matches_type(expected_type)
