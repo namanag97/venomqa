@@ -85,6 +85,18 @@ from venomqa.v1.recording import RecordedRequest, RequestRecorder, generate_jour
 # Setup helpers (high-level API)
 from venomqa.v1.setup import connect_to_app, connect_to_api, connect_to_protocol, setup_from_config
 
+# Testing modes (deployment topology)
+from venomqa.v1.modes import (
+    TestingMode,
+    TestingModeType,
+    InProcessMode,
+    FullSystemMode,
+    ProtocolMode,
+    in_process,
+    full_system,
+    protocol,
+)
+
 # Reporters
 from venomqa.v1.reporters.console import ConsoleReporter
 from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
