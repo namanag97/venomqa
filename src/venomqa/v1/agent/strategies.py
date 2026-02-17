@@ -52,6 +52,14 @@ class BaseStrategy(ABC):
         """Pick the next (state, action) pair to explore."""
         ...
 
+    def notify(self, state: State, actions: list[Action]) -> None:
+        """Notify strategy of a new state and its valid actions.
+
+        Default implementation does nothing. Override in subclasses
+        that maintain internal state (queues, stacks, etc.).
+        """
+        pass
+
 
 class BFS(BaseStrategy):
     """Breadth-first search strategy.
