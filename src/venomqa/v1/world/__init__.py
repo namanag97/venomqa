@@ -13,6 +13,7 @@ from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
 
 if TYPE_CHECKING:
     from venomqa.v1.adapters.http import HttpClient as _HttpClientType
+    from venomqa.v1.adapters.resource_graph import ResourceGraph as _ResourceGraphType
 
 
 class World:
