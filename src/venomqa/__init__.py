@@ -2,43 +2,10 @@
 
 Define Actions and Invariants. VenomQA explores every state path automatically.
 
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  CRITICAL: VenomQA requires DATABASE ROLLBACK access                         ║
-╠══════════════════════════════════════════════════════════════════════════════╣
-║                                                                              ║
-║  This is NOT a normal test framework. VenomQA explores state graphs by:     ║
-║                                                                              ║
-║    1. Execute action A → observe DB state → checkpoint                       ║
-║    2. ROLLBACK database to checkpoint                                        ║
-║    3. Execute action B from same state → observe → checkpoint                ║
-║    4. Repeat to explore ALL paths                                            ║
-║                                                                              ║
-║  Without database rollback, you can only test ONE linear path.              ║
-║                                                                              ║
-║  SETUP REQUIRED:                                                             ║
-║                                                                              ║
-║    Option 1: PostgreSQL (recommended for real APIs)                          ║
-║      $ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres \\         ║
-║          -p 5432:5432 postgres:15                                            ║
-║      $ export DATABASE_URL="postgresql://postgres:postgres@localhost/mydb"   ║
-║                                                                              ║
-║    Option 2: SQLite (simpler, good for development)                          ║
-║      from venomqa import SQLiteAdapter                                       ║
-║      db = SQLiteAdapter("/path/to/your/api.db")                              ║
-║                                                                              ║
-║  The database must be the SAME database your API writes to.                  ║
-║  VenomQA checkpoints and rolls back that database to explore branches.       ║
-║                                                                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
 Quick Start:
-    from venomqa import Action, Invariant, World, Agent, HttpClient, SQLiteAdapter
+    from venomqa import Action, Invariant, World, Agent, HttpClient
 
-    # Connect to the SAME database your API uses
     api = HttpClient("http://localhost:8000")
-    db = SQLiteAdapter("/path/to/api.db", observe_tables=["users", "orders"])
-
-    # Create world with both API and DB
     world = World(api=api, systems={"db": db})
 
     # Define actions and invariants...
@@ -47,720 +14,388 @@ Quick Start:
 See: https://venomqa.dev for full documentation.
 """
 
+from __future__ import annotations
+
+import importlib
+import sys
+
 # =============================================================================
 # MAIN API - Import these directly: from venomqa import Action, State, ...
 # =============================================================================
 
-# =============================================================================
-# LEGACY API - Still available for backwards compatibility
-# =============================================================================
-from venomqa.adapters import get_adapter, list_adapters, register_adapter, register_adapter_class
-from venomqa.comparison import (
-    BaselineManager,
-    ComparisonHTMLReporter,
-    ComparisonReporter,
-    ComparisonResult,
-    DiffConfig,
-    JSONDiff,
-    ResponseDiff,
-    RunComparator,
-    SnapshotManager,
-    StatusChange,
-    StepComparison,
-    TimingDiff,
-    TrendAnalyzer,
-    TrendData,
-    TrendPoint,
+# Core types
+from venomqa.v1.core.action import (
+    Action,
+    ActionResult,
+    HTTPRequest,
+    HTTPResponse,
+    precondition_action_ran,
+    precondition_has_context,
 )
-from venomqa.config import QAConfig
-from venomqa.context import (
-    ContextBuilder,
-    PortConfig,
-    PortsConfiguration,
-    TestContext,
-    create_context,
-)
-from venomqa.core.context import ExecutionContext
-from venomqa.core.graph import (
-    Edge,
-    ExplorationNode,
-    ExplorationResult as LegacyExplorationResult,
-    Invariant as LegacyInvariant,
-    StateGraph,
-    StateNode,
-)
-from venomqa.core.models import (
-    Branch as LegacyBranch,
-    Checkpoint as LegacyCheckpoint,
-    Issue,
-    Journey as LegacyJourney,
-    JourneyResult,
-    Path as LegacyPath,
-    PathResult,
-    Severity as LegacySeverity,
-    Step as LegacyStep,
-    StepResult,
-)
-from venomqa.data import (
-    CleanupConfig,
-    CleanupManager,
-    CleanupResult,
-    CleanupStrategy,
-    ContentGenerator,
-    EcommerceGenerator,
-    FakeDataGenerator,
-    ResourceTracker,
-    SeedConfig,
-    SeedData,
-    SeedFile,
-    SeedManager,
-    SeedMode,
-    SeedResult,
-    TrackedResource,
-    UserGenerator,
-    content,
-    create_content_generator,
-    create_ecommerce_generator,
-    create_fake,
-    create_user_generator,
-    ecommerce,
-    fake,
-    reset_global_seed,
-    seed_fixture,
-    set_global_seed,
-    users,
-)
-from venomqa.environments import (
-    Environment,
-    EnvironmentComparison,
-    EnvironmentConfig,
-    EnvironmentHealthCheck,
-    EnvironmentHealthResult,
-    EnvironmentManager,
-    EnvironmentSecrets,
-)
-from venomqa.errors import (
-    BackoffStrategy,
-    CircuitBreaker,
-    CircuitOpenError,
-    ConnectionError,
-    ConnectionTimeoutError,
-    ErrorCode,
-    ErrorContext,
-    GlobalErrorHandler,
-    JourneyError,
-    RateLimitedError,
-    RecoveryStrategy,
-    RetryExhaustedError,
-    RetryPolicy,
-    StateError,
-    ValidationError,
-    VenomQAError,
-    handle_errors,
-    with_circuit_breaker,
-    with_retry,
-)
-from venomqa.files import (
-    AzureBlobBackend,
-    BinaryGenerator,
-    CSVGenerator,
-    FileGenerator,
-    FileHandler,
-    FileUploadResult,
-    GCSStorageBackend,
-    ImageGenerator,
-    JSONGenerator,
-    LocalStorageBackend,
-    PDFGenerator,
-    S3StorageBackend,
-    StorageBackend,
-    StorageConfig,
-)
-from venomqa.generators import (
-    GeneratedAction,
-    GeneratedFixture,
-    GeneratorConfig,
-    OpenAPIGenerator,
-    OpenAPIParseError,
-    OpenAPISchema,
-)
-from venomqa.graphql import (
-    ActionGenerator,
-    Fragment,
-    FragmentRegistry,
-    GraphQLAssertionError,
-    GraphQLEnumType,
-    GraphQLExpectation,
-    GraphQLField,
-    GraphQLInputType,
-    GraphQLObjectType,
-    GraphQLSchemaInfo,
-    GraphQLTester,
-    GraphQLTypeKind,
-    SchemaParser,
-    SchemaValidationError,
-    SchemaValidator,
-    SubscriptionClient,
-    SubscriptionEvent,
-    SubscriptionHandler,
-    SubscriptionOptions,
-    assert_graphql_data_at,
-    assert_graphql_error_contains,
-    assert_graphql_no_errors,
-    compose_query,
-    expect_graphql,
-    fragment,
-    generate_actions_from_schema,
-    load_schema_from_file,
-    load_schema_from_introspection,
-    mutation,
-    query,
-    subscription,
-)
-from venomqa.graphql import (
-    GeneratedAction as GraphQLGeneratedAction,
-)
-from venomqa.graphql import (
-    action as graphql_action,
-)
-from venomqa.http import Client, SecureCredentials
-from venomqa.mocking import (
-    AWSS3Mock,
-    CallRecord,
-    DelayedResponse,
-    ErrorResponse,
-    HTTPMock,
-    MockConfig,
-    MockedEndpoint,
-    MockedResponse,
-    MockManager,
-    MockVerifier,
-    RequestMatcher,
-    ResponseSequence,
-    SendGridMock,
-    ServiceMock,
-    StripeMock,
-    TimeoutResponse,
-    TwilioMock,
-    VerificationError,
-    WireMockContainer,
-    WireMockManager,
-    WireMockStub,
-    load_mock_config,
-    verify_call_count,
-    verify_call_params,
-    verify_called,
-    verify_not_called,
-)
-from venomqa.notifications import (
-    AlertCondition,
-    AlertManager,
-    AlertSeverity,
-    AlertState,
-    AlertTrigger,
-    BaseChannel,
-    ChannelType,
-    CustomWebhookChannel,
-    DiscordChannel,
-    EmailChannel,
-    NotificationConfig,
-    NotificationEvent,
-    NotificationManager,
-    NotificationMessage,
-    PagerDutyChannel,
-    RateLimiter,
-    SlackChannel,
-    create_notification_manager_from_config,
-)
-from venomqa.performance import (
-    BatchExecutor,
-    BatchProgress,
-    BatchResult,
-    CachedResponse,
-    ConnectionPool,
-    DBConnectionPool,
-    HTTPConnectionPool,
-    PoolStats,
-    ResponseCache,
-    aggregate_results,
-    default_progress_callback,
-)
-from venomqa.plugins import (
-    ActionPlugin,
-    AdapterPlugin,
-    BranchContext,
-    FailureContext,
-    GeneratorPlugin,
-    HookManager,
-    HookPlugin,
-    HookPriority,
-    HookType,
-    JourneyContext,
-    PluginConfig,
-    PluginInfo,
-    PluginLoader,
-    PluginLoadError,
-    PluginManager,
-    PluginsConfig,
-    PluginType,
-    ReporterPlugin,
-    StepContext,
-    VenomQAPlugin,
-    discover_plugins,
-    get_hook_manager,
-    get_plugin_manager,
-    load_plugin,
-    reset_hook_manager,
-    reset_plugin_manager,
-)
-from venomqa.ports import (
-    CacheEntry,
-    CachePort,
-    ClientPort,
-    ColumnInfo,
-    ConcurrencyPort,
-    DatabasePort,
-    Email,
-    EmailAttachment,
-    FileInfo,
-    FilePort,
-    IndexedDocument,
-    JobInfo,
-    JobResult,
-    JobStatus,
-    MailPort,
-    MockEndpoint,
-    MockPort,
-    MockResponse,
-    NotificationPort,
-    PushNotification,
-    QueryResult,
-    QueuePort,
-    RecordedRequest,
-    Request,
-    RequestBuilder,
-    Response,
-    ScheduledTask,
-    SearchIndex,
-    SearchPort,
-    SearchResult,
-    SMSMessage,
-    StateEntry,
-    StatePort,
-    StateQuery,
-    StorageObject,
-    StoragePort,
-    TableInfo,
-    TaskInfo,
-    TaskResult,
-    TimeInfo,
-    TimePort,
-    WebhookPort,
-    WebhookRequest,
-    WebhookResponse,
-    WebhookSubscription,
-    WebSocketPort,
-    WSConnection,
-    WSMessage,
-)
-from venomqa.preflight import (
-    APINotReadyError,
-    AutoPreflight,
-    CheckResult,
-    CheckStatus,
-    PreflightChecker,
-    PreflightError,
-    PreflightResult,
-    SmokeTest,
-    SmokeTestReport,
-    SmokeTestResult,
-    run_preflight_checks,
-    run_preflight_checks_with_output,
-)
-from venomqa.runner import JourneyRunner
-from venomqa.security import (
-    EnvironmentBackend,
-    InputValidator,
-    Sanitizer,
-    SecretsManager,
-    SensitiveDataFilter,
-    VaultBackend,
-)
-
-# The main entry point
-from venomqa.v1 import explore
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.sqlite import SQLiteAdapter  # Recommended for exploration
-from venomqa.v1.agent import Agent, Scheduler
-from venomqa.v1.agent.strategies import BFS, DFS, CoverageGuided, Random, Strategy, Weighted
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.v1.core.state import Observation, State
 from venomqa.v1.core.context import Context
 from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import Invariant, InvariantTiming, Severity, Violation
-from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.core.state import Observation, State
 from venomqa.v1.core.transition import Transition
-from venomqa.v1.dsl import Branch, Journey, Path, Step
-from venomqa.v1.dsl.decorators import action, invariant
-from venomqa.v1.reporters.console import ConsoleReporter
+from venomqa.v1.core.invariant import (
+    Invariant,
+    InvariantTiming,
+    ResponseAssertion,
+    Severity,
+    Violation,
+)
+from venomqa.v1.core.result import ExplorationResult
+
+# World (sandbox with checkpoint/rollback)
 from venomqa.v1.world import World
-from venomqa.v1.world.checkpoint import Checkpoint
+from venomqa.v1.world.checkpoint import Checkpoint, SystemCheckpoint
 from venomqa.v1.world.rollbackable import Rollbackable
 
-__version__ = "0.4.6"
+# Agent (exploration engine)
+from venomqa.v1.agent import Agent, Scheduler
+from venomqa.v1.agent.strategies import (
+    BFS,
+    DFS,
+    CoverageGuided,
+    DimensionNoveltyStrategy,
+    Random,
+    Strategy,
+    Weighted,
+)
+
+# Adapters
+from venomqa.v1.adapters.http import HttpClient
+from venomqa.v1.adapters.sqlite import SQLiteAdapter
+
+# Auth helpers
+from venomqa.v1.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
+
+# Constraints
+from venomqa.v1.core.constraints import (
+    DEFAULT_CONSTRAINTS,
+    AnonHasNoRole,
+    AuthHasRole,
+    FreeCannotExceedUsage,
+    LambdaConstraint,
+    StateConstraint,
+    constraint,
+)
+
+# Coverage
+from venomqa.v1.core.coverage import DimensionAxisCoverage, DimensionCoverage
+
+# Dimensions (hypergraph / multi-dimensional state space)
+from venomqa.v1.core.dimensions import (
+    BUILTIN_DIMENSIONS,
+    AuthStatus,
+    CountClass,
+    EntityStatus,
+    PlanType,
+    UsageClass,
+    UserRole,
+)
+from venomqa.v1.core.hyperedge import Hyperedge
+from venomqa.v1.core.hypergraph import Hypergraph
+
+# Observation helpers
+from venomqa.v1.core.observers import (
+    COMMON_QUERIES,
+    aggregate,
+    column_value,
+    combine_observers,
+    has_rows,
+    latest_row,
+    row_with_status,
+)
+
+# DSL (Journey definition)
+from venomqa.v1.dsl import Branch, Journey, Path, Step
+from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
+from venomqa.v1.dsl.compiler import compile as compile_journey
+from venomqa.v1.dsl.decorators import action, invariant
+
+# Built-in invariants
+from venomqa.v1.invariants import OpenAPISchemaInvariant
+
+# Testing modes (deployment topology)
+from venomqa.v1.modes import (
+    FullSystemMode,
+    InProcessMode,
+    ProtocolMode,
+    TestingMode,
+    TestingModeType,
+    full_system,
+    in_process,
+    protocol,
+)
+
+# Recording
+from venomqa.v1.recording import RecordedRequest, RequestRecorder, generate_journey_code
+
+# Reporters
+from venomqa.v1.reporters.console import ConsoleReporter
+from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
+from venomqa.v1.reporters.html_trace import HTMLTraceReporter
+from venomqa.v1.reporters.json import JSONReporter
+from venomqa.v1.reporters.junit import JUnitReporter
+from venomqa.v1.reporters.markdown import MarkdownReporter
+
+# Setup helpers (high-level API)
+from venomqa.v1.setup import connect_to_api, connect_to_app, connect_to_protocol, setup_from_config
+
+# Validation
+from venomqa.v1.validation import (
+    SchemaValidator,
+    has_fields,
+    is_list,
+    matches_type,
+    validate_response,
+)
+
+# Type aliases
+StateID = str
+TransitionID = str
+CheckpointID = str
+ViolationID = str
+
+
+def explore(
+    base_url: str,
+    journey: Journey,
+    *,
+    db_url: str | None = None,
+    redis_url: str | None = None,
+    strategy: Strategy | None = None,
+    max_steps: int = 1000,
+    coverage_target: float | None = None,
+    progress_every: int = 0,
+) -> ExplorationResult:
+    """Convenience function for running an exploration.
+
+    This is the simplest way to run VenomQA. It:
+    1. Creates an HTTP client for the base URL
+    2. Sets up database/cache adapters if URLs provided
+    3. Compiles the Journey to Actions
+    4. Creates an Agent and runs exploration
+    5. Returns the result
+
+    Args:
+        base_url: The base URL of the API to test.
+        journey: The Journey DSL defining the test flow.
+        db_url: Optional PostgreSQL connection string.
+        redis_url: Optional Redis connection string.
+        strategy: Exploration strategy (default: BFS).
+        max_steps: Maximum exploration steps (default: 1000).
+        coverage_target: Optional coverage percentage target (0.0 to 1.0).
+        progress_every: Print progress every N steps (0 = disabled).
+
+    Returns:
+        ExplorationResult with graph, violations, and statistics.
+
+    Example:
+        from venomqa import Journey, Step, explore
+
+        journey = Journey(
+            name="login_test",
+            steps=[
+                Step("login", login_action),
+                Step("logout", logout_action),
+            ],
+        )
+
+        result = explore("http://localhost:8000", journey)
+        assert result.success
+    """
+    from venomqa.v1.adapters.http import HttpClient as _HttpClient
+    from venomqa.v1.dsl.compiler import compile as _compile
+
+    # Create HTTP client
+    api = _HttpClient(base_url)
+
+    # Set up systems
+    systems: dict[str, Rollbackable] = {}
+
+    if db_url:
+        from venomqa.v1.adapters.postgres import PostgresAdapter
+        systems["db"] = PostgresAdapter(db_url)
+
+    if redis_url:
+        from venomqa.v1.adapters.redis import RedisAdapter
+        systems["cache"] = RedisAdapter(redis_url)
+
+    # Create world
+    world = World(api=api, systems=systems)
+
+    # Compile journey
+    compiled = _compile(journey)
+
+    # Create and run agent
+    agent = Agent(
+        world=world,
+        actions=compiled.actions,
+        invariants=compiled.invariants,
+        strategy=strategy or BFS(),
+        max_steps=max_steps,
+        coverage_target=coverage_target,
+        progress_every=progress_every,
+    )
+
+    return agent.explore()
+
+
+# =============================================================================
+# Module aliasing: allow `from venomqa.world import World` etc.
+#
+# For subpackages that only exist under v1/ (not at the v0 top-level),
+# we register sys.modules aliases so Python resolves them automatically.
+# =============================================================================
+
+_V1_ONLY_SUBPACKAGES = [
+    "agent",
+    "bridge",
+    "dsl",
+    "invariants",
+    "recording",
+    "validation",
+    "world",
+    "modes",
+    "setup",
+    "auth",
+]
+
+for _subpkg in _V1_ONLY_SUBPACKAGES:
+    _v1_name = f"venomqa.v1.{_subpkg}"
+    _alias_name = f"venomqa.{_subpkg}"
+    # Only create alias if the v1 module is already imported or can be imported,
+    # AND there's no existing top-level module with that name
+    if _alias_name not in sys.modules:
+        try:
+            _mod = importlib.import_module(_v1_name)
+            sys.modules[_alias_name] = _mod
+        except ImportError:
+            pass
+
+
+__version__ = "0.5.0"
 __author__ = "Naman Agarwal"
 __license__ = "MIT"
 
 __all__ = [
-    # ==========================================================================
-    # MAIN API - The stuff you actually need
-    # ==========================================================================
+    # Core
+    "State",
+    "Observation",
+    "Context",
     "Action",
     "ActionResult",
     "HTTPRequest",
     "HTTPResponse",
-    "State",
-    "Observation",
-    "Context",
+    "Transition",
+    "Graph",
     "Invariant",
     "Violation",
     "Severity",
     "InvariantTiming",
-    "Graph",
-    "Transition",
+    "ResponseAssertion",
     "ExplorationResult",
+    # World
     "World",
-    "Checkpoint",
     "Rollbackable",
+    "Checkpoint",
+    "SystemCheckpoint",
+    # Agent
     "Agent",
-    "Scheduler",
     "Strategy",
     "BFS",
     "DFS",
     "Random",
     "CoverageGuided",
     "Weighted",
-    "HttpClient",
-    "SQLiteAdapter",
+    "DimensionNoveltyStrategy",
+    "Scheduler",
+    # Hypergraph
+    "AuthStatus",
+    "UserRole",
+    "EntityStatus",
+    "CountClass",
+    "UsageClass",
+    "PlanType",
+    "BUILTIN_DIMENSIONS",
+    "Hyperedge",
+    "Hypergraph",
+    "StateConstraint",
+    "AnonHasNoRole",
+    "AuthHasRole",
+    "FreeCannotExceedUsage",
+    "LambdaConstraint",
+    "constraint",
+    "DEFAULT_CONSTRAINTS",
+    "DimensionCoverage",
+    "DimensionAxisCoverage",
+    "DimensionCoverageReporter",
+    # DSL
     "Journey",
     "Step",
+    "JourneyCheckpoint",
     "Branch",
     "Path",
     "action",
     "invariant",
-    "explore",
-    "ConsoleReporter",
-    # ==========================================================================
-    # LEGACY API - Backwards compatibility (300+ exports)
-    # ==========================================================================
-    "Journey",
-    "JourneyResult",
-    "Step",
-    "StepResult",
-    "Branch",
-    "Path",
-    "PathResult",
-    "Checkpoint",
-    "Issue",
-    "Severity",
-    "ExecutionContext",
-    "TestContext",
-    "ContextBuilder",
-    "PortConfig",
-    "PortsConfiguration",
-    "create_context",
-    "StateGraph",
-    "StateNode",
-    "Edge",
-    "Invariant",
-    "ExplorationNode",
-    "ExplorationResult",
-    "JourneyRunner",
-    "Client",
-    "SecureCredentials",
-    "QAConfig",
-    "VenomQAError",
-    "ErrorCode",
-    "ErrorContext",
-    "ConnectionError",
-    "ConnectionTimeoutError",
-    "ValidationError",
-    "StateError",
-    "JourneyError",
-    "CircuitOpenError",
-    "RetryExhaustedError",
-    "RateLimitedError",
-    "BackoffStrategy",
-    "RetryPolicy",
-    "CircuitBreaker",
-    "RecoveryStrategy",
-    "GlobalErrorHandler",
-    "handle_errors",
-    "with_retry",
-    "with_circuit_breaker",
-    "ResponseCache",
-    "CachedResponse",
-    "CacheStats",
-    "ConnectionPool",
-    "HTTPConnectionPool",
-    "DBConnectionPool",
-    "PoolStats",
-    "BatchExecutor",
-    "BatchProgress",
-    "BatchResult",
-    "aggregate_results",
-    "default_progress_callback",
-    "InputValidator",
-    "SecretsManager",
-    "VaultBackend",
-    "EnvironmentBackend",
-    "Sanitizer",
-    "SensitiveDataFilter",
-    "FileHandler",
-    "FileUploadResult",
-    "StorageBackend",
-    "StorageConfig",
-    "LocalStorageBackend",
-    "S3StorageBackend",
-    "GCSStorageBackend",
-    "AzureBlobBackend",
-    "FileGenerator",
-    "ImageGenerator",
-    "PDFGenerator",
-    "CSVGenerator",
-    "JSONGenerator",
-    "BinaryGenerator",
-    "ClientPort",
-    "Request",
-    "Response",
-    "RequestBuilder",
-    "StatePort",
-    "StateEntry",
-    "StateQuery",
-    "DatabasePort",
-    "QueryResult",
-    "TableInfo",
-    "ColumnInfo",
-    "TimePort",
-    "TimeInfo",
-    "ScheduledTask",
-    "FilePort",
-    "StoragePort",
-    "FileInfo",
-    "StorageObject",
-    "WebSocketPort",
-    "WSMessage",
-    "WSConnection",
-    "QueuePort",
-    "JobInfo",
-    "JobResult",
-    "JobStatus",
-    "MailPort",
-    "Email",
-    "EmailAttachment",
-    "ConcurrencyPort",
-    "TaskInfo",
-    "TaskResult",
-    "CachePort",
-    "CacheEntry",
-    "SearchPort",
-    "SearchIndex",
-    "SearchResult",
-    "IndexedDocument",
-    "NotificationPort",
-    "PushNotification",
-    "SMSMessage",
-    "WebhookPort",
-    "WebhookRequest",
-    "WebhookResponse",
-    "WebhookSubscription",
-    "MockPort",
-    "MockEndpoint",
-    "MockResponse",
+    "compile_journey",
+    # Built-in invariants
+    "OpenAPISchemaInvariant",
+    # Auth helpers
+    "BearerTokenAuth",
+    "ApiKeyAuth",
+    "MultiRoleAuth",
+    "AuthHttpClient",
+    # Adapters
+    "HttpClient",
+    "SQLiteAdapter",
+    # Recording
+    "RequestRecorder",
     "RecordedRequest",
-    "get_adapter",
-    "list_adapters",
-    "register_adapter",
-    "register_adapter_class",
-    # OpenAPI Generator
-    "OpenAPIGenerator",
-    "OpenAPISchema",
-    "GeneratedAction",
-    "GeneratedFixture",
-    "GeneratorConfig",
-    "OpenAPIParseError",
-    # Environment Management
-    "Environment",
-    "EnvironmentConfig",
-    "EnvironmentManager",
-    "EnvironmentSecrets",
-    "EnvironmentHealthCheck",
-    "EnvironmentHealthResult",
-    "EnvironmentComparison",
-    # Data Generation
-    "fake",
-    "FakeDataGenerator",
-    "create_fake",
-    "set_global_seed",
-    "reset_global_seed",
-    "ecommerce",
-    "EcommerceGenerator",
-    "create_ecommerce_generator",
-    "users",
-    "UserGenerator",
-    "create_user_generator",
-    "content",
-    "ContentGenerator",
-    "create_content_generator",
-    # Data Seeding and Cleanup
-    "SeedManager",
-    "SeedMode",
-    "SeedConfig",
-    "SeedData",
-    "SeedFile",
-    "SeedResult",
-    "seed_fixture",
-    "CleanupManager",
-    "CleanupStrategy",
-    "CleanupConfig",
-    "CleanupResult",
-    "ResourceTracker",
-    "TrackedResource",
-    # External Service Mocking
-    "HTTPMock",
-    "MockedEndpoint",
-    "MockedResponse",
-    "RequestMatcher",
-    "ResponseSequence",
-    "DelayedResponse",
-    "ErrorResponse",
-    "TimeoutResponse",
-    "ServiceMock",
-    "StripeMock",
-    "SendGridMock",
-    "TwilioMock",
-    "AWSS3Mock",
-    "MockManager",
-    "MockConfig",
-    "load_mock_config",
-    "WireMockManager",
-    "WireMockContainer",
-    "WireMockStub",
-    "MockVerifier",
-    "CallRecord",
-    "VerificationError",
-    "verify_called",
-    "verify_call_count",
-    "verify_call_params",
-    "verify_not_called",
-    # Notifications and Alerting
-    "NotificationManager",
-    "NotificationConfig",
-    "NotificationMessage",
-    "NotificationEvent",
-    "BaseChannel",
-    "ChannelType",
-    "SlackChannel",
-    "DiscordChannel",
-    "EmailChannel",
-    "PagerDutyChannel",
-    "CustomWebhookChannel",
-    "AlertCondition",
-    "AlertManager",
-    "AlertSeverity",
-    "AlertState",
-    "AlertTrigger",
-    "RateLimiter",
-    "create_notification_manager_from_config",
-    # Plugin System
-    "VenomQAPlugin",
-    "ReporterPlugin",
-    "AdapterPlugin",
-    "GeneratorPlugin",
-    "ActionPlugin",
-    "HookPlugin",
-    "PluginType",
-    "HookType",
-    "HookPriority",
-    "PluginConfig",
-    "PluginsConfig",
-    "PluginInfo",
-    "StepContext",
-    "JourneyContext",
-    "BranchContext",
-    "FailureContext",
-    "PluginManager",
-    "get_plugin_manager",
-    "reset_plugin_manager",
-    "HookManager",
-    "get_hook_manager",
-    "reset_hook_manager",
-    "PluginLoader",
-    "PluginLoadError",
-    "discover_plugins",
-    "load_plugin",
-    # Comparison and Diffing
-    "RunComparator",
-    "ComparisonResult",
-    "StepComparison",
-    "StatusChange",
-    "TimingDiff",
-    "ResponseDiff",
-    "JSONDiff",
-    "DiffConfig",
-    "BaselineManager",
-    "SnapshotManager",
-    "TrendAnalyzer",
-    "TrendData",
-    "TrendPoint",
-    "ComparisonReporter",
-    "ComparisonHTMLReporter",
-    # GraphQL Testing
-    "query",
-    "mutation",
-    "subscription",
-    "graphql_action",
-    "expect_graphql",
-    "GraphQLExpectation",
-    "GraphQLAssertionError",
-    "assert_graphql_no_errors",
-    "assert_graphql_data_at",
-    "assert_graphql_error_contains",
+    "generate_journey_code",
+    # Reporters
+    "ConsoleReporter",
+    "MarkdownReporter",
+    "JSONReporter",
+    "JUnitReporter",
+    "HTMLTraceReporter",
+    # Validation
     "SchemaValidator",
-    "SchemaValidationError",
-    "GraphQLSchemaInfo",
-    "GraphQLObjectType",
-    "GraphQLField",
-    "GraphQLEnumType",
-    "GraphQLInputType",
-    "GraphQLTypeKind",
-    "load_schema_from_file",
-    "load_schema_from_introspection",
-    "Fragment",
-    "FragmentRegistry",
-    "fragment",
-    "compose_query",
-    "SubscriptionClient",
-    "SubscriptionEvent",
-    "SubscriptionHandler",
-    "SubscriptionOptions",
-    "SchemaParser",
-    "ActionGenerator",
-    "GraphQLGeneratedAction",
-    "generate_actions_from_schema",
-    "GraphQLTester",
-    # Preflight Checks (legacy)
-    "CheckStatus",
-    "CheckResult",
-    "PreflightResult",
-    "PreflightChecker",
-    "run_preflight_checks",
-    "run_preflight_checks_with_output",
-    # Preflight Smoke Tests (new)
-    "SmokeTest",
-    "SmokeTestResult",
-    "SmokeTestReport",
-    "APINotReadyError",
-    "PreflightError",
-    "AutoPreflight",
+    "validate_response",
+    "has_fields",
+    "is_list",
+    "matches_type",
+    # Observation helpers
+    "has_rows",
+    "latest_row",
+    "row_with_status",
+    "column_value",
+    "aggregate",
+    "combine_observers",
+    "COMMON_QUERIES",
+    # Precondition helpers
+    "precondition_has_context",
+    "precondition_action_ran",
+    # Convenience
+    "explore",
+    # Setup helpers
+    "connect_to_app",
+    "connect_to_api",
+    "connect_to_protocol",
+    "setup_from_config",
+    # Testing modes
+    "TestingMode",
+    "TestingModeType",
+    "InProcessMode",
+    "FullSystemMode",
+    "ProtocolMode",
+    "in_process",
+    "full_system",
+    "protocol",
+    # Type aliases
+    "StateID",
+    "TransitionID",
+    "CheckpointID",
+    "ViolationID",
 ]
