@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "venomqa"
-version = "0.2.6"
+version = "0.3.0"
 description = "Autonomous API QA agent — define actions and invariants, explore every state path automatically."
 readme = "README.md"
 license = "MIT"
