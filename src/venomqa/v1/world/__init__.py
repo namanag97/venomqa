@@ -254,7 +254,7 @@ class World:
     # ── ResourceGraph integration ──────────────────────────────────────────
 
     @property
-    def resources(self) -> "_ResourceGraphType | None":
+    def resources(self) -> _ResourceGraphType | None:
         """Get the ResourceGraph system, if configured.
 
         Returns None if no ResourceGraph was registered in systems.
@@ -320,8 +320,24 @@ class World:
             if not graph.can_execute(requires, bindings):
                 return False
 
-        # Delegate to action's own precondition check
-        state = self.observe()
+        # Fast path: skip observe() if all preconditions are context-only.
+        # Preconditions are context-only if they have one of these markers:
+        # - _required_context_keys (from precondition_has_context)
+        # - _required_actions (from precondition_action_ran)
+        # - _context_precondition (from lambda ctx: ... wrapper)
+        needs_state = any(
+            not hasattr(p, "_required_context_keys")
+            and not hasattr(p, "_required_actions")
+            and not hasattr(p, "_context_precondition")
+            for p in action.preconditions
+        )
+
+        if needs_state:
+            state = self.observe()
+        else:
+            # Use a dummy state for context-only checks
+            state = State(id="", observations={})
+
         return action.can_execute_with_context(state, self.context)
 
 
