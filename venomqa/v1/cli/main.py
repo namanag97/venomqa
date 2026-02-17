@@ -124,6 +124,39 @@ def cmd_validate(args: Any) -> int:
         return 1
 
 
+def cmd_record(args: Any) -> int:
+    """Record HTTP traffic from a journey replay and generate a new journey."""
+    from venomqa.v1.adapters.http import HttpClient
+    from venomqa.v1.recording import RequestRecorder, generate_journey_code
+
+    api = HttpClient(args.base_url)
+    recorder = RequestRecorder(api)
+
+    if args.journey_file != "-":
+        # Replay the journey so we capture real traffic
+        journey = load_journey(args.journey_file)
+        if journey is None:
+            print(f"Error: Could not load journey from {args.journey_file}", file=sys.stderr)
+            return 1
+
+        from venomqa.v1.dsl.compiler import compile
+        from venomqa.v1.world import World
+        from venomqa.v1.agent import Agent
+
+        compiled = compile(journey)
+        world = World(api=recorder, systems={})
+        agent = Agent(world=world, actions=compiled.actions, max_steps=len(compiled.actions) * 2)
+        agent.explore()
+
+    code = generate_journey_code(
+        recorder.captured,
+        journey_name=args.name,
+        base_url=args.base_url,
+    )
+    _write_output(code, getattr(args, "output", None))
+    return 0
+
+
 def load_journey(path: str) -> Any:
     """Load a journey from a Python file."""
     p = Path(path)
