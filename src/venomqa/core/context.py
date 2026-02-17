@@ -12,13 +12,13 @@ Example:
 
 from __future__ import annotations
 
-# Re-export the v1 Context for new-style imports
-from venomqa.v1.core.context import Context
-
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, TypeVar
+
+# Re-export the v1 Context for new-style imports
+from venomqa.v1.core.context import Context  # noqa: F401
 
 if TYPE_CHECKING:
     from venomqa.state import StateManager
