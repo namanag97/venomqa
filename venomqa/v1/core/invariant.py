@@ -140,6 +140,7 @@ class Violation:
     message: str
     severity: Severity
     action: "Action | None" = None
+    action_result: "ActionResult | None" = None
     reproduction_path: list["Transition"] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)
 
@@ -150,6 +151,7 @@ class Violation:
         state: "State",
         action: "Action | None" = None,
         reproduction_path: list["Transition"] | None = None,
+        action_result: "ActionResult | None" = None,
     ) -> Violation:
         """Create a violation from an invariant and state."""
         return cls(
@@ -159,6 +161,7 @@ class Violation:
             message=invariant.message,
             severity=invariant.severity,
             action=action,
+            action_result=action_result,
             reproduction_path=reproduction_path or [],
         )
 
