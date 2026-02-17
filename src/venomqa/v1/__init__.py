@@ -311,6 +311,15 @@ __all__ = [
     "connect_to_api",
     "connect_to_protocol",
     "setup_from_config",
+    # Testing modes
+    "TestingMode",
+    "TestingModeType",
+    "InProcessMode",
+    "FullSystemMode",
+    "ProtocolMode",
+    "in_process",
+    "full_system",
+    "protocol",
     # Type aliases
     "StateID",
     "TransitionID",
