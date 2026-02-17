@@ -97,7 +97,22 @@ def format_error_for_cli(error: Exception) -> str:
 
     return "\n".join(lines)
 
-VENVOMQA_YAML_TEMPLATE = """# VenomQA Configuration
+
+# Import templates from separate module to keep this file focused on commands
+from venomqa.cli.templates import (
+    VENOMQA_YAML_TEMPLATE as VENVOMQA_YAML_TEMPLATE,  # backwards compat alias
+    DOCKER_COMPOSE_QA_TEMPLATE,
+    ACTIONS_INIT_PY,
+    FIXTURES_INIT_PY,
+    JOURNEYS_INIT_PY,
+    SAMPLE_ACTION_PY,
+    SAMPLE_JOURNEY_PY,
+    get_readme_template as _get_readme_template,
+)
+
+
+# Placeholder for removed inline templates - now in cli/templates.py
+_TEMPLATES_REMOVED = """# VenomQA Configuration
 # Documentation: https://venomqa.dev/docs/configuration
 
 # ============================================================================
