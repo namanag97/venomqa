@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -188,8 +188,8 @@ def _generate_action_function(ep: EndpointDef) -> str:
     # Store id if response returns one
     if ep.response_has_id and ep.method in ("POST", "PUT"):
         lines.append(f'    if resp.response and resp.response.status_code in {ep.expected_status}:')
-        lines.append(f'        body = resp.response.body or {{}}')
-        lines.append(f'        if isinstance(body, dict) and "id" in body:')
+        lines.append('        body = resp.response.body or {}')
+        lines.append('        if isinstance(body, dict) and "id" in body:')
         lines.append(f'            context.set("{ep.tag}_id", body["id"])')
 
     lines.append('    return resp')
@@ -226,8 +226,8 @@ def generate_actions_code(
           - Add real invariants (the ones below are stubs)
         """
 
-        from venomqa.v1 import Action, Agent, BFS, Invariant, Severity, World
-        from venomqa.v1.adapters.http import HttpClient
+        from venomqa import Action, Agent, BFS, Invariant, Severity, World
+        from venomqa.adapters.http import HttpClient
 
     '''))
 
@@ -243,15 +243,15 @@ def generate_actions_code(
     for ep in endpoints:
         status_list = repr(ep.expected_status)
         expect_failure = "True" if all(s >= 400 for s in ep.expected_status) else "False"
-        sections.append(f'    Action(')
+        sections.append('    Action(')
         sections.append(f'        name="{ep.func_name}",')
         sections.append(f'        execute={ep.func_name},')
         if ep.summary:
             sections.append(f'        description={ep.summary!r},')
         sections.append(f'        expected_status={status_list},')
         if expect_failure == "True":
-            sections.append(f'        expect_failure=True,')
-        sections.append(f'    ),')
+            sections.append('        expect_failure=True,')
+        sections.append('    ),')
     sections.append("]")
 
     # Stub invariants
