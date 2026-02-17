@@ -406,7 +406,7 @@ def check_environment_vars() -> tuple[bool, str]:
 def check_v1_quick_start() -> tuple[bool, str]:
     """Check if v1 module can be imported and is working."""
     try:
-        from venomqa.v1 import State, Action, World, Agent, explore
+        from venomqa.v1 import Action, Agent, State, World, explore  # noqa: F401
         return True, "v1 module ready"
     except ImportError as e:
         return False, f"v1 import failed: {e}"
