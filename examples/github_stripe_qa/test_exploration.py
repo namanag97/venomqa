@@ -94,15 +94,21 @@ def world(servers, clean_state):
     """Provide a freshly configured World with both API clients."""
     github_api = HttpClient(f"http://localhost:{GITHUB_PORT}")
     stripe_api = StripeProxy(f"http://localhost:{STRIPE_PORT}")
-    webhook_queue = MockQueue(name="github_webhooks")
+    github_obs = GitHubObserver(f"http://localhost:{GITHUB_PORT}")
+    stripe_obs = StripeObserver(f"http://localhost:{STRIPE_PORT}")
 
-    w = World(api=github_api, systems={"webhooks": webhook_queue})
+    w = World(
+        api=github_api,
+        systems={"github": github_obs, "stripe_obs": stripe_obs},
+    )
     w.context.set("stripe", stripe_api)
 
     yield w
 
     github_api.close()
     stripe_api.close()
+    github_obs.close()
+    stripe_obs.close()
 
 
 def _all_actions() -> list[Action]:
