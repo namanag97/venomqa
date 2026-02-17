@@ -453,16 +453,31 @@ def get_user(api, context):
 
 ## Invariants
 
+Invariants should make LIVE API calls to verify server state, not just check context.
+
 ```python
 from venomqa.v1 import Invariant, Severity
 
-def user_id_is_set(world):          # receives World, not (state, ctx)
-    return world.context.has("user_id")
+def users_list_is_valid(world):
+    # GOOD: Make a live API call to verify server state
+    resp = world.api.get("/users")
+    if resp.status_code != 200:
+        return False
+    data = resp.json()
+    return isinstance(data, list)   # Must be a list
+
+def user_exists_on_server(world):
+    # GOOD: Cross-check client state against server
+    user_id = world.context.get("user_id")
+    if user_id is None:
+        return True   # Nothing to check yet
+    resp = world.api.get(f"/users/{{user_id}}")
+    return resp.status_code == 200
 
 Invariant(
-    name="user_id_set",
-    check=user_id_is_set,
-    message="user_id must exist after login",   # ← 'message', not 'description'
+    name="users_list_valid",
+    check=users_list_is_valid,
+    message="GET /users must return valid JSON array",   # ← 'message', not 'description'
     severity=Severity.CRITICAL,
 )
 ```
