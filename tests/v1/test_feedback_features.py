@@ -269,7 +269,7 @@ class TestWorldTeardown:
             raise RuntimeError("cleanup error")
 
         api = _make_mock_api()
-        world = World(api=api, teardown=bad_cleanup)
+        world = World(api=api, teardown=bad_cleanup, state_from_context=[])
 
         def noop(api, ctx):
             req = HTTPRequest(method="GET", url="/")
