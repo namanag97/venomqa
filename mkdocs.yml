@@ -104,14 +104,8 @@ nav:
     - Roadmap: roadmap.md
   - Specifications:
     - Framework Spec: specs/framework-spec.md
-    - Sample App Spec: specs/sample-app-spec.md
     - State Chain: specs/state-chain.md
     - State Explorer: specs/state-explorer.md
-    - State Explorer Project: specs/state-explorer-project.md
-    - State Explorer Tasks: specs/state-explorer-tasks.md
-    - Strategy: specs/strategy.md
-    - Validation Report: specs/validation-report.md
-    - Improvements: specs/improvements.md
     - Publishing: specs/publishing.md
 
 # Plugins
