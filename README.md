@@ -46,60 +46,123 @@ VenomQA finds these. Automatically.
 
 ---
 
+## Why VenomQA Needs Database Access
+
+VenomQA explores state graphs by **branching**:
+
+```
+State S0 ──[create_order]──▶ S1
+   │                         │
+   │                    [cancel_order]──▶ S2 (branch A)
+   │                         │
+   │                    [refund_order]──▶ S3 (branch B) ← BUG FOUND!
+   │
+   └──[list_orders]──▶ S4 (branch C)
+```
+
+To explore both branches A and B from state S1, VenomQA must:
+1. Execute `create_order` → reach S1
+2. Execute `cancel_order` → reach S2
+3. **ROLLBACK database to S1** ← This is why you need DB access!
+4. Execute `refund_order` → reach S3
+
+**The database you connect must be the SAME one your API writes to.** VenomQA checkpoints and rolls back THAT database.
+
+---
+
 ## Quickstart
 
 ```bash
 pip install venomqa
 ```
 
-```python
-from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
-from venomqa.v1.adapters.http import HttpClient
+### Step 1: Identify Your Database
 
-# 1. Define actions
+**What database does your API use?**
+- PostgreSQL → Use `PostgresAdapter` (most common)
+- SQLite → Use `SQLiteAdapter`
+- In-memory / No database → Use `state_from_context` (limited)
+
+**CRITICAL**: Connect to the **exact same database** your API writes to:
+- If your API uses `postgresql://prod:5432/myapp`, connect VenomQA to that same URL
+- VenomQA wraps the entire exploration in a transaction and rolls back when done
+
+### Step 2: Run Exploration
+
+```python
+import os
+from venomqa.v1 import Action, Invariant, Agent, World, DFS, Severity
+from venomqa.v1.adapters.http import HttpClient
+from venomqa.v1.adapters.postgres import PostgresAdapter
+
+# Connect to your API's database (same one the API writes to)
+api = HttpClient("http://localhost:8000")
+db = PostgresAdapter(os.environ["DATABASE_URL"])  # e.g. postgresql://user:pass@localhost/mydb
+
+# 1. Define actions (MUST validate responses)
 def create_order(api, context):
     resp = api.post("/orders", json={"product_id": 1, "qty": 2})
+    if resp.status_code != 201:
+        raise AssertionError(f"Create failed: {resp.status_code}")
     context.set("order_id", resp.json()["id"])
     return resp
 
-def cancel_order(api, context):
-    return api.post(f"/orders/{context.get('order_id')}/cancel")
-
 def refund_order(api, context):
-    return api.post(f"/orders/{context.get('order_id')}/refund", json={"amount": 100})
+    order_id = context.get("order_id")
+    resp = api.post(f"/orders/{order_id}/refund", json={"amount": 100})
+    if resp.status_code not in (200, 201):
+        raise AssertionError(f"Refund failed: {resp.status_code}")
+    return resp
 
 def list_orders(api, context):
     resp = api.get("/orders")
+    if resp.status_code != 200:
+        raise AssertionError(f"List failed: {resp.status_code}")
     context.set("orders", resp.json())
     return resp
 
 # 2. Define invariants (rules that must always hold)
 def no_over_refund(world):
-    orders = world.context.get("orders") or []
+    # GOOD: Make live API call to verify server state
+    resp = world.api.get("/orders")
+    if resp.status_code != 200:
+        return False
+    orders = resp.json()
     return all(o.get("refunded", 0) <= o.get("total", 0) for o in orders)
 
 # 3. Explore every reachable sequence
 agent = Agent(
-    world=World(api=HttpClient("http://localhost:8000")),
+    world=World(api=api, systems={"db": db}),  # ← REQUIRED: database adapter
     actions=[
-        Action(name="create_order", execute=create_order),
-        Action(name="cancel_order", execute=cancel_order),
-        Action(name="refund_order", execute=refund_order),
-        Action(name="list_orders",  execute=list_orders),
+        Action(name="create_order", execute=create_order, expected_status=[201]),
+        Action(name="refund_order", execute=refund_order, preconditions=["create_order"]),
+        Action(name="list_orders",  execute=list_orders,  expected_status=[200]),
     ],
     invariants=[
         Invariant(name="no_over_refund", check=no_over_refund,
                   message="Refunded amount cannot exceed order total",
                   severity=Severity.CRITICAL),
     ],
-    strategy=BFS(),
+    strategy=DFS(),  # ← Use DFS with PostgreSQL
     max_steps=200,
 )
 
 result = agent.explore()
 # States: 12, Violations: 1
 # [CRITICAL] no_over_refund: Refunded amount cannot exceed order total
-#   Reproduction path: create_order → cancel_order → refund_order → refund_order → list_orders
+#   Reproduction path: create_order → refund_order → refund_order → list_orders
+```
+
+### No Database? Limited Mode
+
+If your API is stateless or you can't access the database:
+
+```python
+# WARNING: Limited exploration - only context values distinguish states
+world = World(
+    api=api,
+    state_from_context=["order_id", "orders"],  # These values define state identity
+)
 ```
 
 ---
