@@ -136,8 +136,15 @@ def main():
         if line.strip():
             print(f"{DIM}{line}{RESET}")
         if hasattr(v, 'reproduction_path') and v.reproduction_path:
-            path = " → ".join(v.reproduction_path)
-            print(f"    {DIM}Path: {path}{RESET}")
+            steps = []
+            for item in v.reproduction_path:
+                if hasattr(item, 'action'):
+                    steps.append(item.action.name)
+                elif isinstance(item, str):
+                    steps.append(item)
+            if steps:
+                path = " → ".join(steps)
+                print(f"    {DIM}Path: {path}{RESET}")
         print()
 
     print(f"  {DIM}Run venomqa replay to step through the exact sequence.{RESET}")
