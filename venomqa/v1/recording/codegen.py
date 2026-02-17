@@ -95,14 +95,22 @@ journey = Journey(name="{name}", steps=[])
 def _make_action_name(req: RecordedRequest, index: int) -> str:
     """Derive a Python-safe function name from a request."""
     method = req.method.lower()
-    # Strip query string and leading slash, replace slashes/hyphens with _
-    path = req.url.split("?")[0].lstrip("/")
+    # Strip scheme+host, keep only the path segment
+    url = req.url
+    if "://" in url:
+        # e.g. https://api.github.com/repos/owner/repo → /repos/owner/repo
+        url = "/" + url.split("/", 3)[-1] if url.count("/") >= 3 else "/"
+    path = url.split("?")[0].lstrip("/")
+    # Collapse path segments, replace non-alphanum with _
     clean = re.sub(r"[^a-z0-9]", "_", path.lower())
     clean = re.sub(r"_+", "_", clean).strip("_")
+    # Truncate long names (max 40 chars before method prefix)
+    if len(clean) > 40:
+        clean = clean[:40].rstrip("_")
     if not clean:
         clean = f"step_{index}"
     name = f"{method}_{clean}"
-    # Ensure it doesn't clash by appending index if needed
+    # Append index to avoid clashes
     return f"{name}_{index}" if index > 0 else name
 
 
