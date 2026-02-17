@@ -301,13 +301,12 @@ cd examples/github_stripe_qa && python3 main.py
 ## CLI
 
 ```bash
-venomqa scaffold openapi <spec>    # generate actions from OpenAPI spec
-venomqa explore journey.py         # run stateful BFS exploration
-venomqa validate journey.py        # check journey syntax
-venomqa record journey.py          # record HTTP traffic → generate skeleton
-venomqa replay report.json         # replay a violation's reproduction path
+venomqa                            # friendly intro
+venomqa demo                       # see it find a bug (30 seconds)
+venomqa init --with-sample         # create project with examples
 venomqa doctor                     # system diagnostics
-venomqa llm-docs                   # print LLM context doc (paste into Claude/ChatGPT)
+venomqa llm-docs                   # context doc for AI assistants
+venomqa explore journey.py         # run exploration
 ```
 
 ---
