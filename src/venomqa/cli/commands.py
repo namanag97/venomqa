@@ -1717,10 +1717,34 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
     gitignore_path.write_text("*\n!.gitignore\n")
 
     console.print(f"\n[bold green]VenomQA project initialized in '{base}/'[/bold green]")
+
+    # CRITICAL: Database setup warning
+    console.print("\n" + "=" * 70)
+    console.print("[bold red]CRITICAL: Database Setup Required[/bold red]")
+    console.print("=" * 70)
+    console.print("""
+VenomQA explores state graphs by ROLLING BACK the database.
+This is NOT a normal test framework - it needs access to the
+SAME database your API writes to.
+
+Without database rollback, VenomQA can only test one linear path.
+
+[bold yellow]Option 1: PostgreSQL (recommended)[/bold yellow]
+  $ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres \\
+      -p 5432:5432 postgres:15
+  $ export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/yourdb"
+
+[bold yellow]Option 2: SQLite (simpler)[/bold yellow]
+  Your API must use SQLite, then point VenomQA at the same .db file:
+    db = SQLiteAdapter("/path/to/your/api.db")
+""")
+    console.print("=" * 70)
+
     console.print("\n[bold]Next steps:[/bold]")
-    console.print(f"  1. Edit [cyan]{base}/venomqa.yaml[/cyan] — set base_url to your API")
-    console.print(f"  2. Write actions in [cyan]{base}/actions/[/cyan]  (signature: api, context)")
-    console.print(f"  3. Write invariants and run [cyan]Agent.explore()[/cyan] in {base}/journeys/")
+    console.print("  [bold red]1. Set up database rollback first![/bold red] (see above)")
+    console.print(f"  2. Edit [cyan]{base}/venomqa.yaml[/cyan] — set base_url and db_url")
+    console.print(f"  3. Write actions in [cyan]{base}/actions/[/cyan]")
+    console.print(f"  4. Write invariants and run [cyan]Agent.explore()[/cyan]")
 
     if with_sample:
         console.print("\n[bold]Run the sample exploration:[/bold]")
