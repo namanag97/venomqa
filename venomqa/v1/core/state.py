@@ -76,6 +76,7 @@ class State:
     created_at: datetime = field(default_factory=datetime.now)
     checkpoint_id: str | None = None
     parent_transition_id: str | None = None
+    hyperedge: "Hyperedge | None" = None
 
     @classmethod
     def create(
