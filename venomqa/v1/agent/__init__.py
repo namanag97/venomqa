@@ -83,6 +83,7 @@ class Agent:
         logical state via different paths.
         """
         result = ExplorationResult(graph=self.graph)
+        _exhausted = False  # Set True when strategy returns None (exploration complete)
 
         try:
             # Observe initial state WITH checkpoint (critical for rollback)
