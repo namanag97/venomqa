@@ -252,6 +252,8 @@ __all__ = [
     "action",
     "invariant",
     "compile_journey",
+    # Built-in invariants
+    "OpenAPISchemaInvariant",
     # Auth helpers
     "BearerTokenAuth",
     "ApiKeyAuth",
