@@ -2232,7 +2232,8 @@ def benchmark(
     journeys = discover_journeys()
 
     if not journeys:
-        click.echo("No journeys found.", err=True)
+        click.echo("\nNo project found. Set up first with:", err=True)
+        click.echo("  venomqa init --with-sample\n", err=True)
         sys.exit(1)
 
     for name in journey_names:
