@@ -4,10 +4,25 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
 
+from venomqa.core.context import ExecutionContext
+from venomqa.core.models import (
+    Branch,
+    BranchResult,
+    Checkpoint,
+    Issue,
+    Journey,
+    JourneyResult,
+    Path,
+    PathResult,
+    Severity,
+    Step,
+    StepResult,
+)
+from venomqa.http import RequestRecord
+from venomqa.runner import JourneyRunner
 
 # =============================================================================
 # Pytest Configuration for Stress Test Scenarios
@@ -64,7 +79,6 @@ def pytest_collection_modifyitems(config, items):
             if "integration" in item.keywords:
                 item.add_marker(skip_integration)
 
-from venomqa.http import Client, RequestRecord
 from venomqa.core.context import ExecutionContext
 from venomqa.core.models import (
     Branch,
@@ -79,8 +93,8 @@ from venomqa.core.models import (
     Step,
     StepResult,
 )
+from venomqa.http import RequestRecord
 from venomqa.runner import JourneyRunner
-from venomqa.state.base import BaseStateManager, StateManager
 
 
 class MockStateManager:
@@ -171,7 +185,6 @@ class MockClient:
 
     def request(self, method: str, path: str, **kwargs: Any) -> MockHTTPResponse:
         from datetime import datetime
-        from time import perf_counter
 
         if self._responses and self._response_index < len(self._responses):
             response = self._responses[self._response_index]
