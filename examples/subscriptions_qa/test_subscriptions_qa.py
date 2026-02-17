@@ -405,7 +405,7 @@ class TestAdapters:
         api = HttpClient(server)
 
         obs_before = pg.observe()
-        users_before = int(obs_before.data["subs_users"])
+        users_before = int(obs_before.data["subs_users_count"])
 
         # Create user + subscription via API
         r = api.post("/users", json={"email": "pg_test@example.com", "name": "PG"})
