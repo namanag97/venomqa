@@ -240,7 +240,7 @@ class TestWorldTeardown:
             received.append({"api": api, "context": context})
 
         api = _make_mock_api()
-        world = World(api=api, teardown=cleanup)
+        world = World(api=api, teardown=cleanup, state_from_context=[])
 
         def set_key(a, ctx):
             ctx.set("x", 42)
