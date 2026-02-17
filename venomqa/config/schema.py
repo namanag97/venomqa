@@ -292,6 +292,93 @@ VENOMQA_CONFIG_SCHEMA: dict[str, Any] = {
             },
             "additionalProperties": True,
         },
+        "circuit_breaker": {
+            "type": "object",
+            "description": "Circuit breaker configuration for resilience",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable circuit breaker pattern",
+                },
+                "failure_threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 5,
+                    "description": "Number of failures before opening circuit",
+                },
+                "reset_timeout": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 3600,
+                    "default": 60,
+                    "description": "Seconds to wait before attempting reset",
+                },
+                "half_open_requests": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 1,
+                    "description": "Number of test requests in half-open state",
+                },
+            },
+            "additionalProperties": False,
+        },
+        "rate_limit": {
+            "type": "object",
+            "description": "Rate limiting configuration for request throttling",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable rate limiting",
+                },
+                "requests_per_second": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 1000,
+                    "default": 10,
+                    "description": "Maximum requests per second",
+                },
+                "burst_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 20,
+                    "description": "Maximum burst size",
+                },
+            },
+            "additionalProperties": False,
+        },
+        "connection_pool": {
+            "type": "object",
+            "description": "HTTP connection pool configuration",
+            "properties": {
+                "max_connections": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 10,
+                    "description": "Maximum number of connections",
+                },
+                "max_keepalive_connections": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 5,
+                    "description": "Maximum keep-alive connections",
+                },
+                "keepalive_expiry": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 300,
+                    "default": 30,
+                    "description": "Keep-alive connection expiry in seconds",
+                },
+            },
+            "additionalProperties": False,
+        },
     },
     "additionalProperties": False,
 }
