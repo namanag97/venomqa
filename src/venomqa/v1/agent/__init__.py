@@ -628,6 +628,33 @@ class Agent:
         edge = Hyperedge.from_state(state)
         self._hypergraph.add(state.id, edge)
 
+    def _get_valid_actions(self, state: State) -> list[Action]:
+        """Get actions valid in this state, including ResourceGraph checks.
+
+        This combines:
+        1. Graph's precondition filtering (max_calls, action dependencies, context)
+        2. ResourceGraph existence checks (if configured)
+
+        Returns:
+            List of actions that can be executed from this state.
+        """
+        # Get actions that pass preconditions
+        valid = self.graph.get_valid_actions(
+            state, self.world.context, self.graph.used_action_names
+        )
+
+        # If ResourceGraph is configured, also filter by resource requirements
+        resource_graph = self.world.resources
+        if resource_graph is not None:
+            bindings = self.world.context.to_dict()
+            valid = [
+                a for a in valid
+                if not getattr(a, "requires", None)  # No requirements = always valid
+                or resource_graph.can_execute(a.requires, bindings)
+            ]
+
+        return valid
+
     @property
     def hypergraph(self) -> Hypergraph | None:
         """The Hypergraph instance, if hypergraph mode is enabled."""
