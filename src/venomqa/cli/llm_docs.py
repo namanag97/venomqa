@@ -125,27 +125,32 @@ context only if it does. A 1-parameter function receives only api.
 ### Action examples
 
 CRITICAL: Actions must VALIDATE their results. Don't silently ignore errors.
+Use the built-in validation helpers: expect_status(), expect_json_field(), etc.
 
-    # GOOD: Validates response body
+    # GOOD: Using validation helpers (recommended)
     def create_user(api, context):
         resp = api.post("/users", json={"name": "Alice"})
-        if resp.status_code != 201:
-            raise AssertionError(f"Expected 201, got {resp.status_code}: {resp.text}")
-        data = resp.json()
-        if "id" not in data:
-            raise AssertionError(f"Response missing 'id' field: {data}")
+        resp.expect_status(201)                     # raises if not 201
+        data = resp.expect_json_field("id", "name") # raises if fields missing
         context.set("user_id", data["id"])
+        return resp
+
+    # GOOD: List endpoint
+    def list_users(api, context):
+        resp = api.get("/users")
+        resp.expect_status(200)
+        users = resp.expect_json_list()  # raises if not array
+        context.set("users", users)
         return resp
 
     # GOOD: Validates response matches request
     def get_user(api, context):
         user_id = context.get("user_id")
         resp = api.get(f"/users/{user_id}")
-        if resp.status_code != 200:
-            raise AssertionError(f"Failed to get user {user_id}: {resp.status_code}")
-        data = resp.json()
+        resp.expect_status(200)
+        data = resp.expect_json()
         if data.get("id") != user_id:
-            raise AssertionError(f"Wrong user returned: expected {user_id}, got {data.get('id')}")
+            raise AssertionError(f"Wrong user returned: expected {user_id}, got {data}")
         return resp
 
     # BAD - Don't do this (silent no-op):
@@ -158,10 +163,18 @@ CRITICAL: Actions must VALIDATE their results. Don't silently ignore errors.
     def delete_user(api, context):
         user_id = context.get("user_id")
         resp = api.delete(f"/users/{user_id}")
-        if resp.status_code not in (200, 204, 404):
-            raise AssertionError(f"Delete failed: {resp.status_code}")
-        context.delete("user_id")  # Clean up context
+        resp.expect_status(200, 204)  # raises if not 200 or 204
+        context.delete("user_id")     # Clean up context
         return resp
+
+### Validation helpers on ActionResult
+
+    resp.expect_status(201)              # raises AssertionError if not 201
+    resp.expect_status(200, 201)         # raises if not 200 OR 201
+    resp.expect_success()                # raises if not 2xx/3xx
+    data = resp.expect_json()            # raises if not JSON, returns body
+    data = resp.expect_json_field("id")  # raises if field missing, returns dict
+    items = resp.expect_json_list()      # raises if not array, returns list
 
 ### Wrapping a function as an Action
 
