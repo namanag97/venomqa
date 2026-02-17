@@ -1,15 +1,16 @@
-"""VenomQA v1 - Clean, minimal API for stateful exploration testing.
+"""VenomQA v1 internal package.
 
-This module provides the v1 API with ~18 exports instead of 300+.
-Import what you need from here.
+NOTE: Users should import from `venomqa` directly, not from `venomqa.v1`.
+This module is kept for internal use and backward compatibility.
 
-Example:
+Example (preferred):
+    from venomqa import State, Action, Graph, World, Agent, Invariant, explore
+
+Example (deprecated, still works):
     from venomqa.v1 import State, Action, Graph, World, Agent, Invariant, explore
 """
 
 from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
-from venomqa.v1.invariants import OpenAPISchemaInvariant
 from venomqa.v1.agent import Agent, Scheduler
 from venomqa.v1.agent.strategies import (
     BFS,
@@ -20,6 +21,7 @@ from venomqa.v1.agent.strategies import (
     Strategy,
     Weighted,
 )
+from venomqa.v1.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
 from venomqa.v1.core.action import (
     Action,
     ActionResult,
@@ -78,24 +80,22 @@ from venomqa.v1.dsl import Branch, Journey, Path, Step
 from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
 from venomqa.v1.dsl.compiler import compile as compile_journey
 from venomqa.v1.dsl.decorators import action, invariant
-
-# Recording
-from venomqa.v1.recording import RecordedRequest, RequestRecorder, generate_journey_code
-
-# Setup helpers (high-level API)
-from venomqa.v1.setup import connect_to_app, connect_to_api, connect_to_protocol, setup_from_config
+from venomqa.v1.invariants import OpenAPISchemaInvariant
 
 # Testing modes (deployment topology)
 from venomqa.v1.modes import (
+    FullSystemMode,
+    InProcessMode,
+    ProtocolMode,
     TestingMode,
     TestingModeType,
-    InProcessMode,
-    FullSystemMode,
-    ProtocolMode,
-    in_process,
     full_system,
+    in_process,
     protocol,
 )
+
+# Recording
+from venomqa.v1.recording import RecordedRequest, RequestRecorder, generate_journey_code
 
 # Reporters
 from venomqa.v1.reporters.console import ConsoleReporter
@@ -104,6 +104,9 @@ from venomqa.v1.reporters.html_trace import HTMLTraceReporter
 from venomqa.v1.reporters.json import JSONReporter
 from venomqa.v1.reporters.junit import JUnitReporter
 from venomqa.v1.reporters.markdown import MarkdownReporter
+
+# Setup helpers (high-level API)
+from venomqa.v1.setup import connect_to_api, connect_to_app, connect_to_protocol, setup_from_config
 
 # Validation
 from venomqa.v1.validation import (
