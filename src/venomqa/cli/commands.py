@@ -1928,9 +1928,9 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
             console.print(f"[bold]Updating VenomQA framework files in '{base}/'[/bold]\n")
         elif not force:
             console.print(f"[yellow]Directory '{base}' already exists.[/yellow]")
-            console.print("Options:")
-            console.print("  --update  Update framework files only (preserves your actions/journeys)")
-            console.print("  --force   Overwrite ALL files (will delete your actions/journeys!)")
+            console.print("\nRun one of:")
+            console.print(f"  [cyan]venomqa init --update[/cyan]  Update framework files (preserves your code)")
+            console.print(f"  [cyan]venomqa init --force[/cyan]   Overwrite ALL files (deletes your code!)")
             sys.exit(1)
         else:
             console.print(f"[bold]Reinitializing VenomQA project in '{base}/'[/bold]\n")
