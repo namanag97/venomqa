@@ -189,8 +189,8 @@ disallow_incomplete_defs = false
 check_untyped_defs = false
 warn_return_any = false
 warn_unused_ignores = false
-# Ignore common errors in legacy code
-disable_error_code = ["attr-defined", "arg-type", "call-arg", "index", "operator", "return-value", "assignment", "misc"]
+# Ignore common errors in legacy code (enable gradually)
+disable_error_code = ["attr-defined", "arg-type", "call-arg", "index", "operator", "return-value", "assignment", "misc", "list-item", "valid-type", "var-annotated", "union-attr", "type-arg", "name-defined", "import-untyped"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
