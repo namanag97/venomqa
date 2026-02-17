@@ -215,7 +215,7 @@ class TestWorldTeardown:
             called.append((api, context))
 
         api = _make_mock_api()
-        world = World(api=api, teardown=cleanup)
+        world = World(api=api, teardown=cleanup, state_from_context=[])
 
         def noop_action(api, context):
             req = HTTPRequest(method="GET", url="/")
