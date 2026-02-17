@@ -60,7 +60,7 @@ class HTMLTraceReporter:
 
         links: list[dict[str, Any]] = []
         seen: set[tuple[str, str, str]] = set()
-        for t in graph.transitions.values():
+        for t in graph.transitions:
             key = (t.from_state_id, t.action_name, t.to_state_id)
             if key in seen:
                 continue
