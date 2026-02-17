@@ -1613,7 +1613,8 @@ def list_journeys(ctx: click.Context, output_format: str) -> None:
     journeys = discover_journeys()
 
     if not journeys:
-        click.echo("No journeys found. Create journeys in the 'journeys/' directory.")
+        click.echo("\nNo project found. Set up first with:")
+        click.echo("  venomqa init --with-sample\n")
         return
 
     if output_format == "json":
