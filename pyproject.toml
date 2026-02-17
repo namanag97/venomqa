@@ -159,7 +159,7 @@ select = ["E", "F", "I", "N", "W", "UP", "B", "C4"]
 
 [tool.mypy]
 python_version = "3.10"
-ignore_errors = true
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -167,4 +167,10 @@ testpaths = ["tests"]
 markers = [
     "timeout: marks test with timeout",
     "network: marks tests that require network",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests that require live services (postgres, redis, etc.)",
+    "stress: marks stress/load tests",
+    "branching: marks tests that exercise state branching",
+    "concurrency: marks concurrency tests",
+    "performance: marks performance benchmark tests",
 ]
