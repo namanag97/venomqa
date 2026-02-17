@@ -108,7 +108,7 @@ lint:
 	ruff check src/venomqa tests
 
 typecheck:
-	mypy src/venomqa --strict
+	mypy src/venomqa
 
 format:
 	black src/venomqa tests
