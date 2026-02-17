@@ -214,8 +214,7 @@ def run_exploration(max_steps: int = 50) -> bool:
     stripe_server.shutdown()
     github_api.close()
     stripe_api.close()
-    github_obs.close()
-    stripe_obs.close()
+    # MockHTTPServer observers have no HTTP client to close (no-op close)
 
     return len(result.violations) == 0
 
