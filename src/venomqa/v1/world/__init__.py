@@ -251,6 +251,79 @@ class World:
         """Check if a checkpoint exists."""
         return checkpoint_id in self._checkpoints
 
+    # ── ResourceGraph integration ──────────────────────────────────────────
+
+    @property
+    def resources(self) -> "_ResourceGraphType | None":
+        """Get the ResourceGraph system, if configured.
+
+        Returns None if no ResourceGraph was registered in systems.
+
+        Example::
+
+            world = World(
+                api=http,
+                systems={
+                    "db": PostgresAdapter(...),
+                    "resources": ResourceGraph(schema),
+                },
+            )
+
+            # Later:
+            if world.resources:
+                world.resources.create("workspace", ws_id)
+        """
+        from venomqa.v1.adapters.resource_graph import ResourceGraph
+
+        for system in self.systems.values():
+            if isinstance(system, ResourceGraph):
+                return system
+        return None
+
+    def resource_exists(self, resource_type: str, resource_id: str) -> bool:
+        """Check if a resource exists in the ResourceGraph.
+
+        Convenience method for precondition checks.
+        Returns False if no ResourceGraph is configured.
+
+        Args:
+            resource_type: Type of resource (e.g., "workspace", "upload")
+            resource_id: ID of the resource
+
+        Returns:
+            True if resource exists and is alive, False otherwise
+        """
+        graph = self.resources
+        if graph is None:
+            return False
+        return graph.exists(resource_type, resource_id)
+
+    def can_execute_action(self, action: Action) -> bool:
+        """Check if an action can execute based on resource requirements.
+
+        Checks:
+        1. ResourceGraph requirements (action.requires)
+        2. Context-based preconditions (action.preconditions)
+
+        Args:
+            action: The action to check
+
+        Returns:
+            True if all requirements are satisfied
+        """
+        graph = self.resources
+        requires = getattr(action, "requires", None)
+
+        # Check resource requirements
+        if graph is not None and requires:
+            bindings = self.context.to_dict()
+            if not graph.can_execute(requires, bindings):
+                return False
+
+        # Delegate to action's own precondition check
+        state = self.observe()
+        return action.can_execute_with_context(state, self.context)
+
 
 __all__ = [
     "World",
