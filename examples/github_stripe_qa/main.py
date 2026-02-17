@@ -37,6 +37,7 @@ from venomqa.v1.adapters.mock_queue import MockQueue
 from venomqa.v1.core.action import Action
 from venomqa.v1.agent.strategies import BFS
 from stripe_proxy import StripeProxy
+from api_observers import GitHubObserver, StripeObserver
 
 from mock_github import start_server as start_github, reset_state as reset_github
 from mock_stripe import start_server as start_stripe, reset_state as reset_stripe
