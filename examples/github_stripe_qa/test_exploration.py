@@ -33,6 +33,7 @@ from stripe_proxy import StripeProxy
 
 import mock_github
 import mock_stripe
+from api_observers import GitHubObserver, StripeObserver
 from actions import (
     create_user,
     create_repo,
