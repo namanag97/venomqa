@@ -141,18 +141,42 @@ class Agent:
             # Run user-defined setup (DB seeding, auth bootstrap, etc.)
             self.world.run_setup()
 
-            # ── Sanity check #1: warn if no systems registered ──────────────
-            # Without at least one system or state_from_context, all observations
-            # are empty dicts, every state hashes identically, and BFS sees only
-            # 1 state no matter how many actions fire.
+            # ── CRITICAL: No systems = no state exploration ──────────────────
+            # Without a database/system to rollback, VenomQA cannot explore
+            # different branches. Every state hashes identically.
             if not self.world.systems and not self.world._state_from_context:
-                warnings.warn(
-                    "No systems registered in World. All states will hash identically "
-                    "(states_visited will be 1 regardless of actions taken). "
-                    "Add a PostgresAdapter, SQLiteAdapter, or MockHTTPServer to World "
-                    "so that DB/API state is part of the state fingerprint.\n"
-                    "  Example: world = World(api=api, systems={'db': PostgresAdapter(...)})",
-                    stacklevel=3,
+                raise ValueError(
+                    "\n"
+                    "=" * 70 + "\n"
+                    "CRITICAL: No database/systems registered in World\n"
+                    "=" * 70 + "\n"
+                    "\n"
+                    "VenomQA explores state graphs by ROLLING BACK the database.\n"
+                    "Without a database connection, it cannot:\n"
+                    "  - Checkpoint state after each action\n"
+                    "  - Rollback to explore different branches\n"
+                    "  - Distinguish different states (all states look identical)\n"
+                    "\n"
+                    "You MUST connect to the SAME database your API writes to.\n"
+                    "\n"
+                    "FIX - Add a database adapter to World:\n"
+                    "\n"
+                    "  # Option 1: PostgreSQL (recommended)\n"
+                    "  from venomqa import World, HttpClient\n"
+                    "  from venomqa.v1.adapters.postgres import PostgresAdapter\n"
+                    "  \n"
+                    "  api = HttpClient('http://localhost:8000')\n"
+                    "  db = PostgresAdapter('postgresql://user:pass@localhost/mydb')\n"
+                    "  world = World(api=api, systems={'db': db})\n"
+                    "\n"
+                    "  # Option 2: SQLite\n"
+                    "  from venomqa import World, HttpClient, SQLiteAdapter\n"
+                    "  \n"
+                    "  api = HttpClient('http://localhost:8000')\n"
+                    "  db = SQLiteAdapter('/path/to/your/api.db')\n"
+                    "  world = World(api=api, systems={'db': db})\n"
+                    "\n"
+                    "=" * 70
                 )
 
             # Observe initial state WITH checkpoint (critical for rollback)
