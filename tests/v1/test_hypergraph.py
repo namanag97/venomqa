@@ -414,7 +414,7 @@ class TestAgentWithHypergraph:
 
     def _make_world(self):
         from venomqa.v1.world import World
-        return World(api=None, systems={})
+        return World(api=None, state_from_context=[])
 
     def _ok(self):
         from venomqa.v1.core.action import ActionResult, HTTPRequest, HTTPResponse
