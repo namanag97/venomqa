@@ -85,7 +85,7 @@ from venomqa import Journey, Step, Action, ActionResult, HTTPRequest, HTTPRespon
 def _empty_journey(name: str) -> str:
     return f'''"""Auto-generated VenomQA journey — no requests recorded."""
 
-from venomqa.v1 import Journey, Step
+from venomqa import Journey, Step
 
 journey = Journey(name="{name}", steps=[])
 '''
