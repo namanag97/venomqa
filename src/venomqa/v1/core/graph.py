@@ -215,7 +215,7 @@ class Graph:
         Useful for debugging coverage issues - shows which actions DFS/BFS
         never reached, even after many steps.
         """
-        all_names = {a.name for a in self.actions}
+        all_names = set(self._actions.keys())
         used = self.used_action_names
         return sorted(all_names - used)
 
