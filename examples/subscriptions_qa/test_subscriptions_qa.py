@@ -505,9 +505,10 @@ class TestAdapters:
         r2 = api.post("/subscriptions", json={"user_id": r.json()["id"], "plan": "enterprise"})
         sub_id = r2.json()["id"]
 
-        pdf = storage.get(f"invoice_{sub_id}.pdf")
-        assert pdf is not None, "Invoice PDF was not stored"
-        assert b"199.00" in pdf, f"Enterprise invoice should be $199, content: {pdf}"
+        stored = storage.get(f"invoice_{sub_id}.pdf")
+        assert stored is not None, "Invoice PDF was not stored"
+        content = stored.content if hasattr(stored, "content") else stored
+        assert b"199.00" in content, f"Enterprise invoice should be $199, content: {content}"
         assert storage.file_count >= 1
 
     def test_mock_time_drives_time_sensitive_ops(self, server, clock):
