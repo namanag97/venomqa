@@ -158,6 +158,7 @@ target-version = "py310"
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4"]
 ignore = [
     "E402",   # Module level import not at top of file (needed for test fixtures)
+    "E501",   # Line too long (already at 100 limit, many legacy violations)
     "B027",   # Empty method in abstract base class (intentional for optional hooks)
     "B904",   # raise from err (too strict for existing codebase)
     "B024",   # Abstract class without abstract methods (intentional for plugin base)
