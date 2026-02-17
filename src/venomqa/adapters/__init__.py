@@ -1,35 +1,42 @@
-"""Adapters for VenomQA Ports.
+"""VenomQA Adapters.
 
-This module provides concrete implementations of the Port interfaces
-for various backend services commonly used in testing environments.
+This module provides adapters for external systems.
 
-Mock Adapters (for testing):
-    - MockCacheAdapter: In-memory cache for unit tests
-    - MockMailAdapter: In-memory email capture
-    - MockQueueAdapter: In-memory job queue
-    - MockStorageAdapter: In-memory object storage
-    - MockTimeAdapter: Controllable time for deterministic tests
-    - ThreadConcurrencyAdapter: Thread-based task execution
+Main adapters (recommended):
+    - HttpClient: HTTP client for API testing
+    - PostgresAdapter: PostgreSQL with savepoint/rollback
+    - SQLiteAdapter: SQLite with checkpoint/rollback
+    - MySQLAdapter: MySQL adapter
+    - RedisAdapter: Redis cache adapter
+    - MockQueue, MockMail, MockStorage, MockTime: In-memory mocks
 
-Real Adapters (for integration):
-    - MailhogAdapter: MailHog email catcher integration
-    - MailpitAdapter: Mailpit email catcher integration
-    - RedisQueueAdapter: Redis-based job queue
-    - CeleryQueueAdapter: Celery task queue integration
-    - RedisCacheAdapter: Redis cache backend
-    - ElasticsearchAdapter: Elasticsearch search engine
-    - S3StorageAdapter: AWS S3 object storage
-    - LocalStorageAdapter: Local filesystem storage
-    - AsyncConcurrencyAdapter: Asyncio-based concurrency
-    - ControllableTimeAdapter: Controllable time for testing
-    - RealTimeAdapter: Real system time
-    - WireMockAdapter: WireMock mock server
-    - SMTPMockAdapter: SMTP mock server
+Legacy adapters (backwards compatibility):
+    - MockCacheAdapter, MockMailAdapter, MockQueueAdapter, etc.
 """
 
 from __future__ import annotations
 
+import importlib
+import sys
 from collections.abc import Callable
+
+# =============================================================================
+# Main adapters (from v1) - the recommended imports
+# =============================================================================
+from venomqa.v1.adapters.http import HttpClient
+from venomqa.v1.adapters.mock_mail import Email, MockMail
+from venomqa.v1.adapters.mock_queue import Message, MockQueue
+from venomqa.v1.adapters.mock_storage import MockStorage, StoredFile
+from venomqa.v1.adapters.mock_time import MockTime
+from venomqa.v1.adapters.mysql import MySQLAdapter
+from venomqa.v1.adapters.postgres import PostgresAdapter
+from venomqa.v1.adapters.redis import RedisAdapter
+from venomqa.v1.adapters.sqlite import SQLiteAdapter
+from venomqa.v1.adapters.wiremock import WireMockAdapter as V1WireMockAdapter
+
+# =============================================================================
+# Legacy adapters (backwards compatibility)
+# =============================================================================
 
 # Real adapters (for integration tests - may require optional dependencies)
 from venomqa.adapters.asyncio_concurrency import AsyncConcurrencyAdapter
@@ -126,13 +133,66 @@ def list_adapters() -> list[str]:
     return list(_adapters.keys())
 
 
-# Build __all__ dynamically based on available adapters
+# =============================================================================
+# Submodule aliasing: allow `from venomqa.adapters.http import HttpClient` etc.
+# This maps venomqa.adapters.{name} -> venomqa.v1.adapters.{name}
+# for submodules that only exist under v1/adapters/.
+# =============================================================================
+
+_V1_ADAPTER_SUBMODULES = [
+    "http", "postgres", "sqlite", "mysql", "redis",
+    "mock_mail", "mock_queue", "mock_storage", "mock_time",
+    "mock_http_server", "resource_graph", "asgi", "protocol",
+]
+
+for _submod in _V1_ADAPTER_SUBMODULES:
+    _v1_name = f"venomqa.v1.adapters.{_submod}"
+    _alias_name = f"venomqa.adapters.{_submod}"
+    if _alias_name not in sys.modules:
+        try:
+            _mod = importlib.import_module(_v1_name)
+            sys.modules[_alias_name] = _mod
+        except ImportError:
+            pass
+
+
+# Lazy imports for optional adapters (v1)
+_original_getattr = None
+
+
+def __getattr__(name: str):
+    if name in ("ASGIAdapter", "SharedPostgresAdapter", "ASGIResponse"):
+        from venomqa.v1.adapters.asgi import ASGIAdapter, ASGIResponse, SharedPostgresAdapter
+        return {"ASGIAdapter": ASGIAdapter, "SharedPostgresAdapter": SharedPostgresAdapter, "ASGIResponse": ASGIResponse}[name]
+    if name == "ProtocolAdapter":
+        from venomqa.v1.adapters.protocol import ProtocolAdapter
+        return ProtocolAdapter
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
+    # Main adapters (recommended)
+    "HttpClient",
+    "PostgresAdapter",
+    "MySQLAdapter",
+    "SQLiteAdapter",
+    "RedisAdapter",
+    "V1WireMockAdapter",
+    "MockQueue",
+    "Message",
+    "MockMail",
+    "Email",
+    "MockStorage",
+    "StoredFile",
+    "MockTime",
+    "ASGIAdapter",
+    "SharedPostgresAdapter",
+    # Registry
     "register_adapter",
     "get_adapter",
     "register_adapter_class",
     "list_adapters",
-    # Mock adapters (always available)
+    # Legacy adapters
     "MockCacheAdapter",
     "CacheEntry",
     "MockMailAdapter",
