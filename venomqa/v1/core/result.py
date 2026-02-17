@@ -115,6 +115,7 @@ class ExplorationResult:
             "actions_used": self.graph.used_action_count,
             "action_coverage_percent": round(self.action_coverage_percent, 2),
             "transition_coverage_percent": round(self.coverage_percent, 2),
+            "truncated_by_max_steps": self.truncated_by_max_steps,
             "violations": len(self.violations),
             "critical": len(self.critical_violations),
             "success": self.success,
