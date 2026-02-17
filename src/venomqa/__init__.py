@@ -431,6 +431,7 @@ __all__ = [
     "CoverageGuided",
     "Weighted",
     "HttpClient",
+    "SQLiteAdapter",
     "Journey",
     "Step",
     "Branch",
