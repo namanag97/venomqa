@@ -110,6 +110,12 @@ class Agent:
 
         result.violations = list(self._violations)
         result.finish()
+
+        # Attach dimension coverage if hypergraph was used
+        if self._hypergraph is not None:
+            from venomqa.v1.core.coverage import DimensionCoverage
+            result.dimension_coverage = DimensionCoverage.from_hypergraph(self._hypergraph)
+
         return result
 
     def _step(self) -> Transition | None:
