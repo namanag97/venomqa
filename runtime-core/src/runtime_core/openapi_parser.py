@@ -182,14 +182,19 @@ class OpenAPIParser:
                     id_field=id_field,
                     path_param=path_param,
                 )
-            elif parent_type and types[resource_type].parent is None:
-                # Update parent if we find a more specific path
-                types[resource_type] = ResourceType(
-                    name=resource_type,
-                    parent=parent_type,
-                    id_field=types[resource_type].id_field,
-                    path_param=path_param or types[resource_type].path_param,
-                )
+            else:
+                # Update existing type with more info if available
+                existing = types[resource_type]
+                new_parent = parent_type if parent_type and not existing.parent else existing.parent
+                new_path_param = path_param if path_param else existing.path_param
+
+                if new_parent != existing.parent or new_path_param != existing.path_param:
+                    types[resource_type] = ResourceType(
+                        name=resource_type,
+                        parent=new_parent,
+                        id_field=existing.id_field,
+                        path_param=new_path_param,
+                    )
 
             # Only set parent for next type if this one has an ID param
             # (i.e., it's a specific resource, not just a collection)
