@@ -83,7 +83,7 @@ from venomqa.v1.dsl.decorators import action, invariant
 from venomqa.v1.recording import RecordedRequest, RequestRecorder, generate_journey_code
 
 # Setup helpers (high-level API)
-from venomqa.v1.setup import connect_to_app, connect_to_api, setup_from_config
+from venomqa.v1.setup import connect_to_app, connect_to_api, connect_to_protocol, setup_from_config
 
 # Reporters
 from venomqa.v1.reporters.console import ConsoleReporter
