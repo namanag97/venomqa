@@ -455,23 +455,35 @@ Invariant(
 
 ## Run an exploration
 
+**CRITICAL**: VenomQA needs database rollback to explore branches.
+Without it, VenomQA can only test ONE linear path.
+
 ```python
-from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
+import os
+from venomqa.v1 import Action, Invariant, Agent, World, DFS, Severity
 from venomqa.v1.adapters.http import HttpClient
+from venomqa.v1.adapters.postgres import PostgresAdapter  # or SQLiteAdapter
 from actions.my_actions import create_user, get_user
 
+# Connect to the SAME database your API writes to
+api = HttpClient("http://localhost:8000")
+db = PostgresAdapter(os.environ["DATABASE_URL"])
+
 agent = Agent(
-    world=World(api=HttpClient("http://localhost:8000")),
+    world=World(api=api, systems={{"db": db}}),  # ← REQUIRED for state exploration
     actions=[
         Action(name="create_user", execute=create_user, expected_status=[201]),
-        Action(name="get_user",    execute=get_user,    expected_status=[200]),
+        Action(name="get_user",    execute=get_user,    expected_status=[200],
+               preconditions=["create_user"]),  # ← only run after create_user
     ],
     invariants=[...],
-    strategy=BFS(),
+    strategy=DFS(),   # ← use DFS with PostgreSQL
     max_steps=200,
 )
 result = agent.explore()
 ```
+
+**No database?** Use `state_from_context=["user_id", ...]` for limited context-based exploration.
 
 ## Using an AI assistant
 
