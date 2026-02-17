@@ -77,8 +77,8 @@ class SchemaValidator:
         """
         try:
             import jsonschema
-        except ImportError:
-            raise ImportError("jsonschema required: pip install jsonschema")
+        except ImportError as e:
+            raise ImportError("jsonschema required: pip install jsonschema") from e
 
         def check(body: Any) -> bool:
             try:
