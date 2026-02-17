@@ -151,6 +151,10 @@ class Agent:
         # add_state returns canonical state (deduplicates if same observations)
         to_state = self.graph.add_state(to_state)
 
+        # Register in hypergraph if enabled
+        if self._hypergraph is not None:
+            self._register_hyperedge(to_state)
+
         # Record transition
         transition = Transition.create(
             from_state_id=from_state.id,
