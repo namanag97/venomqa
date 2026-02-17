@@ -321,7 +321,8 @@ def _singularize(name: str) -> str:
     """
     if name.endswith("ies"):
         return name[:-3] + "y"
-    if name.endswith("es") and not name.endswith("ses"):
+    # "statuses" -> "status", "boxes" -> "box"
+    if name.endswith("ses") or name.endswith("xes") or name.endswith("ches") or name.endswith("shes"):
         return name[:-2]
     if name.endswith("s") and not name.endswith("ss"):
         return name[:-1]
