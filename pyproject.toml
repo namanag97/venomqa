@@ -150,6 +150,10 @@ cache = "venomqa.adapters.cache:MockCacheAdapter"
 [tool.hatch.build.targets.wheel]
 packages = ["src/venomqa"]
 
+[tool.hatch.build.targets.wheel.shared-scripts]
+# Shell script wrapper that finds Python at runtime - more resilient than console_scripts
+venomqa = "scripts/bin/venomqa"
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
