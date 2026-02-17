@@ -112,6 +112,20 @@ class ExplorationResult:
         return len(self.violations) == 0
 
     @property
+    def unused_actions(self) -> list[str]:
+        """List of action names that were never executed.
+
+        Useful for debugging coverage issues. If DFS runs 2000 steps but
+        only uses 36% of actions, this shows which ones were skipped.
+        """
+        return self.graph.unused_action_names
+
+    @property
+    def used_actions(self) -> list[str]:
+        """List of action names that were executed at least once."""
+        return list(self.graph.used_action_names)
+
+    @property
     def critical_violations(self) -> list[Violation]:
         """List of critical severity violations."""
         return [v for v in self.violations if v.severity == Severity.CRITICAL]
