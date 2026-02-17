@@ -303,6 +303,117 @@ def check_common_ports() -> tuple[bool, str]:
     return True, "No services detected on common ports"
 
 
+# ---------------------------------------------------------------------------
+# Database Connectivity Checks (new)
+# ---------------------------------------------------------------------------
+
+
+def check_psycopg3() -> tuple[bool, str]:
+    """Check if psycopg3 is installed (required for PostgreSQL support)."""
+    try:
+        import psycopg
+        version = getattr(psycopg, "__version__", "installed")
+        return True, f"psycopg {version}"
+    except ImportError:
+        return False, "psycopg3 not installed (pip install 'psycopg[binary]')"
+
+
+def check_postgres_connection() -> tuple[bool, str]:
+    """Check actual PostgreSQL connectivity using DATABASE_URL or defaults."""
+    db_url = os.environ.get("DATABASE_URL")
+
+    if not db_url:
+        # Try common local defaults
+        defaults = [
+            "postgresql://postgres:postgres@localhost:5432/postgres",
+            "postgresql://localhost:5432/postgres",
+        ]
+    else:
+        defaults = [db_url]
+
+    try:
+        import psycopg
+    except ImportError:
+        return False, "psycopg3 not installed (cannot test connection)"
+
+    last_error = None
+    for url in defaults:
+        try:
+            with psycopg.connect(url, connect_timeout=3) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT version()")
+                    version = cur.fetchone()[0]
+                    # Extract just the version number
+                    version_short = version.split(",")[0] if version else "connected"
+                    return True, version_short
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    error_msg = last_error or "Connection failed"
+    if "connection refused" in error_msg.lower():
+        return False, "PostgreSQL not running (connection refused)"
+    elif "password authentication failed" in error_msg.lower():
+        return False, "PostgreSQL auth failed (check DATABASE_URL credentials)"
+    elif "does not exist" in error_msg.lower():
+        return False, "Database does not exist (create it first)"
+    else:
+        return False, f"PostgreSQL connection failed: {error_msg[:50]}"
+
+
+def check_redis_connection() -> tuple[bool, str]:
+    """Check actual Redis connectivity using REDIS_URL or defaults."""
+    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+    try:
+        import redis
+    except ImportError:
+        return False, "redis-py not installed (pip install redis)"
+
+    try:
+        client = redis.from_url(redis_url, socket_connect_timeout=2)
+        info = client.info("server")
+        version = info.get("redis_version", "connected")
+        client.close()
+        return True, f"Redis {version}"
+    except redis.ConnectionError as e:
+        error_msg = str(e)
+        if "connection refused" in error_msg.lower():
+            return False, "Redis not running (connection refused)"
+        return False, f"Redis connection failed: {error_msg[:40]}"
+    except Exception as e:
+        return False, f"Redis error: {str(e)[:40]}"
+
+
+def check_environment_vars() -> tuple[bool, str]:
+    """Check if common environment variables are set."""
+    env_vars = {
+        "DATABASE_URL": os.environ.get("DATABASE_URL"),
+        "REDIS_URL": os.environ.get("REDIS_URL"),
+    }
+
+    set_vars = [k for k, v in env_vars.items() if v]
+    missing_vars = [k for k, v in env_vars.items() if not v]
+
+    if set_vars and not missing_vars:
+        return True, f"All env vars set ({', '.join(set_vars)})"
+    elif set_vars:
+        return True, f"Set: {', '.join(set_vars)} | Missing: {', '.join(missing_vars)}"
+    else:
+        return False, f"No env vars set ({', '.join(missing_vars)})"
+
+
+def check_v1_quick_start() -> tuple[bool, str]:
+    """Check if v1 module can be imported and is working."""
+    try:
+        from venomqa.v1 import State, Action, World, Agent, explore
+        return True, "v1 module ready"
+    except ImportError as e:
+        return False, f"v1 import failed: {e}"
+    except Exception as e:
+        return False, f"v1 error: {e}"
+
+
 def check_config_file() -> tuple[bool, str]:
     """Check if a VenomQA configuration file exists."""
     from pathlib import Path
