@@ -250,7 +250,7 @@ class TestInvariantViolation:
     def test_violation_reproduction_path(self):
         """Test that violations include reproduction paths."""
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        world = World(api=api, state_from_context=[])
 
         violation_triggered = False
 
@@ -295,7 +295,7 @@ class TestInvariantViolation:
     def test_multiple_violations(self):
         """Test detection of multiple invariant violations."""
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        world = World(api=api, state_from_context=[])
 
         inv1 = Invariant(name="inv1", check=lambda w: False, message="First", severity=Severity.HIGH)
         inv2 = Invariant(name="inv2", check=lambda w: False, message="Second", severity=Severity.MEDIUM)
@@ -318,7 +318,7 @@ class TestInvariantViolation:
     def test_passing_invariants(self):
         """Test that passing invariants don't create violations."""
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        world = World(api=api, state_from_context=[])
 
         passing_invariant = Invariant(
             name="always_passes",
@@ -347,7 +347,7 @@ class TestJourneyIntegration:
         from venomqa.v1.dsl.compiler import compile
 
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        world = World(api=api, state_from_context=[])
 
         def login_action(api):
             return api.post("/login", json={"user": "test"})
@@ -376,7 +376,7 @@ class TestExplorationResult:
     def test_coverage_calculation(self):
         """Test coverage percentage calculation."""
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        world = World(api=api, state_from_context=[])
 
         actions = [
             Action(name="a1", execute=lambda api: api.get("/a1")),
@@ -392,7 +392,7 @@ class TestExplorationResult:
     def test_timing(self):
         """Test that timing is recorded."""
         api = MockHttpClient()
-        world = World(api=api, systems={})
+        world = World(api=api, state_from_context=[])
 
         action = Action(name="test", execute=lambda api: api.get("/test"))
 
