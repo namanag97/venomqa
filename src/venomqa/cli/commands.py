@@ -3630,7 +3630,7 @@ def record_v1(
     """Proxy HTTP calls and generate a V1 Journey skeleton."""
     import types
 
-    from venomqa.v1.cli.main import cmd_record
+    from venomqa.cli.main import cmd_record
 
     args = types.SimpleNamespace(
         journey_file=journey_file,
