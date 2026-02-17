@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-02-17
+
+### Added
+
+- **`BearerTokenAuth`, `ApiKeyAuth`, `MultiRoleAuth`** — built-in auth helpers that eliminate the `_auth(context)` helper copy-pasted in every action file. Pass `auth=` to `World` and every request gets the token injected automatically:
+  ```python
+  from venomqa.v1 import BearerTokenAuth, MultiRoleAuth, World
+  world = World(api=api, auth=BearerTokenAuth(lambda ctx: ctx.get("token")))
+  # In actions: api.get("/x")  ← no manual headers needed
+
+  # Multi-role RBAC:
+  world = World(api=api, auth=MultiRoleAuth(
+      roles={"admin": BearerTokenAuth(lambda c: c.get("token")),
+             "viewer": BearerTokenAuth(lambda c: c.get("viewer_token"))},
+      default="admin",
+  ))
+  def viewer_cannot_delete(api, context):
+      return api.delete("/resource/1", role="viewer")  # viewer token injected
+  # or: viewer = api.with_role("viewer"); viewer.delete("/resource/1")
+  ```
+
+- **`Agent(shrink=True)`** — automatic path shrinking. After finding a violation with a long reproduction path (e.g. 15 steps), VenomQA delta-debugs it down to the minimal sequence that still triggers the same invariant. The violation message notes how many steps were removed. Off by default (opt-in).
+
+- **`OpenAPISchemaInvariant`** — validates every HTTP response against the OpenAPI spec automatically. No per-endpoint invariants needed — catches missing required fields, wrong types, and schema drift for free:
+  ```python
+  from venomqa.v1.invariants import OpenAPISchemaInvariant
+  invariants = [
+      OpenAPISchemaInvariant(spec_url="http://localhost:8000/openapi.json"),
+      # or: OpenAPISchemaInvariant(spec_path="api-spec.yaml")
+  ]
+  ```
+  Uses `jsonschema` for full validation if installed; falls back to structural checks (required fields + type) if not. Skips paths not in the spec and undocumented status codes.
+
+- **`world.last_action_result`** — property exposing the `ActionResult` from the most recent `world.act()` call. Available inside invariant `check(world)` functions for HTTP-aware invariants.
+
 ## [0.4.4] - 2026-02-17
 
 ### Added
