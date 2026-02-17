@@ -179,6 +179,12 @@ class TodoObserver(MockHTTPServer):
             data={
                 "count": len(todos),
                 "done_count": sum(1 for t in todos.values() if t["done"]),
+                # next_id distinguishes "never created any todo" (next_id=1)
+                # from "created then deleted" (next_id=2+). Without this,
+                # initial state and post-delete state look identical and
+                # collapse into one node in the exploration graph, causing
+                # reproduction paths to appear empty.
+                "next_id": state["next_id"],
             },
         )
 
