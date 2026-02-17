@@ -401,9 +401,46 @@ __author__ = "Naman Agarwal"
 __license__ = "MIT"
 
 __all__ = [
-    # v1 API
-    "v1",
-    # Legacy exports
+    # ==========================================================================
+    # MAIN API - The stuff you actually need
+    # ==========================================================================
+    "Action",
+    "ActionResult",
+    "HTTPRequest",
+    "HTTPResponse",
+    "State",
+    "Observation",
+    "Context",
+    "Invariant",
+    "Violation",
+    "Severity",
+    "InvariantTiming",
+    "Graph",
+    "Transition",
+    "ExplorationResult",
+    "World",
+    "Checkpoint",
+    "Rollbackable",
+    "Agent",
+    "Scheduler",
+    "Strategy",
+    "BFS",
+    "DFS",
+    "Random",
+    "CoverageGuided",
+    "Weighted",
+    "HttpClient",
+    "Journey",
+    "Step",
+    "Branch",
+    "Path",
+    "action",
+    "invariant",
+    "explore",
+    "ConsoleReporter",
+    # ==========================================================================
+    # LEGACY API - Backwards compatibility (300+ exports)
+    # ==========================================================================
     "Journey",
     "JourneyResult",
     "Step",
