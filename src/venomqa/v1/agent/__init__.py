@@ -484,7 +484,16 @@ class Agent:
                 continue
 
             try:
-                if not inv.check(self.world):
+                check_result = inv.check(self.world)
+                failed = check_result is False or isinstance(check_result, str)
+                if failed:
+                    # Dedup: same invariant firing at the same state is reported only once
+                    dedup_key = (inv.name, state.id)
+                    if dedup_key in self._seen_violations:
+                        continue
+                    self._seen_violations.add(dedup_key)
+
+                    dynamic_message = check_result if isinstance(check_result, str) else ""
                     # Get reproduction path (how to reach this state)
                     path = self.graph.get_path_to(state.id)
                     repro_path = path + [transition] if transition else path
@@ -494,6 +503,7 @@ class Agent:
                         action=action,
                         reproduction_path=repro_path,
                         action_result=action_result,
+                        message_override=dynamic_message,
                     )
                     # Optionally shrink the reproduction path to its minimum
                     if self.shrink and len(repro_path) > 1:
