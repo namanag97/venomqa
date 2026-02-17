@@ -1,20 +1,26 @@
 """Code generators for VenomQA.
 
-This module provides tools for auto-generating VenomQA actions, fixtures,
-and other test artifacts from various specifications.
+Main generators (recommended):
+    - generate_actions: Generate Actions from OpenAPI spec
+    - generate_schema_and_actions: Generate ResourceSchema + Actions from OpenAPI spec
 
-Classes:
-    OpenAPIGenerator: Generate actions and fixtures from OpenAPI specs.
-    GeneratedAction: Represents a generated action function.
-    GeneratedFixture: Represents a generated fixture function.
-    GeneratorConfig: Configuration for code generation.
+Legacy generators (backwards compatibility):
+    - OpenAPIGenerator: Older style generator from OpenAPI specs.
 
 Example:
-    >>> from venomqa.generators import OpenAPIGenerator
-    >>> generator = OpenAPIGenerator("openapi.yaml")
-    >>> generator.generate("./qa/actions/")
+    >>> from venomqa.generators.openapi_actions import generate_actions
+    >>> actions = generate_actions(spec_path="openapi.yaml")
 """
 
+from __future__ import annotations
+
+import importlib
+import sys
+
+# Main generator (from v1)
+from venomqa.v1.generators.openapi_actions import generate_actions, generate_schema_and_actions
+
+# Legacy generators
 from venomqa.generators.openapi import (
     EndpointInfo,
     GeneratedAction,
@@ -30,7 +36,24 @@ from venomqa.generators.openapi import (
     SchemaInfo,
 )
 
+# Submodule aliasing: allow `from venomqa.generators.openapi_actions import generate_actions`
+_V1_GENERATOR_SUBMODULES = ["openapi_actions"]
+
+for _submod in _V1_GENERATOR_SUBMODULES:
+    _v1_name = f"venomqa.v1.generators.{_submod}"
+    _alias_name = f"venomqa.generators.{_submod}"
+    if _alias_name not in sys.modules:
+        try:
+            _mod = importlib.import_module(_v1_name)
+            sys.modules[_alias_name] = _mod
+        except ImportError:
+            pass
+
 __all__ = [
+    # Main
+    "generate_actions",
+    "generate_schema_and_actions",
+    # Legacy
     "OpenAPIGenerator",
     "OpenAPISchema",
     "GeneratedAction",
