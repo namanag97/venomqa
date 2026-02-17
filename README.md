@@ -99,26 +99,26 @@ from venomqa.v1.adapters.postgres import PostgresAdapter
 api = HttpClient("http://localhost:8000")
 db = PostgresAdapter(os.environ["DATABASE_URL"])  # e.g. postgresql://user:pass@localhost/mydb
 
-# 1. Define actions (MUST validate responses)
+# 1. Define actions using expect_* helpers (cleanest pattern)
 def create_order(api, context):
     resp = api.post("/orders", json={"product_id": 1, "qty": 2})
-    if resp.status_code != 201:
-        raise AssertionError(f"Create failed: {resp.status_code}")
-    context.set("order_id", resp.json()["id"])
+    resp.expect_status(201)                          # raises if not 201
+    data = resp.expect_json_field("id", "total")     # raises if fields missing
+    context.set("order_id", data["id"])
+    context.set("order_total", data["total"])
     return resp
 
 def refund_order(api, context):
     order_id = context.get("order_id")
     resp = api.post(f"/orders/{order_id}/refund", json={"amount": 100})
-    if resp.status_code not in (200, 201):
-        raise AssertionError(f"Refund failed: {resp.status_code}")
+    resp.expect_status(200, 201)                     # 200 or 201
     return resp
 
 def list_orders(api, context):
     resp = api.get("/orders")
-    if resp.status_code != 200:
-        raise AssertionError(f"List failed: {resp.status_code}")
-    context.set("orders", resp.json())
+    resp.expect_status(200)
+    orders = resp.expect_json_list()                 # raises if not array
+    context.set("orders", orders)
     return resp
 
 # 2. Define invariants (rules that must always hold)
