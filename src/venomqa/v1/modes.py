@@ -222,6 +222,66 @@ CHOOSING A MODE:
 │                                                                           │
 └───────────────────────────────────────────────────────────────────────────┘
 
+
+CRITICAL: STRATEGY + DATABASE COMPATIBILITY
+═══════════════════════════════════════════
+
+PostgreSQL SAVEPOINTs are a LIFO STACK. You can only rollback to the
+most recent savepoint, then the one before it, etc. You CANNOT jump
+to an arbitrary savepoint without destroying all savepoints after it.
+
+   SAVEPOINT Stack:        Valid Rollback:       Invalid Rollback:
+   ┌─────────────┐         ┌─────────────┐       ┌─────────────┐
+   │    sp_3     │ ◀─ top  │    sp_3     │ ◀──   │    sp_3     │ destroyed!
+   ├─────────────┤         ├─────────────┤       ├─────────────┤
+   │    sp_2     │         │    sp_2     │       │    sp_2     │ destroyed!
+   ├─────────────┤         ├─────────────┤       ├─────────────┤
+   │    sp_1     │         │    sp_1     │       │    sp_1     │ ◀── jump here
+   └─────────────┘         └─────────────┘       └─────────────┘
+                           ROLLBACK TO sp_3     ROLLBACK TO sp_1
+                           (OK - top of stack)   (DESTROYS sp_2, sp_3!)
+
+DFS (Depth-First Search):
+   Explores deep, then backtracks. Rollbacks are always LIFO.
+   ✓ SAFE with PostgreSQL
+
+   Exploration:           Rollbacks:
+   sp_1 → sp_2 → sp_3     sp_3 → sp_2 → sp_1  (LIFO - matches stack!)
+
+BFS / CoverageGuided / Weighted / Random:
+   Jump to arbitrary states. Rollbacks are NOT LIFO.
+   ✗ UNSAFE with PostgreSQL - will crash or corrupt state!
+
+   Exploration:           Rollbacks needed:
+   sp_1 → sp_2 → sp_3     sp_1 (jump!) → sp_3 (???) → sp_2 (???)
+                          Can't jump to sp_1 without destroying sp_2, sp_3!
+
+STRATEGY COMPATIBILITY MATRIX:
+┌─────────────────────┬────────────┬──────────┬──────────────────────────┐
+│ Strategy            │ PostgreSQL │ SQLite   │ MockHTTPServer           │
+├─────────────────────┼────────────┼──────────┼──────────────────────────┤
+│ DFS                 │ ✓ SAFE     │ ✓ SAFE   │ ✓ SAFE                   │
+│ BFS                 │ ✗ UNSAFE   │ ✓ SAFE   │ ✓ SAFE (uses snapshots)  │
+│ CoverageGuided      │ ✗ UNSAFE   │ ✓ SAFE   │ ✓ SAFE                   │
+│ Weighted            │ ✗ UNSAFE   │ ✓ SAFE   │ ✓ SAFE                   │
+│ Random              │ ✗ UNSAFE   │ ✓ SAFE   │ ✓ SAFE                   │
+│ DimensionNovelty    │ ✗ UNSAFE   │ ✓ SAFE   │ ✓ SAFE                   │
+└─────────────────────┴────────────┴──────────┴──────────────────────────┘
+
+WHY SQLITE IS DIFFERENT:
+   SQLite allows copying the entire database file, creating true
+   independent snapshots. VenomQA can restore any snapshot without
+   affecting others.
+
+WHY MockHTTPServer IS DIFFERENT:
+   In-memory state can be deep-copied (dict.copy(), etc.), creating
+   true independent snapshots.
+
+RECOMMENDATION:
+   • PostgreSQL: ALWAYS use DFS()
+   • SQLite: Any strategy works
+   • In-memory mocks: Any strategy works
+
 """
 
 from __future__ import annotations
