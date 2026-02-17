@@ -294,6 +294,10 @@ __all__ = [
     "precondition_action_ran",
     # Convenience
     "explore",
+    # Setup helpers
+    "connect_to_app",
+    "connect_to_api",
+    "setup_from_config",
     # Type aliases
     "StateID",
     "TransitionID",
