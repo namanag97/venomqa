@@ -115,9 +115,9 @@ class State:
                 "data": obs.data,
             }
 
-        # Hash the content
+        # Hash the content (16 hex chars = 64 bits, birthday collision at ~4B states)
         json_str = json.dumps(content, sort_keys=True, default=str)
-        content_hash = hashlib.sha256(json_str.encode()).hexdigest()[:12]
+        content_hash = hashlib.sha256(json_str.encode()).hexdigest()[:16]
         return f"s_{content_hash}"
 
     def content_hash(self) -> str:
