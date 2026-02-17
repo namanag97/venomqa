@@ -415,12 +415,22 @@ Autonomous API exploration — define actions and invariants, let VenomQA find e
 
 ## Quick Start
 
-1. **Edit `venomqa.yaml`** — set `base_url` to your API
-2. **Write actions** in `actions/` — signature: `def my_action(api, context)`
-3. **Run an exploration**:
+**CRITICAL**: VenomQA needs database rollback to explore branches.
+
+1. **Identify your API's database** — PostgreSQL, SQLite, or none?
+2. **Edit `venomqa.yaml`** — set `base_url` AND `db_url` (same DB your API uses)
+3. **Write actions** in `actions/` — signature: `def my_action(api, context)`
+4. **Run an exploration**:
    ```bash
    python3 journeys/sample_journey.py
    ```
+
+Why database access is required: VenomQA explores by branching. To test both
+`create → update` AND `create → delete` from the same state, it must:
+1. Create → reach state S1
+2. Update → explore branch A
+3. **ROLLBACK to S1** ← requires database access
+4. Delete → explore branch B
 
 ## Actions (v1 API)
 
