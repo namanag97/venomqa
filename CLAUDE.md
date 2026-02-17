@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## App Goal
 
-VenomQA is an autonomous QA agent that explores APIs like an exhaustive human tester. Instead of writing linear test scripts, users define **Actions** (what can be done) and **Invariants** (what must always be true), and VenomQA explores every path through the application's state graph — using DB savepoints/rollbacks to branch and reset state between paths.
+VenomQA is an autonomous QA agent that explores APIs like an exhaustive human tester. Instead of writing linear test scripts, users define **Actions** (what can be done) and **Invariants** (what must always be true), and VenomQA explores every path through the application's state graph -- using DB savepoints/rollbacks to branch and reset state between paths.
 
 ## Commands
 
@@ -36,50 +36,55 @@ venomqa watch    # Auto-rerun on file changes
 
 ## Architecture
 
-### Two API Tiers
+### Import Style
 
-**V1 (recommended for new code)** — `venomqa/v1/` — ~18 exports, clean minimal interface:
+All imports use the top-level `venomqa` package:
 ```python
-from venomqa.v1 import State, Action, World, Agent, Invariant, Journey, explore
+from venomqa import State, Action, World, Agent, Invariant, Journey, explore
+from venomqa.adapters.http import HttpClient
+from venomqa.adapters.postgres import PostgresAdapter
+from venomqa.core.action import Action, ActionResult
 ```
 
-**V0 (legacy, backward compat)** — `venomqa/` — 300+ exports, the original comprehensive API:
-```python
-from venomqa import Journey, Step, StateGraph, JourneyRunner, Client
-```
-
-### V1 Module Map
+### Module Map
 
 | Module | Purpose |
 |--------|---------|
-| `v1/core/` | `State`, `Action`, `ActionResult`, `Invariant`, `Violation`, `Graph`, `Transition` |
-| `v1/world/` | `World` sandbox with `checkpoint()` / `rollback()` orchestration |
-| `v1/agent/` | `Agent`, `Scheduler`, exploration strategies (BFS, DFS, Random, CoverageGuided, Weighted) |
-| `v1/dsl/` | `Journey`, `Step`, `Branch` DSL + `@action`/`@invariant` decorators + compiler |
-| `v1/adapters/` | `HttpClient`, `PostgresAdapter`, `RedisAdapter` |
+| `core/` | `State`, `Action`, `ActionResult`, `Invariant`, `Violation`, `Graph`, `Transition` |
+| `world/` | `World` sandbox with `checkpoint()` / `rollback()` orchestration |
+| `agent/` | `Agent`, `Scheduler`, exploration strategies (BFS, DFS, Random, CoverageGuided, Weighted) |
+| `dsl/` | `Journey`, `Step`, `Branch` DSL + `@action`/`@invariant` decorators + compiler |
+| `adapters/` | `HttpClient`, `PostgresAdapter`, `RedisAdapter`, `MockQueue`, `MockMail`, etc. |
+| `reporters/` | `ConsoleReporter`, `HTMLTraceReporter`, `JSONReporter`, `JUnitReporter`, `MarkdownReporter` |
+| `generators/` | `generate_actions` from OpenAPI specs |
+| `recording/` | `RequestRecorder`, `generate_journey_code` |
+| `invariants/` | `OpenAPISchemaInvariant` |
 
-### V0 Key Components
+### Legacy Components (backwards compatible)
 
 | Module | Purpose |
 |--------|---------|
 | `explorer/engine.py` (69KB) | Core state-graph exploration algorithm |
 | `core/models.py` | `Journey`, `Step`, `Branch`, `Checkpoint`, `Path`, `Issue` |
-| `runner/` | `JourneyRunner` — executes journeys, caches results |
+| `runner/` | `JourneyRunner` -- executes journeys, caches results |
 | `state/` | Pluggable DB backends: `postgres`, `mysql`, `sqlite`, `memory` via factory |
-| `adapters/` | 10+ injectable adapters: cache, mail, queue, storage, time, concurrency |
 | `ports/` | Abstract protocol interfaces (`DatabasePort`, `CachePort`, etc.) |
 | `http/` | REST, GraphQL, gRPC, WebSocket clients |
-| `reporters/` | HTML, JSON, JUnit, Markdown, SARIF, Slack, Discord, Dashboard |
 | `cli/commands.py` (118KB) | All CLI subcommands |
 | `security/` | Security-specific test checks |
 | `preflight/` | Smoke tests before full exploration |
 | `plugins/` | Plugin system via `venomqa.plugins` entry point |
 
+### Internal Structure
+
+The main API is implemented in `src/venomqa/v1/` and re-exported at the top level.
+Internal v1 code uses `venomqa.v1.*` imports. External/user code should use `venomqa.*`.
+
 ### Rollback Mechanism
 
 State exploration branches using per-system rollback:
-- **PostgreSQL**: `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` — entire run is one uncommitted transaction
-- **Redis**: `DUMP` all keys → `FLUSHALL` + `RESTORE`
+- **PostgreSQL**: `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` -- entire run is one uncommitted transaction
+- **Redis**: `DUMP` all keys -> `FLUSHALL` + `RESTORE`
 - **Queues/Mail**: in-memory copy + restore
 
 ### Test Markers
@@ -105,20 +110,19 @@ parallel_paths: 4
 
 ### Entry Points (Plugin System)
 
-Registered in `pyproject.toml` — extend via:
-- `venomqa.state_backends` — custom DB backends
-- `venomqa.reporters` — custom report formats
-- `venomqa.plugins` — lifecycle hooks
-- `venomqa.adapters` — injectable services
+Registered in `pyproject.toml` -- extend via:
+- `venomqa.state_backends` -- custom DB backends
+- `venomqa.reporters` -- custom report formats
+- `venomqa.plugins` -- lifecycle hooks
+- `venomqa.adapters` -- injectable services
 
 ## Key Files for Orientation
 
-- `venomqa/v1/__init__.py` — canonical v1 public API
-- `venomqa/__init__.py` — v0 public API (300+ exports)
-- `venomqa/explorer/engine.py` — core exploration loop
-- `tests/v1/` — best examples of v1 usage
-- `examples/v1_quickstart/` — user-facing quickstart
-- `MIGRATION_PLAN.md` — v0 → v1 migration guide
+- `venomqa/__init__.py` -- public API (clean, ~100 exports)
+- `venomqa/v1/` -- internal implementation
+- `venomqa/explorer/engine.py` -- core exploration loop
+- `tests/v1/` -- best examples of usage
+- `examples/` -- user-facing examples
 
 ## Tech Stack
 
