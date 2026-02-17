@@ -58,9 +58,10 @@ Python 3.10+ required.
     from venomqa.v1.adapters.http import HttpClient
     from venomqa.v1.adapters.postgres import PostgresAdapter   # optional
     from venomqa.v1.adapters.redis import RedisAdapter         # optional
-    from venomqa.v1.reporters.console import ConsoleReporter
-    from venomqa.v1.reporters.html_trace import HTMLTraceReporter
-    from venomqa.v1.reporters.json import JSONReporter
+    # reporters — importable from top-level or submodule (both work)
+    from venomqa.v1 import ConsoleReporter, JSONReporter, HTMLTraceReporter, MarkdownReporter, JUnitReporter
+    # or equivalently:
+    # from venomqa.v1.reporters.console import ConsoleReporter
 
 ---
 
