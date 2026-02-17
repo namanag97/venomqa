@@ -42,6 +42,7 @@ class World:
         clients: dict[str, _HttpClientType] | None = None,
         teardown: Callable[..., None] | None = None,
         state_from_context: list[str] | None = None,
+        auth: Any | None = None,
     ) -> None:
         self.api = api
         self.systems: dict[str, Rollbackable] = systems or {}
