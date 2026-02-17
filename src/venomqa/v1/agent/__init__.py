@@ -103,10 +103,11 @@ class Agent:
             return  # DFS, Random, DimensionNovelty — all fine
 
         # Check if any registered system is a PostgresAdapter
+        # Lazy import to avoid import-time dependency on psycopg
+        from venomqa.v1.adapters.postgres import PostgresAdapter
+
         for name, system in self.world.systems.items():
-            # Avoid importing postgres here to keep the check lightweight
-            type_name = type(system).__name__
-            if type_name == "PostgresAdapter":
+            if isinstance(system, PostgresAdapter):
                 strategy_name = type(self.strategy).__name__
                 raise ValueError(
                     f"Incompatible strategy + adapter: {strategy_name} + PostgresAdapter ('{name}').\n"
