@@ -100,9 +100,32 @@ def format_error_for_cli(error: Exception) -> str:
 VENVOMQA_YAML_TEMPLATE = """# VenomQA Configuration
 # Documentation: https://venomqa.dev/docs/configuration
 
+# ============================================================================
+# CRITICAL: VenomQA needs database rollback to explore state graphs
+# ============================================================================
+#
+# VenomQA explores your API by:
+#   1. Execute action → checkpoint database state
+#   2. ROLLBACK database to checkpoint
+#   3. Execute different action from same state
+#   4. Repeat to explore ALL paths
+#
+# Without db_url, VenomQA can only test ONE linear path.
+#
+# Set up PostgreSQL:
+#   $ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:15
+#   $ export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/yourdb"
+#
+# Then uncomment db_url below and set it to your API's database.
+# ============================================================================
+
 # Target API configuration
 base_url: "http://localhost:8000"
 timeout: 30
+
+# REQUIRED for state exploration - set this to your API's database
+# db_url: "postgresql://user:pass@localhost:5432/testdb"
+db_url: "${DATABASE_URL}"  # Uses environment variable
 
 # Test execution settings
 verbose: false
@@ -115,9 +138,6 @@ report_dir: "reports"
 
 # Docker Compose file for test infrastructure (optional)
 # docker_compose_file: "docker-compose.qa.yml"
-
-# Database URL for state management (optional)
-# db_url: "postgresql://user:pass@localhost:5432/testdb"
 
 # Notifications configuration (optional)
 # notifications:
