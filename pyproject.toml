@@ -169,6 +169,8 @@ ignore = [
     "B017",   # Blind exception assertions (acceptable in tests)
     "N806",   # Variable in function should be lowercase (test mocks)
     "F811",   # Redefinition of unused (test fixtures share names with app routes)
+    "B023",   # Loop variable binding (common pattern in test generators)
+    "F821",   # Undefined name (forward refs in test type hints)
 ]
 "src/venomqa/__init__.py" = [
     "F401",   # Unused imports (re-exports for API)
