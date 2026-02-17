@@ -281,7 +281,7 @@ def generate_actions_code(
     sections.append("        max_steps=500,")
     sections.append("    )")
     sections.append("    result = agent.explore()")
-    sections.append("    from venomqa.v1.reporters.console import ConsoleReporter")
+    sections.append("    from venomqa.reporters.console import ConsoleReporter")
     sections.append("    ConsoleReporter().report(result)")
 
     return "\n".join(sections) + "\n"
