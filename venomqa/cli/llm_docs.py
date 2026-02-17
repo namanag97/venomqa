@@ -342,11 +342,16 @@ In-memory mocks (for unit testing without real services):
     emails[0].to                          # str (recipient)
     emails[0].body                        # str
 
-    # MockStorage
-    storage.put("file.pdf", b"PDF content")   # content must be str or bytes
-    storage.get("file.pdf")                   # returns bytes or None
+    # MockStorage — get() returns a StoredFile object, not raw bytes
+    storage.put("file.pdf", b"PDF content")   # content must be str or bytes (not dict)
+    stored = storage.get("file.pdf")          # returns StoredFile | None
+    stored.content                            # bytes — the actual file content
+    stored.path                               # str — the key used in put()
     storage.file_count                        # int: number of files stored
     storage.delete("file.pdf")
+    # PostgresAdapter observe_tables keys are "<table>_count" (not the table name):
+    obs = pg.observe()
+    obs.data["subs_users_count"]   # NOT obs.data["subs_users"]
 
     # MockTime
     from datetime import datetime
