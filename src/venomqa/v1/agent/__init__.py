@@ -402,10 +402,7 @@ class Agent:
 
         # Tell strategy about the new state's valid actions (context, action-dependency, and resource-aware)
         valid_actions = self._get_valid_actions(to_state)
-        if hasattr(self.strategy, "enqueue"):
-            self.strategy.enqueue(to_state, valid_actions)
-        elif hasattr(self.strategy, "push"):
-            self.strategy.push(to_state, valid_actions)
+        self.strategy.notify(to_state, valid_actions)
 
         return transition
 
