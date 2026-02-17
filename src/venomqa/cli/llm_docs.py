@@ -479,45 +479,67 @@ Custom mock server: subclass MockHTTPServer, implement 3 methods:
 
 ## Minimal working example (copy-paste ready)
 
-    from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
-    from venomqa.v1.adapters.http import HttpClient
+CRITICAL: You must connect to your database OR use state_from_context.
 
+### Option A: With PostgreSQL (recommended)
+
+    import os
+    from venomqa.v1 import Action, Invariant, Agent, World, DFS, Severity
+    from venomqa.v1.adapters.http import HttpClient
+    from venomqa.v1.adapters.postgres import PostgresAdapter
+
+    # Actions MUST validate responses — don't assume success!
     def create_item(api, context):
         resp = api.post("/items", json={"name": "widget"})
-        context.set("item_id", resp.json()["id"])
+        if resp.status_code != 201:
+            raise AssertionError(f"Create failed: {resp.status_code} - {resp.text}")
+        data = resp.json()
+        if "id" not in data:
+            raise AssertionError(f"Missing 'id' in response: {data}")
+        context.set("item_id", data["id"])
         return resp
 
     def list_items(api, context):
         resp = api.get("/items")
+        if resp.status_code != 200:
+            raise AssertionError(f"List failed: {resp.status_code}")
         context.set("items", resp.json())
         return resp
 
     def delete_item(api, context):
         item_id = context.get("item_id")
-        if item_id is None:
-            return api.get("/items")   # no-op if nothing to delete
-        return api.delete(f"/items/{item_id}")
+        resp = api.delete(f"/items/{item_id}")
+        if resp.status_code not in (200, 204):
+            raise AssertionError(f"Delete failed: {resp.status_code}")
+        context.delete("item_id")
+        return resp
 
-    def count_is_consistent(world):
-        items = world.context.get("items") or []
-        return isinstance(items, list)
+    def list_returns_array(world):
+        # GOOD: Make live API call — don't just check context
+        resp = world.api.get("/items")
+        return resp.status_code == 200 and isinstance(resp.json(), list)
+
+    # Connect to the SAME database your API writes to
+    api = HttpClient("http://localhost:8000")
+    db = PostgresAdapter(os.environ["DATABASE_URL"])
 
     agent = Agent(
-        world=World(api=HttpClient("http://localhost:8000")),
+        world=World(api=api, systems={"db": db}),  # ← REQUIRED for exploration
         actions=[
             Action(name="create_item", execute=create_item, expected_status=[201]),
             Action(name="list_items",  execute=list_items,  expected_status=[200]),
-            Action(name="delete_item", execute=delete_item),
+            Action(name="delete_item", execute=delete_item,
+                   preconditions=["create_item"]),  # ← only run after create_item
         ],
         invariants=[
             Invariant(
-                name="list_is_always_a_list",
-                check=count_is_consistent,
+                name="list_returns_array",
+                check=list_returns_array,
                 message="GET /items must always return a JSON array",
                 severity=Severity.CRITICAL,
             ),
         ],
-        strategy=BFS(),
+        strategy=DFS(),   # ← Use DFS with PostgreSQL (BFS doesn't work with PG savepoints)
         max_steps=100,
     )
 
@@ -525,8 +547,16 @@ Custom mock server: subclass MockHTTPServer, implement 3 methods:
     for v in result.violations:
         print(f"[{v.severity.value.upper()}] {v.invariant_name}: {v.message}")
     print(f"Done. States={result.states_visited}, Coverage={result.action_coverage_percent:.0f}%")
-    if result.truncated_by_max_steps:
-        print("WARNING: Exploration was truncated by max_steps limit")
+
+### Option B: Without database (limited exploration)
+
+    # If your API is stateless or you don't have DB access, use state_from_context.
+    # WARNING: This only explores based on context values, not actual DB state.
+
+    world = World(
+        api=HttpClient("http://localhost:8000"),
+        state_from_context=["item_id", "items"],  # These context keys define state identity
+    )
 
 ---
 
