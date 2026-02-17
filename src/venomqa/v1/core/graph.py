@@ -137,14 +137,30 @@ class Graph:
         precondition_action_ran() are evaluated against the set of already-fired
         action names.
 
+        Actions with max_calls set are excluded once they've been called that many times.
+
         Without these optional arguments, all preconditions pass (backward-compatible).
         """
-        if context is not None:
-            return [
-                a for a in self._actions.values()
-                if a.can_execute_with_context(state, context, executed_actions)
-            ]
-        return [a for a in self._actions.values() if a.can_execute(state)]
+        result = []
+        for a in self._actions.values():
+            # Check max_calls limit
+            if a.max_calls is not None:
+                call_count = self._action_call_counts.get(a.name, 0)
+                if call_count >= a.max_calls:
+                    continue  # Action has reached its call limit
+
+            # Check preconditions
+            if context is not None:
+                if a.can_execute_with_context(state, context, executed_actions):
+                    result.append(a)
+            elif a.can_execute(state):
+                result.append(a)
+
+        return result
+
+    def get_action_call_count(self, action_name: str) -> int:
+        """Get how many times an action has been called."""
+        return self._action_call_counts.get(action_name, 0)
 
     def get_unexplored(self) -> list[tuple[State, Action]]:
         """Get all unexplored (state, action) pairs."""
