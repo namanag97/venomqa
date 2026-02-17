@@ -4,10 +4,12 @@ from venomqa.v1.reporters.console import ConsoleReporter
 from venomqa.v1.reporters.markdown import MarkdownReporter
 from venomqa.v1.reporters.json import JSONReporter
 from venomqa.v1.reporters.junit import JUnitReporter
+from venomqa.v1.reporters.html_trace import HTMLTraceReporter
 
 __all__ = [
     "ConsoleReporter",
     "MarkdownReporter",
     "JSONReporter",
     "JUnitReporter",
+    "HTMLTraceReporter",
 ]
