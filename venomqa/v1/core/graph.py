@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Iterator
+from collections.abc import Iterator
 
-from venomqa.v1.core.state import State
 from venomqa.v1.core.action import Action
+from venomqa.v1.core.state import State
 from venomqa.v1.core.transition import Transition
 
 
@@ -168,6 +168,14 @@ class Graph:
     @property
     def action_count(self) -> int:
         return len(self._actions)
+
+    @property
+    def used_action_count(self) -> int:
+        """Number of unique actions that have been executed at least once."""
+        used = set()
+        for t in self._transitions:
+            used.add(t.action_name)
+        return len(used)
 
     @property
     def explored_count(self) -> int:
