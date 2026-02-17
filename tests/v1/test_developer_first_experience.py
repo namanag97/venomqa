@@ -253,49 +253,34 @@ def _actions() -> list[Action]:
 
 def _invariants() -> list[Invariant]:
     def completed_todo_not_deletable(world: Any) -> Any:
-        """Return True (ok), False (static message), or str (dynamic message)."""
+        """Invariants can return a string to give a dynamic failure message.
+
+        Returns True  → no violation.
+        Returns False → violation with the static invariant.message.
+        Returns str   → violation with that string as the message (actual values).
+        """
         last = world.last_action_result
         if last is None or last.request.method != "DELETE":
             return True
         if last.status_code == 404:
-            return True  # todo didn't exist — not the bug we're testing
+            return True  # todo didn't exist — not a violation
+
         todo_id = world.context.get("todo_id")
         if todo_id is None:
             return True
-        snap = TodoObserver.get_state_snapshot()
-        # After a successful delete the todo is gone from state.
-        # We detect the bug from the HTTP response: delete returned 200
-        # but the todo_id we just deleted was completed.
-        # Check the action_result that was stored pre-delete via world.last_action_result.
-        # We need to check whether the deleted todo WAS done before deletion.
-        # Because the server has a bug, it deletes a completed todo and returns 200.
-        # We can detect this by checking the response: if 200 AND we know the todo was done.
-        # Snapshot is AFTER deletion (todo gone). We use action_result.
-        # The action_result has the request (DELETE /todos/{id}).
-        # We can't recover the pre-delete state here easily from snapshot.
-        # Instead: if the deletion was 200, look at the response body.
-        # The bug: 200 was returned — we flag it if we saw the todo was completed.
-        # We store "was_done" in context from complete_todo.
+
+        # todo_was_done is set by complete_todo action and captured in the
+        # checkpoint for that state. Rolling back to a post-complete state
+        # restores this flag, so the invariant correctly detects the sequence:
+        #   create_todo → complete_todo → delete_todo
         was_done = world.context.get("todo_was_done", False)
         if was_done and last.status_code == 200:
             return (
                 f"DELETE /todos/{todo_id} returned {last.status_code} "
                 f"but todo was marked as completed — expected 403 Forbidden. "
-                f"Sequence: create → complete → delete triggered the bug."
+                f"Sequence: create → complete → delete triggered the planted bug."
             )
         return True
-
-    def complete_todo_sets_done_flag(world: Any) -> Any:
-        """After completing a todo, mark context so the delete invariant knows."""
-        last = world.last_action_result
-        if last is None:
-            return True
-        req_path = last.request.url if last.request else ""
-        if last.request and last.request.method == "PATCH" and last.ok:
-            body = last.json() if last.ok else {}
-            if isinstance(body, dict) and body.get("done"):
-                world.context.set("todo_was_done", True)
-        return True  # This invariant never fires; it's a side-effect hook
 
     return [
         Invariant(
@@ -303,12 +288,6 @@ def _invariants() -> list[Invariant]:
             check=completed_todo_not_deletable,
             message="Completed todos must not be deletable (expected 403 Forbidden)",
             severity=Severity.CRITICAL,
-        ),
-        Invariant(
-            name="track_done_state",
-            check=complete_todo_sets_done_flag,
-            message="",
-            severity=Severity.LOW,
         ),
     ]
 
