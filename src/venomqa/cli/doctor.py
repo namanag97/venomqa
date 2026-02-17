@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import os
 import shutil
 import subprocess
 import sys
@@ -10,9 +11,68 @@ from collections.abc import Callable
 
 import click
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 console = Console()
+
+# ---------------------------------------------------------------------------
+# Common fix suggestions
+# ---------------------------------------------------------------------------
+
+FIXES = {
+    "postgres_not_running": """
+[bold yellow]To fix PostgreSQL connectivity:[/bold yellow]
+
+  [cyan]# If using Docker:[/cyan]
+  docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:15
+
+  [cyan]# Or start local PostgreSQL:[/cyan]
+  brew services start postgresql  # macOS
+  sudo systemctl start postgresql  # Linux
+
+  [cyan]# Then set DATABASE_URL:[/cyan]
+  export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/venomqa"
+""",
+    "redis_not_running": """
+[bold yellow]To fix Redis connectivity:[/bold yellow]
+
+  [cyan]# If using Docker:[/cyan]
+  docker run -d --name redis -p 6379:6379 redis:7
+
+  [cyan]# Or start local Redis:[/cyan]
+  brew services start redis  # macOS
+  sudo systemctl start redis  # Linux
+
+  [cyan]# Then set REDIS_URL:[/cyan]
+  export REDIS_URL="redis://localhost:6379"
+""",
+    "psycopg_missing": """
+[bold yellow]To fix psycopg3 installation:[/bold yellow]
+
+  pip install 'psycopg[binary]'
+
+  [dim]# Or for source build (slower):[/dim]
+  pip install psycopg
+""",
+    "redis_py_missing": """
+[bold yellow]To fix redis-py installation:[/bold yellow]
+
+  pip install redis
+""",
+    "env_vars_missing": """
+[bold yellow]To set up environment variables:[/bold yellow]
+
+  [cyan]# Create a .env file or export directly:[/cyan]
+  export DATABASE_URL="postgresql://user:pass@localhost:5432/dbname"
+  export REDIS_URL="redis://localhost:6379"
+  export VENOMQA_API_TOKEN="your-api-token"  # if using auth
+
+  [cyan]# Or create venomqa.env:[/cyan]
+  echo 'DATABASE_URL=postgresql://localhost/venomqa' > venomqa.env
+  source venomqa.env
+""",
+}
 
 
 class HealthCheck:
