@@ -316,11 +316,14 @@ In-memory mocks (for unit testing without real services):
     storage = MockStorage(bucket="uploads")
     clock   = MockTime(start=datetime(2024, 1, 1))   # auto-frozen at start
 
-    # MockQueue
-    queue.push({"type": "job", "id": 1})   # enqueue item
-    queue.pending_count                    # int: items not yet consumed
-    queue.processed_count                  # int: items consumed via pop()
-    queue.pop()                            # removes and returns oldest item
+    # MockQueue — pop() returns a Message object, not the raw payload
+    queue.push({"type": "job", "id": 1})   # enqueue item (any payload)
+    queue.pending_count                    # int: unprocessed messages
+    queue.processed_count                  # int: consumed messages
+    msg = queue.pop()                      # returns Message | None (marks as processed)
+    msg.payload                            # the original dict/value you pushed
+    msg.id                                 # auto-generated "msg_1", "msg_2", …
+    msg.processed                          # True after pop()
 
     # MockMail
     mail.send("to@example.com", "Subject", "Body text")
