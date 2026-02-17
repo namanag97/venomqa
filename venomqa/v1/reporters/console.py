@@ -61,7 +61,7 @@ class ConsoleReporter:
                     req = ar.request
                     self._line(f"    {self._c('Request:', self.BOLD)} {req.method} {req.url}")
                     if req.body is not None:
-                        self._line(f"      Body: {req.body}")
+                        self._line(f"      Body: {self._truncate(req.body)}")
                     if ar.response is not None:
                         resp = ar.response
                         ok_color = self.GREEN if resp.ok else self.RED
@@ -70,7 +70,7 @@ class ConsoleReporter:
                             f"{self._c(str(resp.status_code), ok_color)}"
                         )
                         if resp.body is not None:
-                            self._line(f"      Body: {resp.body}")
+                            self._line(f"      Body: {self._truncate(resp.body)}")
                     elif ar.error:
                         self._line(f"    {self._c('Error:', self.RED)} {ar.error}")
             self._newline()
