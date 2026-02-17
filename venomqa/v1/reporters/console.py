@@ -98,6 +98,13 @@ class ConsoleReporter:
     def _newline(self) -> None:
         print(file=self.file)
 
+    def _truncate(self, body: object, max_chars: int = 200) -> str:
+        """Render a response/request body, capping at max_chars."""
+        text = repr(body) if not isinstance(body, str) else body
+        if len(text) <= max_chars:
+            return text
+        return text[:max_chars] + f"  … (+{len(text) - max_chars} chars)"
+
     def _severity_color(self, severity: Severity) -> str:
         if severity == Severity.CRITICAL:
             return self.RED + self.BOLD
