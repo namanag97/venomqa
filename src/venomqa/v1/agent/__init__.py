@@ -64,6 +64,11 @@ class Agent:
         self._violations: list[Violation] = []
         self._step_count = 0
 
+        # Loop detection: track (state_id, action_name) -> count of times it led to same state
+        # If the same action from the same state repeatedly produces no state change, it's a loop.
+        self._noop_counts: dict[tuple[str, str], int] = {}
+        self._max_noop_per_action = 3  # Skip action after this many no-ops from same state
+
         # ── Guard: PostgresAdapter + BFS/CoverageGuided crash mid-run ───────
         # PostgreSQL SAVEPOINTs are destroyed when you ROLLBACK TO an earlier
         # one. BFS and CoverageGuided need arbitrary rollback, so they'll crash
