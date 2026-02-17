@@ -15,6 +15,7 @@ from venomqa.v1.core.state import State
 from venomqa.v1.core.transition import Transition
 
 if TYPE_CHECKING:
+    from venomqa.v1.adapters.resource_graph import ResourceGraph
     from venomqa.v1.core.hypergraph import Hypergraph
     from venomqa.v1.world import World
 
