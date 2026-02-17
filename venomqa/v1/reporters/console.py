@@ -50,10 +50,29 @@ class ConsoleReporter:
             for v in result.violations:
                 color = self._severity_color(v.severity)
                 self._line(f"  {self._c(v.severity.value.upper(), color)}: {v.invariant_name}")
-                self._line(f"    {v.message}")
+                if v.message:
+                    self._line(f"    {v.message}")
                 if v.reproduction_path:
                     path_str = " -> ".join(t.action_name for t in v.reproduction_path)
                     self._line(f"    Path: {path_str}")
+                # Show HTTP request/response payload when available
+                if v.action_result is not None:
+                    ar = v.action_result
+                    req = ar.request
+                    self._line(f"    {self._c('Request:', self.BOLD)} {req.method} {req.url}")
+                    if req.body is not None:
+                        self._line(f"      Body: {req.body}")
+                    if ar.response is not None:
+                        resp = ar.response
+                        ok_color = self.GREEN if resp.ok else self.RED
+                        self._line(
+                            f"    {self._c('Response:', self.BOLD)} "
+                            f"{self._c(str(resp.status_code), ok_color)}"
+                        )
+                        if resp.body is not None:
+                            self._line(f"      Body: {resp.body}")
+                    elif ar.error:
+                        self._line(f"    {self._c('Error:', self.RED)} {ar.error}")
             self._newline()
 
         # Final status
