@@ -37,6 +37,15 @@ def main(args: list[str] | None = None) -> int:
     validate_parser = subparsers.add_parser("validate", help="Validate journey syntax")
     validate_parser.add_argument("journey_file", help="Path to journey definition file")
 
+    # record command
+    record_parser = subparsers.add_parser(
+        "record", help="Proxy HTTP calls and generate a Journey skeleton"
+    )
+    record_parser.add_argument("journey_file", help="Path to existing journey to replay (or '-' to skip)")
+    record_parser.add_argument("--base-url", "-u", required=True, help="Base URL of API to record")
+    record_parser.add_argument("--output", "-o", help="Output file for generated code (default: stdout)")
+    record_parser.add_argument("--name", default="recorded_journey", help="Journey name in generated code")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "explore":
