@@ -8,7 +8,8 @@ if TYPE_CHECKING:
     from venomqa.v1.core.action import Action
     from venomqa.v1.core.constraints import StateConstraint
     from venomqa.v1.core.graph import Graph
-    from venomqa.v1.core.hypergraph import Hyperedge, Hypergraph
+    from venomqa.v1.core.hyperedge import Hyperedge
+    from venomqa.v1.core.hypergraph import Hypergraph
     from venomqa.v1.core.state import State
 
 
