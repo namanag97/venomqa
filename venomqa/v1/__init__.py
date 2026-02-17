@@ -191,6 +191,12 @@ __all__ = [
     "compile_journey",
     # Adapters
     "HttpClient",
+    # Reporters
+    "ConsoleReporter",
+    "MarkdownReporter",
+    "JSONReporter",
+    "JUnitReporter",
+    "HTMLTraceReporter",
     # Validation
     "SchemaValidator",
     "validate_response",
