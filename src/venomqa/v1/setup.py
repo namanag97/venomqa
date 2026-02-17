@@ -193,6 +193,61 @@ def connect_to_app(
         raise ValueError(f"Unsupported database type for in-process: {db_type.value}")
 
 
+def connect_to_protocol(
+    api_url: str,
+    control_prefix: str = "/venomqa",
+) -> "World":
+    """Connect VenomQA to an API that implements the VenomQA Control Protocol.
+
+    Use this for APIs written in ANY language (Node.js, Go, Java, etc.)
+    that implement the VenomQA Control Protocol endpoints.
+
+    The API must implement:
+        POST /venomqa/begin      - Start a session
+        POST /venomqa/checkpoint - Create a savepoint
+        POST /venomqa/rollback   - Rollback to a savepoint
+        POST /venomqa/end        - End the session
+
+    See sdk/PROTOCOL.md for the full specification.
+
+    Args:
+        api_url: Base URL of the API (e.g., "http://localhost:3000")
+        control_prefix: URL prefix for control endpoints (default: "/venomqa")
+
+    Returns:
+        A configured World instance with full rollback support
+
+    Example:
+        # Node.js API with VenomQA middleware
+        world = connect_to_protocol("http://localhost:3000")
+
+        agent = Agent(world=world, actions=[...], invariants=[...])
+        result = agent.explore()
+    """
+    from venomqa.v1.adapters.protocol import ProtocolAdapter
+    from venomqa.v1.world import World
+
+    adapter = ProtocolAdapter(api_url, control_prefix=control_prefix)
+
+    # Verify the API implements the protocol
+    try:
+        health = adapter.health_check()
+        protocol_version = health.get("venomqa_protocol", "unknown")
+        print(f"Connected to API with VenomQA protocol v{protocol_version}")
+    except Exception as e:
+        raise RuntimeError(
+            f"API at {api_url} does not implement VenomQA protocol. "
+            f"Error: {e}\n\n"
+            f"See sdk/PROTOCOL.md for how to add VenomQA support to your API."
+        ) from e
+
+    # The adapter serves as both API client AND database controller
+    return World(
+        api=adapter,
+        systems={"db": adapter},
+    )
+
+
 def connect_to_api(
     api_url: str,
     db_url: str | None = None,
