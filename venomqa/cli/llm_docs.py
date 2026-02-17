@@ -291,7 +291,16 @@ the path= kwarg does not exist. The method only takes result and returns a strin
     api.patch(path, json=None, **kwargs)
     api.delete(path, **kwargs)
 
-All return an httpx.Response — use .json(), .text, .status_code, .ok etc.
+All return ActionResult (NOT httpx.Response). Convenience proxies exist:
+    resp = api.post("/items", json={"name": "x"})
+    resp.json()           # parsed body dict/list (proxy to resp.response.json())
+    resp.status_code      # int (proxy to resp.response.status_code)
+    resp.ok               # bool — True if 2xx/3xx
+    resp.text             # body as string
+    resp.success          # bool — same as ok
+    resp.response         # HTTPResponse object (full access)
+    resp.response.body    # raw parsed body
+    resp.request          # HTTPRequest object
 
 Headers / auth:
     HttpClient("http://localhost:8000", headers={"Authorization": "Bearer token"})
