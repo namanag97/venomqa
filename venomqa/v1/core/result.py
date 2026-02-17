@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from venomqa.v1.core.graph import Graph
 from venomqa.v1.core.invariant import Violation, Severity
+
+if TYPE_CHECKING:
+    from venomqa.v1.core.coverage import DimensionCoverage
 
 
 @dataclass
