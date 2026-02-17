@@ -223,10 +223,10 @@ class FileWatcher:
         from watchdog.observers import Observer
 
         class Handler(FileSystemEventHandler):
-            def __init__(handler_self, watcher: FileWatcher) -> None:
+            def __init__(handler_self, watcher: FileWatcher) -> None:  # noqa: N805
                 handler_self.watcher = watcher
 
-            def on_any_event(handler_self, event: FileSystemEvent) -> None:
+            def on_any_event(handler_self, event: FileSystemEvent) -> None:  # noqa: N805
                 if event.is_directory:
                     return
                 if not event.src_path.endswith(".py"):
