@@ -84,26 +84,44 @@ context only if it does. A 1-parameter function receives only api.
 
 ### Action examples
 
-    # No shared state needed
-    def health_check(api, context):
-        return api.get("/health")
+CRITICAL: Actions must VALIDATE their results. Don't silently ignore errors.
 
-    # Write to context so later actions can read it
+    # GOOD: Validates response body
     def create_user(api, context):
         resp = api.post("/users", json={"name": "Alice"})
-        context.set("user_id", resp.json()["id"])
+        if resp.status_code != 201:
+            raise AssertionError(f"Expected 201, got {resp.status_code}: {resp.text}")
+        data = resp.json()
+        if "id" not in data:
+            raise AssertionError(f"Response missing 'id' field: {data}")
+        context.set("user_id", data["id"])
         return resp
 
-    # Read from context written by a previous action
+    # GOOD: Validates response matches request
     def get_user(api, context):
         user_id = context.get("user_id")
-        return api.get(f"/users/{user_id}")
+        resp = api.get(f"/users/{user_id}")
+        if resp.status_code != 200:
+            raise AssertionError(f"Failed to get user {user_id}: {resp.status_code}")
+        data = resp.json()
+        if data.get("id") != user_id:
+            raise AssertionError(f"Wrong user returned: expected {user_id}, got {data.get('id')}")
+        return resp
 
-    # Guard: skip if precondition not met
-    def delete_user(api, context):
+    # BAD - Don't do this (silent no-op):
+    def delete_user_BAD(api, context):
         if not context.has("user_id"):
-            return api.get("/noop")   # or raise, or return early
+            return api.get("/noop")   # WRONG: silently does nothing
         return api.delete(f"/users/{context.get('user_id')}")
+
+    # GOOD: Use preconditions instead of silent no-ops
+    def delete_user(api, context):
+        user_id = context.get("user_id")
+        resp = api.delete(f"/users/{user_id}")
+        if resp.status_code not in (200, 204, 404):
+            raise AssertionError(f"Delete failed: {resp.status_code}")
+        context.delete("user_id")  # Clean up context
+        return resp
 
 ### Wrapping a function as an Action
 
