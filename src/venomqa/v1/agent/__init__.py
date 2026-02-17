@@ -144,7 +144,8 @@ class Agent:
             # ── CRITICAL: No systems = no state exploration ──────────────────
             # Without a database/system to rollback, VenomQA cannot explore
             # different branches. Every state hashes identically.
-            if not self.world.systems and not self.world._state_from_context:
+            # Allow bypass if state_from_context was explicitly set (even to []).
+            if not self.world.systems and not self.world._state_from_context_explicit:
                 raise ValueError(
                     "\n"
                     "=" * 70 + "\n"
