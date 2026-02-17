@@ -62,10 +62,18 @@ class HttpClient:
             )
             duration_ms = (time.perf_counter() - start) * 1000
 
+            if resp.headers.get("content-type", "").startswith("application/json"):
+                try:
+                    body: Any = resp.json()
+                except Exception:
+                    body = resp.text
+            else:
+                body = resp.text
+
             response = HTTPResponse(
                 status_code=resp.status_code,
                 headers=dict(resp.headers),
-                body=resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text,
+                body=body,
             )
 
             return ActionResult.from_response(request, response, duration_ms)
