@@ -415,9 +415,9 @@ class TestAdapters:
         assert r2.status_code == 201
 
         obs_after = pg.observe()
-        assert int(obs_after.data["subs_users"]) == users_before + 1
-        assert int(obs_after.data["subs_subscriptions"]) >= 1
-        assert int(obs_after.data["subs_invoices"]) >= 1
+        assert int(obs_after.data["subs_users_count"]) == users_before + 1
+        assert int(obs_after.data["subs_subscriptions_count"]) >= 1
+        assert int(obs_after.data["subs_invoices_count"]) >= 1
         assert int(obs_after.data["active_sub_count"]) >= 1
 
     def test_postgres_savepoint_rollback(self, pg):
