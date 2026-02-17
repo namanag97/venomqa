@@ -1977,18 +1977,37 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
     else:
         files_to_create = framework_files + user_files
 
-    # Create directories
-    for dir_path in dirs_to_create:
-        dir_path.mkdir(parents=True, exist_ok=True)
-        console.print(f"  [green]OK[/green] Created directory: {dir_path}")
+    # Create directories (skip in update mode if they exist)
+    if not update:
+        for dir_path in dirs_to_create:
+            dir_path.mkdir(parents=True, exist_ok=True)
+            if dir_path.exists():
+                console.print(f"  [green]OK[/green] Created directory: {dir_path}")
 
-    # Create files
+    # Create/update files
     for file_path, content in files_to_create:
-        if file_path.exists() and not force:
-            console.print(f"  [dim]--[/dim] Skipped (exists): {file_path}")
-            continue
-        file_path.write_text(content)
-        console.print(f"  [green]OK[/green] Created file: {file_path}")
+        is_framework_file = file_path in [f[0] for f in framework_files]
+
+        if file_path.exists():
+            if update and is_framework_file:
+                # Always update framework files in update mode (with backup)
+                backup_path = file_path.with_suffix(file_path.suffix + ".bak")
+                import shutil
+                shutil.copy(file_path, backup_path)
+                file_path.write_text(content)
+                console.print(f"  [green]OK[/green] Updated: {file_path} (backup: {backup_path.name})")
+            elif force:
+                # Force mode: overwrite everything
+                file_path.write_text(content)
+                console.print(f"  [yellow]++[/yellow] Overwrote: {file_path}")
+            else:
+                # Normal mode: skip existing files
+                console.print(f"  [dim]--[/dim] Skipped (exists): {file_path}")
+        else:
+            # File doesn't exist: create it
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content)
+            console.print(f"  [green]OK[/green] Created: {file_path}")
 
     # Create .gitignore for reports
     gitignore_path = base / "reports" / ".gitignore"
