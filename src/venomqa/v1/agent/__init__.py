@@ -63,6 +63,7 @@ class Agent:
         self.progress_every = progress_every    # print progress line every N steps (0 = off)
         self.shrink = shrink                    # if True, shrink violation paths after finding them
         self._violations: list[Violation] = []
+        self._seen_violations: set[tuple[str, str]] = set()  # (invariant_name, state_id)
         self._step_count = 0
 
         # Loop detection: track (state_id, action_name) -> count of times it led to same state
