@@ -256,7 +256,7 @@ class Agent:
 
         finally:
             # Close registered systems (DB connections, etc.) even if exploration crashes
-            for name, system in self.world.systems.items():
+            for _, system in self.world.systems.items():
                 if hasattr(system, "close"):
                     try:
                         system.close()
