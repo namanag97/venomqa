@@ -2,10 +2,10 @@
 """VenomQA Bootstrap Script.
 
 Download and run directly:
-    curl -fsSL https://raw.githubusercontent.com/namanag97/venomqa/main/venomqa.py | python3 - init
+    curl -fsSL https://venomqa.dev/install.py | python3 - init
 
 Or save locally:
-    curl -fsSL https://raw.githubusercontent.com/namanag97/venomqa/main/venomqa.py -o venomqa
+    curl -fsSL https://venomqa.dev/install.py -o venomqa
     chmod +x venomqa
     ./venomqa init
 
@@ -15,9 +15,26 @@ This script handles installation automatically - no pip commands needed.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+# ANSI colors
+BOLD = "\033[1m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+CYAN = "\033[36m"
+DIM = "\033[2m"
+RESET = "\033[0m"
+
+
+def color(text: str, c: str) -> str:
+    """Apply color if stdout is a tty."""
+    if sys.stdout.isatty():
+        return f"{c}{text}{RESET}"
+    return text
 
 
 def get_python() -> str:
@@ -43,16 +60,128 @@ def get_venomqa_version() -> str | None:
         return None
 
 
-def install_venomqa(upgrade: bool = False) -> bool:
-    """Install venomqa using pip."""
-    print("\n" + "=" * 60)
-    print("  VenomQA - Autonomous API Testing")
-    print("=" * 60)
+def diagnose_environment() -> dict:
+    """Diagnose Python environment issues."""
+    info = {
+        "python_path": sys.executable,
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        "sys_prefix": sys.prefix,
+        "in_virtualenv": hasattr(sys, "real_prefix") or (
+            hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+        ),
+        "pip_available": False,
+        "pipx_available": shutil.which("pipx") is not None,
+        "uv_available": shutil.which("uv") is not None,
+        "venomqa_importable": False,
+        "venomqa_in_path": shutil.which("venomqa"),
+        "issues": [],
+    }
 
-    if upgrade:
-        print("\n📦 Upgrading venomqa...")
+    # Check pip
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "--version"],
+            capture_output=True, check=True
+        )
+        info["pip_available"] = True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        info["issues"].append("pip not available for this Python")
+
+    # Check venomqa import
+    try:
+        import venomqa  # noqa: F401
+        info["venomqa_importable"] = True
+        info["venomqa_version"] = getattr(venomqa, "__version__", "unknown")
+    except ImportError:
+        pass
+
+    # Detect environment mismatch
+    if info["venomqa_in_path"] and not info["venomqa_importable"]:
+        info["issues"].append(
+            f"venomqa command found at {info['venomqa_in_path']} but package not importable - "
+            "this usually means it was installed for a different Python"
+        )
+
+    return info
+
+
+def print_diagnosis(info: dict) -> None:
+    """Print environment diagnosis."""
+    print(f"\n{color('Environment Diagnosis', BOLD)}")
+    print("=" * 50)
+    print(f"Python:      {info['python_path']}")
+    print(f"Version:     {info['python_version']}")
+    print(f"Virtualenv:  {'Yes' if info['in_virtualenv'] else 'No'}")
+    print(f"pip:         {color('OK', GREEN) if info['pip_available'] else color('Not found', RED)}")
+    print(f"pipx:        {color('Available', GREEN) if info['pipx_available'] else color('Not found', DIM)}")
+    print(f"uv:          {color('Available', GREEN) if info['uv_available'] else color('Not found', DIM)}")
+
+    if info["venomqa_in_path"]:
+        print(f"venomqa cmd: {info['venomqa_in_path']}")
     else:
-        print("\n📦 Installing venomqa (first-time setup)...")
+        print(f"venomqa cmd: {color('Not in PATH', DIM)}")
+
+    if info["venomqa_importable"]:
+        print(f"venomqa pkg: {color(f'v{info.get(\"venomqa_version\", \"?\")}', GREEN)}")
+    else:
+        print(f"venomqa pkg: {color('Not importable', YELLOW)}")
+
+    if info["issues"]:
+        print(f"\n{color('Issues Found:', YELLOW)}")
+        for issue in info["issues"]:
+            print(f"  - {issue}")
+
+
+def print_fix_suggestions(info: dict) -> None:
+    """Print suggestions to fix environment issues."""
+    print(f"\n{color('Recommended Fix:', BOLD)}")
+
+    if info["pipx_available"]:
+        print(f"""
+  The most reliable way to install CLI tools is with {color('pipx', CYAN)}:
+
+    pipx install venomqa
+
+  This creates an isolated environment and avoids Python conflicts.
+""")
+    elif info["uv_available"]:
+        print(f"""
+  You have {color('uv', CYAN)} installed. Use it to install venomqa:
+
+    uv tool install venomqa
+""")
+    else:
+        print(f"""
+  Install with pip using this exact Python:
+
+    {info['python_path']} -m pip install venomqa
+
+  Or use this bootstrap script which handles everything:
+
+    curl -fsSL https://venomqa.dev/install.py | python3 - init
+
+  For the best experience, install {color('pipx', CYAN)} first:
+
+    brew install pipx  # macOS
+    apt install pipx   # Ubuntu/Debian
+    pip install pipx   # Other
+
+  Then: pipx install venomqa
+""")
+
+
+def install_venomqa(upgrade: bool = False, quiet: bool = False) -> bool:
+    """Install venomqa using pip."""
+    if not quiet:
+        print()
+        print("=" * 60)
+        print(f"  {color('VenomQA', BOLD)} - Autonomous API Testing")
+        print("=" * 60)
+
+        if upgrade:
+            print(f"\n{color('Upgrading venomqa...', CYAN)}")
+        else:
+            print(f"\n{color('Installing venomqa (first-time setup)...', CYAN)}")
 
     cmd = [get_python(), "-m", "pip", "install", "--quiet"]
     if upgrade:
@@ -63,15 +192,26 @@ def install_venomqa(upgrade: bool = False) -> bool:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             version = get_venomqa_version() or "latest"
-            print(f"✓ Successfully installed venomqa v{version}")
+            if not quiet:
+                print(f"{color('OK', GREEN)} Successfully installed venomqa v{version}")
             return True
         else:
-            print(f"✗ Installation failed: {result.stderr}")
-            print("\nManual installation:")
-            print(f"  {get_python()} -m pip install venomqa")
+            if not quiet:
+                print(f"{color('FAILED', RED)} Installation failed")
+                if result.stderr:
+                    # Show last few lines of error
+                    lines = result.stderr.strip().split("\n")[-5:]
+                    for line in lines:
+                        print(f"  {color(line, DIM)}")
+
+                # Run diagnosis
+                info = diagnose_environment()
+                print_diagnosis(info)
+                print_fix_suggestions(info)
             return False
     except Exception as e:
-        print(f"✗ Installation error: {e}")
+        if not quiet:
+            print(f"{color('ERROR', RED)} Installation error: {e}")
         return False
 
 
