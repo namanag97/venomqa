@@ -306,6 +306,19 @@ class Agent:
                 timestamp=result.timestamp,
             ))
 
+    def _register_hyperedge(self, state: State) -> None:
+        """Infer and register a state's hyperedge in the Hypergraph."""
+        if self._hypergraph is None:
+            return
+        from venomqa.v1.core.hyperedge import Hyperedge
+        edge = Hyperedge.from_state(state)
+        self._hypergraph.add(state.id, edge)
+
+    @property
+    def hypergraph(self) -> "Hypergraph | None":
+        """The Hypergraph instance, if hypergraph mode is enabled."""
+        return self._hypergraph
+
     @property
     def violations(self) -> list[Violation]:
         """Get all violations found so far."""
