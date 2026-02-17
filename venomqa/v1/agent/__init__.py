@@ -89,6 +89,10 @@ class Agent:
         # add_state returns canonical state (may be deduplicated)
         initial_state = self.graph.add_state(initial_state)
 
+        # Register initial state in hypergraph if enabled
+        if self._hypergraph is not None:
+            self._register_hyperedge(initial_state)
+
         # Initialize strategy with initial state's valid actions
         valid_actions = self.graph.get_valid_actions(initial_state)
         if hasattr(self.strategy, "enqueue"):
