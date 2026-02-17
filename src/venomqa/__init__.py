@@ -2,36 +2,47 @@
 
 Define Actions and Invariants. VenomQA explores every state path automatically.
 
-Quick Start:
-    >>> from venomqa import Action, Invariant, World, Agent, explore
-    >>>
-    >>> # Define what can be done
-    >>> login = Action(
-    ...     name="login",
-    ...     execute=lambda api, ctx: api.post("/login", json={"user": "test"}),
-    ... )
-    >>>
-    >>> # Define what must always be true
-    >>> auth_required = Invariant(
-    ...     name="auth_required",
-    ...     check=lambda state: state.api_response.status_code != 401,
-    ... )
-    >>>
-    >>> # Explore
-    >>> result = explore(
-    ...     base_url="http://localhost:8000",
-    ...     actions=[login],
-    ...     invariants=[auth_required],
-    ... )
-    >>> print(result.summary())
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  CRITICAL: VenomQA requires DATABASE ROLLBACK access                         ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  This is NOT a normal test framework. VenomQA explores state graphs by:     ║
+║                                                                              ║
+║    1. Execute action A → observe DB state → checkpoint                       ║
+║    2. ROLLBACK database to checkpoint                                        ║
+║    3. Execute action B from same state → observe → checkpoint                ║
+║    4. Repeat to explore ALL paths                                            ║
+║                                                                              ║
+║  Without database rollback, you can only test ONE linear path.              ║
+║                                                                              ║
+║  SETUP REQUIRED:                                                             ║
+║                                                                              ║
+║    Option 1: PostgreSQL (recommended for real APIs)                          ║
+║      $ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres \\         ║
+║          -p 5432:5432 postgres:15                                            ║
+║      $ export DATABASE_URL="postgresql://postgres:postgres@localhost/mydb"   ║
+║                                                                              ║
+║    Option 2: SQLite (simpler, good for development)                          ║
+║      from venomqa import SQLiteAdapter                                       ║
+║      db = SQLiteAdapter("/path/to/your/api.db")                              ║
+║                                                                              ║
+║  The database must be the SAME database your API writes to.                  ║
+║  VenomQA checkpoints and rolls back that database to explore branches.       ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-Core API:
-    Action: Something that can be done (HTTP call, DB operation)
-    Invariant: Something that must always be true
-    State: Current system state (observations from all systems)
-    World: The systems under test (API, DB, cache, etc.)
-    Agent: Explores the state space using a strategy
-    explore: Convenience function to run exploration
+Quick Start:
+    from venomqa import Action, Invariant, World, Agent, HttpClient, SQLiteAdapter
+
+    # Connect to the SAME database your API uses
+    api = HttpClient("http://localhost:8000")
+    db = SQLiteAdapter("/path/to/api.db", observe_tables=["users", "orders"])
+
+    # Create world with both API and DB
+    world = World(api=api, systems={"db": db})
+
+    # Define actions and invariants...
+    # Then explore with Agent
 
 See: https://venomqa.dev for full documentation.
 """
