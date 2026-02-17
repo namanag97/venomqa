@@ -541,29 +541,25 @@ CRITICAL: You must connect to your database OR use state_from_context.
     from venomqa.v1.adapters.http import HttpClient
     from venomqa.v1.adapters.postgres import PostgresAdapter
 
-    # Actions MUST validate responses — don't assume success!
+    # Actions MUST validate responses — use expect_* helpers!
     def create_item(api, context):
         resp = api.post("/items", json={"name": "widget"})
-        if resp.status_code != 201:
-            raise AssertionError(f"Create failed: {resp.status_code} - {resp.text}")
-        data = resp.json()
-        if "id" not in data:
-            raise AssertionError(f"Missing 'id' in response: {data}")
+        resp.expect_status(201)                    # raises if not 201
+        data = resp.expect_json_field("id")        # raises if field missing
         context.set("item_id", data["id"])
         return resp
 
     def list_items(api, context):
         resp = api.get("/items")
-        if resp.status_code != 200:
-            raise AssertionError(f"List failed: {resp.status_code}")
-        context.set("items", resp.json())
+        resp.expect_status(200)
+        items = resp.expect_json_list()            # raises if not array
+        context.set("items", items)
         return resp
 
     def delete_item(api, context):
         item_id = context.get("item_id")
         resp = api.delete(f"/items/{item_id}")
-        if resp.status_code not in (200, 204):
-            raise AssertionError(f"Delete failed: {resp.status_code}")
+        resp.expect_status(200, 204)               # raises if not 200 or 204
         context.delete("item_id")
         return resp
 
