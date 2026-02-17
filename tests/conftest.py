@@ -79,23 +79,6 @@ def pytest_collection_modifyitems(config, items):
             if "integration" in item.keywords:
                 item.add_marker(skip_integration)
 
-from venomqa.core.context import ExecutionContext
-from venomqa.core.models import (
-    Branch,
-    BranchResult,
-    Checkpoint,
-    Issue,
-    Journey,
-    JourneyResult,
-    Path,
-    PathResult,
-    Severity,
-    Step,
-    StepResult,
-)
-from venomqa.http import RequestRecord
-from venomqa.runner import JourneyRunner
-
 
 class MockStateManager:
     """Mock state manager for testing."""
