@@ -294,10 +294,10 @@ Each action has signature: (api, context)
   - api      : HttpClient — .get() .post() .put() .patch() .delete()
   - context  : Context   — .get(key) / .set(key, val)  ← NOT context[key]
 
-CRITICAL: Actions MUST validate responses. Don't assume success!
-    - Check status_code before using response body
-    - Raise AssertionError on unexpected status (VenomQA records the failure)
-    - Use Action(preconditions=[...]) instead of silent no-ops
+CRITICAL: Actions MUST validate responses using expect_* helpers:
+  - resp.expect_status(201)         # raises if not 201
+  - resp.expect_json_field("id")    # raises if field missing
+  - resp.expect_json_list()         # raises if not array
 
 Modify these for your specific API, then register them in an Agent.
 """
@@ -306,45 +306,35 @@ Modify these for your specific API, then register them in an Agent.
 def health_check(api, context):
     """Check API health status."""
     resp = api.get("/health")
-    if resp.status_code != 200:
-        raise AssertionError(f"Health check failed: {resp.status_code}")
+    resp.expect_status(200)  # raises AssertionError if not 200
     return resp
 
 
 def list_items(api, context):
     """List all items and store in context.
 
-    GOOD PATTERN: Validate the response before using it.
+    Uses expect_json_list() to validate the response is an array.
     """
     resp = api.get("/api/items")
-    if resp.status_code != 200:
-        raise AssertionError(f"List items failed: {resp.status_code} - {resp.text}")
+    resp.expect_status(200)
+    items = resp.expect_json_list()  # raises if not a list
 
-    data = resp.json()
-    if not isinstance(data, list):
-        raise AssertionError(f"Expected list, got {type(data)}: {data}")
-
-    context.set("items", data)
-    context.set("item_count", len(data))
+    context.set("items", items)
+    context.set("item_count", len(items))
     return resp
 
 
 def create_item(api, context):
     """Create a new item and store its ID in context.
 
-    GOOD PATTERN: Validate response status AND body fields.
+    Uses expect_json_field() to validate required fields exist.
     """
     resp = api.post("/api/items", json={
         "name": "VenomQA Test Item",
         "description": "Created by VenomQA",
     })
-
-    if resp.status_code not in (200, 201):
-        raise AssertionError(f"Create failed: {resp.status_code} - {resp.text}")
-
-    data = resp.json()
-    if "id" not in data:
-        raise AssertionError(f"Response missing 'id' field: {data}")
+    resp.expect_status(200, 201)                    # 200 or 201
+    data = resp.expect_json_field("id")             # raises if "id" missing
 
     context.set("item_id", data["id"])
     return resp
@@ -358,11 +348,9 @@ def get_item(api, context):
     """
     item_id = context.get("item_id")
     resp = api.get(f"/api/items/{item_id}")
+    resp.expect_status(200)
 
-    if resp.status_code != 200:
-        raise AssertionError(f"Get item failed: {resp.status_code}")
-
-    data = resp.json()
+    data = resp.expect_json()
     if data.get("id") != item_id:
         raise AssertionError(f"Wrong item returned: expected {item_id}, got {data}")
 
@@ -381,9 +369,7 @@ def delete_item(api, context):
     """
     item_id = context.get("item_id")
     resp = api.delete(f"/api/items/{item_id}")
-
-    if resp.status_code not in (200, 204):
-        raise AssertionError(f"Delete failed: {resp.status_code}")
+    resp.expect_status(200, 204)  # raises if not 200 or 204
 
     # Clean up context so we know item is gone
     context.delete("item_id")
