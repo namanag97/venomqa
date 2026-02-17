@@ -91,6 +91,11 @@ class Graph:
         self._transition_keys.add(key)
         self._transitions.append(transition)
         self._explored.add((transition.from_state_id, transition.action_name))
+
+        # Track action call count (for max_calls limiting)
+        action_name = transition.action_name
+        self._action_call_counts[action_name] = self._action_call_counts.get(action_name, 0) + 1
+
         return True
 
     def add_action(self, action: Action) -> None:
