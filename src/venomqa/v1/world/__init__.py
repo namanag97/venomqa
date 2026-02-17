@@ -67,6 +67,9 @@ class World:
         # Context keys whose values are included in state identity.
         # When these values change, VenomQA sees a new state — no DB adapter needed.
         self._state_from_context: list[str] = state_from_context or []
+        # Track if state_from_context was explicitly set (even if empty).
+        # Used by Agent to distinguish "forgot to configure" from "explicitly context-only".
+        self._state_from_context_explicit: bool = state_from_context is not None
         self._last_action_result: Any | None = None  # set by act(), read by invariants
 
     def run_teardown(self) -> None:
