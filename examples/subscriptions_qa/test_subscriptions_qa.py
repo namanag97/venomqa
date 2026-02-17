@@ -247,7 +247,7 @@ def mail_sent_on_subscription(world):
         return True
     # At least 1 subscription email must have been sent
     sent = mail.get_sent()
-    return any("Subscribed" in m.get("subject", "") for m in sent)
+    return any("Subscribed" in (m["subject"] if isinstance(m, dict) else m.subject) for m in sent)
 
 
 def storage_has_invoice_pdf(world):
