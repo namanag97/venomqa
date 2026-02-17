@@ -58,7 +58,7 @@ class Invariant:
     """
 
     name: str
-    check: Callable[[World], bool]
+    check: Callable[[World], bool | str]
     message: str = ""
     severity: Severity = Severity.MEDIUM
     timing: InvariantTiming = InvariantTiming.POST_ACTION
