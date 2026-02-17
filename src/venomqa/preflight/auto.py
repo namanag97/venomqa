@@ -212,13 +212,13 @@ class AutoPreflight:
         Returns:
             List of endpoint paths (e.g. ["/health", "/readyz"]).
         """
-        _HEALTH_KEYWORDS = {"health", "healthz", "ready", "readyz", "live", "livez", "ping", "status"}
+        health_keywords = {"health", "healthz", "ready", "readyz", "live", "livez", "ping", "status"}
         found: list[str] = []
 
         paths = self.spec.get("paths", {})
         for path in paths:
             segments = {s.lower() for s in path.strip("/").split("/")}
-            if segments & _HEALTH_KEYWORDS:
+            if segments & health_keywords:
                 found.append(path)
 
         if not found:
