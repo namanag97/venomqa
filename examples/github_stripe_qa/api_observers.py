@@ -32,13 +32,19 @@ class GitHubObserver:
     def observe(self) -> Observation:
         """Fetch current state from the GitHub mock server."""
         try:
+            users_resp = self._client.get("/users")
+            users = users_resp.json() if users_resp.status_code == 200 else []
+        except Exception:
+            users = []
+
+        try:
             repos_resp = self._client.get("/repos")
             repos = repos_resp.json() if repos_resp.status_code == 200 else []
         except Exception:
             repos = []
 
         open_issues_total = sum(r.get("open_issues_count", 0) for r in repos)
-        # Issue states per repo (used to distinguish "issue created" vs "issue closed")
+        # Count closed issues to create distinct states when issues are closed
         closed_issues_total = sum(
             len([i for i in self._fetch_issues(r["id"]) if i.get("state") == "closed"])
             for r in repos
@@ -47,6 +53,7 @@ class GitHubObserver:
         return Observation(
             system="github",
             data={
+                "user_count": len(users),
                 "repo_count": len(repos),
                 "open_issues_total": open_issues_total,
                 "closed_issues_total": closed_issues_total,
