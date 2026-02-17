@@ -1,23 +1,24 @@
-"""TDD: First-time developer experience for VenomQA.
+"""TDD script: what a first-time developer SHOULD experience using VenomQA.
 
-Simulates a developer who finds a todo API, writes 4 actions and 1 invariant,
-runs VenomQA, and expects a clear actionable result.
+All tests here describe DESIRED behaviour. Some fail until the implementation
+is fixed. They model a developer who:
+  1. Has a simple Todo API with one planted bug
+  2. Writes 3 actions + 1 invariant
+  3. Runs VenomQA
+  4. Expects clear, actionable output
 
-Planted bug: DELETE /todos/{id} returns 200 even when the todo is already
-completed (should return 403). VenomQA should find this.
+Planted bug in the mock:
+  DELETE /todos/{id} returns 200 even when the todo is already completed.
+  It should return 403 (Forbidden).
 
-Five tests — four of them expose silent implementation bugs that were fixed
-before this file was merged:
-  1. test_bug_is_found                          ← baseline (should always pass)
-  2. test_violation_message_is_dynamic         ← invariant returns str, not bool
-  3. test_precondition_actually_gates_action   ← context guard actually guards
-  4. test_no_duplicate_violations              ← dedup by (invariant, state)
-  5. test_violation_has_human_readable_reproduction ← reproduction_steps list
+Sequence that triggers it:
+  POST /todos  →  PATCH /todos/{id} (mark done)  →  DELETE /todos/{id}
 """
 
 from __future__ import annotations
 
 import json
+import socket
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
@@ -25,29 +26,18 @@ from urllib.parse import urlparse
 
 import pytest
 
-from venomqa import (
-    Action,
-    ActionResult,
-    Agent,
-    HTTPRequest,
-    HTTPResponse,
-    Invariant,
-    Severity,
-    World,
-)
-from venomqa.adapters.mock_http_server import MockHTTPServer
+from venomqa import Action, Agent, Invariant, Severity, World
 from venomqa.adapters.http import HttpClient
-from venomqa.v1.core.action import precondition_has_context
-from venomqa.v1.core.state import Observation
+from venomqa.adapters.mock_http_server import MockHTTPServer
+from venomqa.core.action import precondition_has_context
 
-# ---------------------------------------------------------------------------
-# Shared module-level state for the mock Todo server
-# ---------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# Inline mock Todo API
+# Module-level state so MockHTTPServer can snapshot/rollback it directly.
+# ─────────────────────────────────────────────────────────────────────────────
 
 _state: dict[str, Any] = {"todos": {}, "next_id": 1}
 _lock = threading.Lock()
-
-_PORT = 18199  # intentionally high to avoid conflicts
 
 
 def _reset_state() -> None:
@@ -56,21 +46,18 @@ def _reset_state() -> None:
         _state["next_id"] = 1
 
 
-# ---------------------------------------------------------------------------
-# HTTP handler — implements the planted bug
-# ---------------------------------------------------------------------------
-
 class _TodoHandler(BaseHTTPRequestHandler):
-    """Minimal HTTP handler for the todo API with a planted bug.
+    """HTTP handler for the inline mock Todo API.
 
-    Bug: DELETE /todos/{id} returns 200 even when todo["done"] is True.
-    Correct behaviour: should return 403.
+    Implements one planted bug:
+      DELETE /todos/{id}  returns 200 even when the todo is completed.
+      Correct behaviour would be 403 Forbidden.
     """
 
-    def log_message(self, fmt, *args):  # silence server logs in test output
-        pass
+    def log_message(self, *_: Any) -> None:
+        pass  # silence server logs in test output
 
-    # ---- helpers -----------------------------------------------------------
+    # ── helpers ──────────────────────────────────────────────────────────────
 
     def _send_json(self, status: int, body: Any) -> None:
         payload = json.dumps(body).encode()
@@ -80,90 +67,89 @@ class _TodoHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def _read_body(self) -> dict:
+    def _read_json(self) -> Any:
         length = int(self.headers.get("Content-Length", 0))
-        if length:
-            return json.loads(self.rfile.read(length))
-        return {}
+        raw = self.rfile.read(length)
+        return json.loads(raw) if raw else {}
 
-    def _todo_id_from_path(self) -> str | None:
-        parts = self.path.split("/")
-        if len(parts) >= 3 and parts[1] == "todos" and parts[2]:
-            return parts[2]
+    def _todo_id_from_path(self) -> int | None:
+        parts = urlparse(self.path).path.strip("/").split("/")
+        if len(parts) == 2 and parts[0] == "todos":
+            try:
+                return int(parts[1])
+            except ValueError:
+                return None
         return None
 
-    # ---- GET ---------------------------------------------------------------
+    # ── routes ───────────────────────────────────────────────────────────────
 
     def do_GET(self) -> None:
-        parsed = urlparse(self.path)
-        if parsed.path == "/todos":
+        path = urlparse(self.path).path
+        if path == "/todos":
             with _lock:
-                self._send_json(200, list(_state["todos"].values()))
+                todos = list(_state["todos"].values())
+            self._send_json(200, todos)
         else:
-            todo_id = self._todo_id_from_path()
-            if todo_id:
-                with _lock:
-                    todo = _state["todos"].get(todo_id)
-                if todo:
-                    self._send_json(200, todo)
-                else:
-                    self._send_json(404, {"error": "not found"})
-            else:
-                self._send_json(404, {"error": "not found"})
-
-    # ---- POST --------------------------------------------------------------
+            self._send_json(404, {"error": "not found"})
 
     def do_POST(self) -> None:
-        if self.path == "/todos":
-            body = self._read_body()
+        path = urlparse(self.path).path
+        if path == "/todos":
+            body = self._read_json()
             with _lock:
-                todo_id = str(_state["next_id"])
+                tid = _state["next_id"]
                 _state["next_id"] += 1
-                todo = {"id": todo_id, "title": body.get("title", ""), "done": False}
-                _state["todos"][todo_id] = todo
+                todo = {"id": tid, "title": body.get("title", ""), "done": False}
+                _state["todos"][str(tid)] = todo
             self._send_json(201, todo)
         else:
             self._send_json(404, {"error": "not found"})
 
-    # ---- PATCH -------------------------------------------------------------
-
     def do_PATCH(self) -> None:
-        todo_id = self._todo_id_from_path()
-        if todo_id:
-            with _lock:
-                todo = _state["todos"].get(todo_id)
-                if todo:
-                    body = self._read_body()
-                    if "done" in body:
-                        todo["done"] = body["done"]
-                    self._send_json(200, todo)
-                else:
-                    self._send_json(404, {"error": "not found"})
-        else:
+        tid = self._todo_id_from_path()
+        if tid is None:
             self._send_json(404, {"error": "not found"})
-
-    # ---- DELETE ------------------------------------------------------------
+            return
+        body = self._read_json()
+        with _lock:
+            todo = _state["todos"].get(str(tid))
+            if todo is None:
+                self._send_json(404, {"error": "not found"})
+                return
+            if "done" in body:
+                todo["done"] = body["done"]
+            self._send_json(200, todo)
 
     def do_DELETE(self) -> None:
-        todo_id = self._todo_id_from_path()
-        if todo_id:
-            with _lock:
-                todo = _state["todos"].get(todo_id)
-                if not todo:
-                    self._send_json(404, {"error": "not found"})
-                    return
-                # BUG: should check if todo["done"] and return 403, but doesn't
-                del _state["todos"][todo_id]
-                self._send_json(200, {"deleted": todo_id})
-        else:
+        tid = self._todo_id_from_path()
+        if tid is None:
             self._send_json(404, {"error": "not found"})
+            return
 
+        with _lock:
+            todo = _state["todos"].get(str(tid))
+            if todo is None:
+                self._send_json(404, {"error": "not found"})
+                return
 
-# ---------------------------------------------------------------------------
-# MockHTTPServer subclass — checkpoint/rollback via module-level state dict
-# ---------------------------------------------------------------------------
+            # ── PLANTED BUG ─────────────────────────────────────────────────
+            # A completed todo should NOT be deletable (403 Forbidden).
+            # This server incorrectly returns 200 for completed todos too.
+            # Correct code would be:
+            #   if todo["done"]:
+            #       self._send_json(403, {"error": "cannot delete completed todo"})
+            #       return
+            del _state["todos"][str(tid)]
+            self._send_json(200, {"deleted": tid})
+
 
 class TodoObserver(MockHTTPServer):
+    """VenomQA state observer for the inline Todo API.
+
+    Implements MockHTTPServer so VenomQA can snapshot/rollback state directly
+    without making HTTP calls — enabling true branching exploration.
+    """
+
     def __init__(self) -> None:
         super().__init__("todo")
 
@@ -184,84 +170,66 @@ class TodoObserver(MockHTTPServer):
             )
             _state["next_id"] = snapshot["next_id"]
 
-    def observe_from_state(self, state: dict[str, Any]) -> Observation:
+    def observe_from_state(self, state: dict[str, Any]) -> Any:
+        from venomqa.v1.core.state import Observation
+
         todos = state["todos"]
         return Observation(
             system="todo",
             data={
                 "count": len(todos),
                 "done_count": sum(1 for t in todos.values() if t["done"]),
-                "next_id": state["next_id"],
             },
         )
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# Server lifecycle
+# ─────────────────────────────────────────────────────────────────────────────
 
-@pytest.fixture(scope="module")
-def todo_server():
-    """Start a daemon HTTP server for the todo API."""
-    server = HTTPServer(("127.0.0.1", _PORT), _TodoHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    yield server
-    server.shutdown()
+def _free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("", 0))
+        return s.getsockname()[1]
 
 
-@pytest.fixture(autouse=True)
-def fresh_state():
-    """Reset in-process state before each test."""
-    _reset_state()
-    yield
+_SERVER_PORT: int = _free_port()
+_server: HTTPServer | None = None
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _build_world() -> World:
-    api = HttpClient(f"http://127.0.0.1:{_PORT}")
-    return World(
-        api=api,
-        systems={"todo": TodoObserver()},
-        state_from_context=["todo_id"],
-    )
+def _start_server() -> None:
+    global _server
+    _server = HTTPServer(("127.0.0.1", _SERVER_PORT), _TodoHandler)
+    t = threading.Thread(target=_server.serve_forever, daemon=True)
+    t.start()
 
 
-def _build_actions() -> list[Action]:
-    def create_todo(api, context):
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _world() -> World:
+    api = HttpClient(f"http://127.0.0.1:{_SERVER_PORT}")
+    return World(api=api, systems={"todo": TodoObserver()})
+
+
+def _actions() -> list[Action]:
+    def create_todo(api: Any, context: Any) -> Any:
         resp = api.post("/todos", json={"title": "test task"})
-        if resp.ok:
-            context.set("todo_id", resp.json()["id"])
+        resp.expect_status(201)
+        context.set("todo_id", resp.json()["id"])
         return resp
 
-    def list_todos(api, context):
-        return api.get("/todos")
-
-    def complete_todo(api, context):
+    def complete_todo(api: Any, context: Any) -> Any:
         todo_id = context.get("todo_id")
-        if not todo_id:
-            # No todo yet — return a no-op success so exploration doesn't crash
-            return ActionResult.from_response(
-                request=HTTPRequest(method="PATCH", url=f"http://127.0.0.1:{_PORT}/todos/none"),
-                response=HTTPResponse(status_code=404),
-            )
         return api.patch(f"/todos/{todo_id}", json={"done": True})
 
-    def delete_todo(api, context):
+    def delete_todo(api: Any, context: Any) -> Any:
         todo_id = context.get("todo_id")
-        if not todo_id:
-            return ActionResult.from_response(
-                request=HTTPRequest(method="DELETE", url=f"http://127.0.0.1:{_PORT}/todos/none"),
-                response=HTTPResponse(status_code=404),
-            )
         return api.delete(f"/todos/{todo_id}")
 
     return [
-        Action(name="create_todo", execute=create_todo),
-        Action(name="list_todos", execute=list_todos, max_calls=2),
+        Action(name="create_todo", execute=create_todo, max_calls=2),
         Action(
             name="complete_todo",
             execute=complete_todo,
@@ -275,125 +243,188 @@ def _build_actions() -> list[Action]:
     ]
 
 
-def _build_invariants_dynamic() -> list[Invariant]:
-    """Invariant that returns a descriptive string instead of False."""
-
-    def completed_todo_not_deletable(world) -> bool | str:
+def _invariants() -> list[Invariant]:
+    def completed_todo_not_deletable(world: Any) -> Any:
+        """Return True (ok), False (static message), or str (dynamic message)."""
         last = world.last_action_result
-        if last is None:
+        if last is None or last.request.method != "DELETE":
             return True
-        if not hasattr(last, "request") or last.request is None:
-            return True
-        if last.request.method != "DELETE":
-            return True
-
-        # Check if any completed todo was just deleted successfully
-        snap = TodoObserver.get_state_snapshot()
+        if last.status_code == 404:
+            return True  # todo didn't exist — not the bug we're testing
         todo_id = world.context.get("todo_id")
         if todo_id is None:
             return True
-
-        # The todo was just deleted — check if it WAS completed before deletion
-        # We can't read it from state now (already gone), but we can check the
-        # response: if status 200 and request was DELETE /todos/{id}, check if
-        # the todo was done at the time (the server deleted it unconditionally).
-        # Use status_code as proxy: if 200, bug may have fired.
-        if last.status_code == 200:
-            # We need to check if the todo was marked done before this DELETE.
-            # Since it's already gone, we rely on context tracking done state.
-            was_done = world.context.get("todo_was_done")
-            if was_done:
-                return (
-                    f"DELETE /todos/{todo_id} returned 200 but todo was completed "
-                    f"(expected 403). Sequence triggered the bug."
-                )
+        snap = TodoObserver.get_state_snapshot()
+        # After a successful delete the todo is gone from state.
+        # We detect the bug from the HTTP response: delete returned 200
+        # but the todo_id we just deleted was completed.
+        # Check the action_result that was stored pre-delete via world.last_action_result.
+        # We need to check whether the deleted todo WAS done before deletion.
+        # Because the server has a bug, it deletes a completed todo and returns 200.
+        # We can detect this by checking the response: if 200 AND we know the todo was done.
+        # Snapshot is AFTER deletion (todo gone). We use action_result.
+        # The action_result has the request (DELETE /todos/{id}).
+        # We can't recover the pre-delete state here easily from snapshot.
+        # Instead: if the deletion was 200, look at the response body.
+        # The bug: 200 was returned — we flag it if we saw the todo was completed.
+        # We store "was_done" in context from complete_todo.
+        was_done = world.context.get("todo_was_done", False)
+        if was_done and last.status_code == 200:
+            return (
+                f"DELETE /todos/{todo_id} returned {last.status_code} "
+                f"but todo was marked as completed — expected 403 Forbidden. "
+                f"Sequence: create → complete → delete triggered the bug."
+            )
         return True
 
-    return [
-        Invariant(
-            name="completed_todo_not_deletable",
-            check=completed_todo_not_deletable,
-            message="completed todos can't be deleted",
-            severity=Severity.HIGH,
-        )
-    ]
-
-
-def _build_invariants_simple() -> list[Invariant]:
-    """Invariant that tracks done state via context and returns bool."""
-
-    def completed_todo_not_deletable(world) -> bool | str:
+    def complete_todo_sets_done_flag(world: Any) -> Any:
+        """After completing a todo, mark context so the delete invariant knows."""
         last = world.last_action_result
         if last is None:
             return True
-        if not hasattr(last, "request") or last.request is None:
-            return True
-        if last.request.method != "DELETE":
-            return True
-        if last.status_code != 200:
-            return True
-
-        todo_id = world.context.get("todo_id")
-        was_done = world.context.get("todo_was_done")
-        if was_done:
-            return (
-                f"DELETE /todos/{todo_id} returned 200 but todo was completed "
-                f"(expected 403). Sequence triggered the bug."
-            )
-        return True
+        req_path = last.request.url if last.request else ""
+        if last.request and last.request.method == "PATCH" and last.ok:
+            body = last.json() if last.ok else {}
+            if isinstance(body, dict) and body.get("done"):
+                world.context.set("todo_was_done", True)
+        return True  # This invariant never fires; it's a side-effect hook
 
     return [
         Invariant(
             name="completed_todo_not_deletable",
             check=completed_todo_not_deletable,
-            message="completed todos can't be deleted",
-            severity=Severity.HIGH,
-        )
+            message="Completed todos must not be deletable (expected 403 Forbidden)",
+            severity=Severity.CRITICAL,
+        ),
+        Invariant(
+            name="track_done_state",
+            check=complete_todo_sets_done_flag,
+            message="",
+            severity=Severity.LOW,
+        ),
     ]
 
 
-def _build_actions_with_done_tracking() -> list[Action]:
-    """Actions that track done state for invariant checking."""
+# ─────────────────────────────────────────────────────────────────────────────
+# Fixtures
+# ─────────────────────────────────────────────────────────────────────────────
 
-    def create_todo(api, context):
-        resp = api.post("/todos", json={"title": "test task"})
-        if resp.ok:
-            context.set("todo_id", resp.json()["id"])
-            context.set("todo_was_done", False)
+@pytest.fixture(scope="module", autouse=True)
+def todo_server() -> None:
+    """Start the inline Todo server once for the whole module."""
+    _start_server()
+
+
+@pytest.fixture(autouse=True)
+def fresh_state() -> None:
+    """Reset server state between tests so tests are independent."""
+    _reset_state()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_bug_is_found() -> None:
+    """VenomQA must find the planted bug: delete of completed todo returns 200.
+
+    This is the foundational test — the full pipeline works.
+    """
+    from venomqa import BFS
+
+    world = _world()
+    agent = Agent(
+        world=world,
+        actions=_actions(),
+        invariants=_invariants(),
+        strategy=BFS(),
+        max_steps=50,
+    )
+    result = agent.explore()
+
+    critical = [v for v in result.violations if v.severity == Severity.CRITICAL]
+    assert len(critical) >= 1, (
+        f"Expected at least one CRITICAL violation but found none.\n"
+        f"States visited: {result.states_visited}\n"
+        f"Transitions taken: {result.transitions_taken}\n"
+        f"All violations: {[v.invariant_name for v in result.violations]}"
+    )
+    assert any(
+        "completed_todo_not_deletable" in v.invariant_name for v in critical
+    ), f"Expected 'completed_todo_not_deletable' violation, got: {[v.invariant_name for v in critical]}"
+
+
+def test_violation_message_is_dynamic() -> None:
+    """When an invariant returns a string, that string becomes the violation message.
+
+    This allows invariants to describe what actually went wrong (actual values,
+    status codes, sequences) rather than showing a static pre-written description.
+
+    CURRENTLY FAILS: Violation.create() ignores the return value and always uses
+    invariant.message (the static field). Needs invariant check to support bool|str.
+    """
+    from venomqa import BFS
+
+    world = _world()
+    agent = Agent(
+        world=world,
+        actions=_actions(),
+        invariants=_invariants(),
+        strategy=BFS(),
+        max_steps=50,
+    )
+    result = agent.explore()
+
+    critical = [
+        v for v in result.violations
+        if v.invariant_name == "completed_todo_not_deletable"
+    ]
+    assert critical, "Expected at least one critical violation to be found"
+
+    violation = critical[0]
+    # The dynamic message must mention the actual status code (200) and the
+    # expected behaviour (403). A static message like "Completed todos must not
+    # be deletable (expected 403 Forbidden)" does NOT contain "200".
+    assert "200" in violation.message, (
+        f"Violation message should contain the actual status code '200' but got:\n"
+        f"  '{violation.message}'\n"
+        f"The invariant returned a dynamic string with the actual values. "
+        f"The framework must capture that string as the violation message."
+    )
+    assert "403" in violation.message, (
+        f"Violation message should mention the expected status '403'.\n"
+        f"Got: '{violation.message}'"
+    )
+
+
+def test_precondition_actually_gates_action() -> None:
+    """Actions guarded by precondition_has_context must not run before their
+    required context key exists.
+
+    Specifically: delete_todo requires 'todo_id'. From the initial state (no
+    todo_id in context), delete_todo must never be executed.
+
+    CURRENTLY FAILS: graph.get_unexplored() ignores context, so BFS fallback
+    can return delete_todo from the initial state, and the agent never
+    re-checks context before executing.
+    """
+    from venomqa import BFS
+
+    calls: list[str] = []
+
+    def create_todo(api: Any, context: Any) -> Any:
+        resp = api.post("/todos", json={"title": "test"})
+        resp.expect_status(201)
+        context.set("todo_id", resp.json()["id"])
         return resp
 
-    def list_todos(api, context):
-        return api.get("/todos")
-
-    def complete_todo(api, context):
+    def delete_todo(api: Any, context: Any) -> Any:
         todo_id = context.get("todo_id")
-        if not todo_id:
-            return ActionResult.from_response(
-                request=HTTPRequest(method="PATCH", url=f"http://127.0.0.1:{_PORT}/todos/none"),
-                response=HTTPResponse(status_code=404),
-            )
-        resp = api.patch(f"/todos/{todo_id}", json={"done": True})
-        if resp.ok:
-            context.set("todo_was_done", True)
-        return resp
-
-    def delete_todo(api, context):
-        todo_id = context.get("todo_id")
-        if not todo_id:
-            return ActionResult.from_response(
-                request=HTTPRequest(method="DELETE", url=f"http://127.0.0.1:{_PORT}/todos/none"),
-                response=HTTPResponse(status_code=404),
-            )
+        calls.append(f"delete called with todo_id={todo_id!r}")
         return api.delete(f"/todos/{todo_id}")
 
-    return [
-        Action(name="create_todo", execute=create_todo),
-        Action(name="list_todos", execute=list_todos, max_calls=2),
-        Action(
-            name="complete_todo",
-            execute=complete_todo,
-            preconditions=[precondition_has_context("todo_id")],
-        ),
+    actions = [
+        Action(name="create_todo", execute=create_todo, max_calls=1),
         Action(
             name="delete_todo",
             execute=delete_todo,
@@ -401,174 +432,123 @@ def _build_actions_with_done_tracking() -> list[Action]:
         ),
     ]
 
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-def test_bug_is_found(todo_server):
-    """Baseline: VenomQA finds the planted DELETE bug via exploration."""
-    world = _build_world()
-    actions = _build_actions_with_done_tracking()
-    invariants = _build_invariants_simple()
-
-    agent = Agent(world=world, actions=actions, invariants=invariants, max_steps=30)
-    result = agent.explore()
-
-    assert len(result.violations) > 0, (
-        "VenomQA should have found the DELETE-on-completed-todo bug. "
-        f"States visited: {len(result.graph.states)}, "
-        f"Transitions: {len(result.graph.transitions)}"
+    world = _world()
+    agent = Agent(
+        world=world,
+        actions=actions,
+        invariants=[],
+        strategy=BFS(),
+        max_steps=20,
     )
-    violation = result.violations[0]
-    assert violation.invariant_name == "completed_todo_not_deletable"
-
-
-def test_violation_message_is_dynamic(todo_server):
-    """Invariant returning a string should produce that string as violation.message.
-
-    Previously Violation.create() always used invariant.message (static string),
-    ignoring any diagnostic string returned by the check function.
-    """
-    world = _build_world()
-    actions = _build_actions_with_done_tracking()
-    invariants = _build_invariants_simple()
-
-    agent = Agent(world=world, actions=actions, invariants=invariants, max_steps=30)
-    result = agent.explore()
-
-    assert len(result.violations) > 0, "No violations found — bug not triggered"
-    violation = result.violations[0]
-
-    # The dynamic message should contain diagnostic detail, not the static fallback
-    assert "403" in violation.message or "completed" in violation.message, (
-        f"Expected dynamic message with diagnostic detail, got: {violation.message!r}. "
-        "Static fallback was: 'completed todos can\\'t be deleted'"
-    )
-    assert violation.message != "completed todos can't be deleted", (
-        "violation.message is the static invariant.message — "
-        "dynamic string returned by check() was not captured"
-    )
-
-
-def test_precondition_actually_gates_action(todo_server):
-    """Actions with precondition_has_context() must not fire from initial state.
-
-    Previously graph.get_unexplored() passed no context to preconditions, and the
-    Agent never re-checked context before executing — so guarded actions ran
-    before context was populated.
-    """
-    world = _build_world()
-
-    executed_before_create = []
-
-    def spy_complete_todo(api, context):
-        todo_id = context.get("todo_id")
-        executed_before_create.append(todo_id)  # record for assertion
-        if not todo_id:
-            return ActionResult.from_response(
-                request=HTTPRequest(method="PATCH", url=f"http://127.0.0.1:{_PORT}/todos/none"),
-                response=HTTPResponse(status_code=404),
-            )
-        return api.patch(f"/todos/{todo_id}", json={"done": True})
-
-    def create_todo(api, context):
-        resp = api.post("/todos", json={"title": "test"})
-        if resp.ok:
-            context.set("todo_id", resp.json()["id"])
-        return resp
-
-    def list_todos(api, context):
-        return api.get("/todos")
-
-    actions = [
-        Action(name="create_todo", execute=create_todo),
-        Action(name="list_todos", execute=list_todos, max_calls=2),
-        Action(
-            name="complete_todo",
-            execute=spy_complete_todo,
-            preconditions=[precondition_has_context("todo_id")],
-        ),
-    ]
-
-    agent = Agent(world=world, actions=actions, max_steps=20)
     agent.explore()
 
-    # complete_todo must NEVER have been called with todo_id=None
-    assert all(tid is not None for tid in executed_before_create), (
-        "complete_todo was executed before create_todo set todo_id in context. "
-        "Precondition guard did not work. "
-        f"Calls with todo_id=None: {[t for t in executed_before_create if t is None]}"
+    # Every call to delete_todo must have had a real todo_id (not None).
+    bad_calls = [c for c in calls if "None" in c]
+    assert not bad_calls, (
+        f"delete_todo was called WITHOUT a todo_id in context:\n"
+        + "\n".join(f"  {c}" for c in bad_calls)
+        + "\n\nThe precondition_has_context('todo_id') guard did not work. "
+        "The agent executed delete_todo from a state where context had no 'todo_id'."
     )
 
 
-def test_no_duplicate_violations(todo_server):
-    """The same (invariant, state) pair should produce exactly one violation entry.
+def test_no_duplicate_violations() -> None:
+    """The same bug at the same state must produce exactly one violation entry.
 
-    Previously there was no dedup — the same bug could be reported dozens of
-    times as BFS explored different paths to the same state.
+    If the same invariant fires in the same state via multiple paths, it
+    should be deduplicated — the developer sees one clear bug, not noise.
+
+    CURRENTLY FAILS: violations are appended without any deduplication check.
     """
-    world = _build_world()
-    actions = _build_actions_with_done_tracking()
-    invariants = _build_invariants_simple()
+    from venomqa import BFS
 
-    agent = Agent(world=world, actions=actions, invariants=invariants, max_steps=50)
+    world = _world()
+    agent = Agent(
+        world=world,
+        actions=_actions(),
+        invariants=_invariants(),
+        strategy=BFS(),
+        max_steps=50,
+    )
     result = agent.explore()
 
-    assert len(result.violations) > 0, "Bug was not found — cannot test dedup"
-
-    # Count violations by (invariant_name, state_id)
-    seen = set()
-    duplicates = []
+    # Group violations by (invariant_name, state_id)
+    seen: dict[tuple[str, str], int] = {}
     for v in result.violations:
         key = (v.invariant_name, v.state.id)
-        if key in seen:
-            duplicates.append(key)
-        seen.add(key)
+        seen[key] = seen.get(key, 0) + 1
 
-    assert len(duplicates) == 0, (
-        f"Found {len(duplicates)} duplicate violation(s) for the same (invariant, state): "
-        f"{duplicates[:3]}"
+    duplicates = {k: count for k, count in seen.items() if count > 1}
+    assert not duplicates, (
+        f"Duplicate violations found (same invariant, same state):\n"
+        + "\n".join(
+            f"  invariant={k[0]!r} state={k[1]!r} appeared {count}x"
+            for k, count in duplicates.items()
+        )
+        + "\n\nVenomQA should deduplicate violations by (invariant_name, state_id)."
     )
 
 
-def test_violation_has_human_readable_reproduction(todo_server):
-    """violation.reproduction_steps should be a list of human-readable strings.
+def test_violation_has_human_readable_reproduction() -> None:
+    """violation.reproduction_steps must be a list of human-readable strings.
 
-    Previously violation.reproduction_path was a list[Transition] with no
-    human-readable form. reproduction_steps should look like:
-      ['POST /todos {"title": "test task"}', 'PATCH /todos/1 {"done": true}', 'DELETE /todos/1']
+    Each step should describe an HTTP request so the developer can reproduce
+    the bug manually or in a script without reading Transition internals.
+
+    Example expected output:
+      ["POST /todos {\"title\": \"test task\"}", "PATCH /todos/1 {\"done\": true}",
+       "DELETE /todos/1"]
+
+    CURRENTLY FAILS: Violation has no reproduction_steps property; only the
+    raw list[Transition] is available.
     """
-    world = _build_world()
-    actions = _build_actions_with_done_tracking()
-    invariants = _build_invariants_simple()
+    from venomqa import BFS
 
-    agent = Agent(world=world, actions=actions, invariants=invariants, max_steps=30)
+    world = _world()
+    agent = Agent(
+        world=world,
+        actions=_actions(),
+        invariants=_invariants(),
+        strategy=BFS(),
+        max_steps=50,
+    )
     result = agent.explore()
 
-    assert len(result.violations) > 0, "Bug was not found — cannot test reproduction steps"
-    violation = result.violations[0]
+    critical = [
+        v for v in result.violations
+        if v.invariant_name == "completed_todo_not_deletable"
+    ]
+    assert critical, "Expected at least one critical violation to be found"
+
+    violation = critical[0]
+
+    # Property must exist
+    assert hasattr(violation, "reproduction_steps"), (
+        "Violation must have a 'reproduction_steps' property.\n"
+        "It should return list[str] with one human-readable step per transition."
+    )
 
     steps = violation.reproduction_steps
-    assert isinstance(steps, list), f"reproduction_steps should be a list, got {type(steps)}"
-    assert len(steps) > 0, "reproduction_steps should not be empty"
-
-    for step in steps:
-        assert isinstance(step, str), f"Each step should be a string, got {type(step)}: {step!r}"
-
-    # At least one step should start with an HTTP method
-    http_methods = {"GET", "POST", "PATCH", "PUT", "DELETE"}
-    has_http_step = any(
-        any(step.startswith(m) for m in http_methods)
-        for step in steps
+    assert isinstance(steps, list), (
+        f"reproduction_steps must be a list, got {type(steps).__name__}"
     )
-    assert has_http_step, (
-        f"Expected at least one step starting with an HTTP method. "
-        f"Steps: {steps}"
+    assert len(steps) >= 2, (
+        f"Expected at least 2 reproduction steps (create + delete), "
+        f"got {len(steps)}: {steps}"
     )
 
-    # The DELETE step should be present (it's the buggy action)
-    has_delete = any("DELETE" in step for step in steps)
-    assert has_delete, (
-        f"Expected a DELETE step in reproduction path. Steps: {steps}"
+    # Each step must be a non-empty string
+    for i, step in enumerate(steps):
+        assert isinstance(step, str) and step.strip(), (
+            f"Step {i} is not a non-empty string: {step!r}"
+        )
+
+    # At least one step should mention an HTTP method (POST, PATCH, DELETE)
+    http_methods = {"POST", "PATCH", "DELETE", "GET", "PUT"}
+    assert any(
+        any(m in step for m in http_methods) for step in steps
+    ), (
+        f"None of the reproduction steps mention an HTTP method.\n"
+        f"Steps: {steps}\n"
+        f"Expected strings like 'POST /todos {{...}}' or 'DELETE /todos/1'"
     )
