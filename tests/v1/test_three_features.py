@@ -246,7 +246,7 @@ class TestWorldAuthIntegration:
         ctx = Context()
         ctx.set("token", "explore_tok")
         auth = BearerTokenAuth(lambda c: c.get("token"))
-        world = World(api=raw, auth=auth, context=ctx)
+        world = World(api=raw, auth=auth, context=ctx, state_from_context=[])
 
         def call_api(api, context):
             return api.get("/test")
