@@ -121,6 +121,7 @@ class Agent:
                         pass  # Best-effort cleanup; don't mask the original error
 
         result.violations = list(self._violations)
+        result.truncated_by_max_steps = not _exhausted
         result.finish()
 
         # Attach dimension coverage if hypergraph was used
