@@ -105,6 +105,10 @@ class BFS(BaseStrategy):
         for action in actions:
             self._queue.append((state.id, action.name))
 
+    def notify(self, state: State, actions: list[Action]) -> None:
+        """Notify strategy of a new state (alias for enqueue)."""
+        self.enqueue(state, actions)
+
 
 class DFS(BaseStrategy):
     """Depth-first search strategy.
