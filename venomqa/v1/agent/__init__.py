@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from venomqa.v1.core.state import State
-from venomqa.v1.core.action import Action
+from venomqa.v1.core.action import Action, ActionResult
 from venomqa.v1.core.transition import Transition
 from venomqa.v1.core.graph import Graph
 from venomqa.v1.core.invariant import Invariant, Violation, InvariantTiming, Severity
@@ -15,6 +15,7 @@ from venomqa.v1.agent.scheduler import Scheduler, ScheduledRun, RunResult
 
 if TYPE_CHECKING:
     from venomqa.v1.world import World
+    from venomqa.v1.core.hypergraph import Hypergraph
 
 
 class Agent:
