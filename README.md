@@ -100,6 +100,17 @@ pip install venomqa
 venomqa  # That's it. Runs autonomously.
 ```
 
+**If your API requires authentication:**
+```bash
+venomqa --api-key YOUR_KEY           # X-API-Key header
+venomqa --auth-token YOUR_TOKEN      # Bearer token
+venomqa --basic-auth user:password   # Basic auth
+
+# Or use environment variables:
+export VENOMQA_API_KEY=your-key
+venomqa
+```
+
 **What happens:**
 1. Reads your `docker-compose.yml` → understands your stack
 2. Spins up **isolated test containers** (won't touch your real database)
