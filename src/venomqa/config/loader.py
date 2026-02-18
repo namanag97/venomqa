@@ -63,6 +63,10 @@ class ConfigLoader:
 
         config = self._apply_env_overrides(config)
 
+        # Resolve relative paths based on config file location
+        if self.config_path:
+            config = self._resolve_relative_paths(config, self.config_path.parent)
+
         if self.validate:
             validate_config(config)
 
