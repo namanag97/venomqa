@@ -652,6 +652,36 @@ if __name__ == "__main__":
     # world, strategy = setup_with_sqlite()
     world, strategy = setup_with_context_only()  # Default: limited mode
 
+    # Check if API is reachable before starting
+    print("Checking API connectivity...")
+    try:
+        resp = world.api.get("/health")
+        if resp.status_code >= 500:
+            print()
+            print("ERROR: API is not healthy")
+            print(f"  GET /health returned {resp.status_code}")
+            print()
+            print("This sample expects a running API at http://localhost:8000")
+            print()
+            print("To customize for YOUR API:")
+            print("  1. Edit actions/sample_actions.py - change endpoints")
+            print("  2. Edit this file - update action list")
+            print()
+            sys.exit(1)
+    except Exception as e:
+        print()
+        print("ERROR: Cannot connect to API at http://localhost:8000")
+        print(f"  {e}")
+        print()
+        print("Either:")
+        print("  1. Start your API: docker compose up")
+        print("  2. Or customize actions/sample_actions.py for your API")
+        print()
+        sys.exit(1)
+
+    print("API is reachable. Starting exploration...")
+    print()
+
     agent = Agent(
         world=world,
         actions=[
