@@ -186,6 +186,26 @@ class ConfigLoader:
                 result[key] = value
         return result
 
+    def _resolve_relative_paths(self, config: dict[str, Any], base_dir: Path) -> dict[str, Any]:
+        """Resolve relative paths in config relative to the config file's directory.
+
+        Path fields are resolved relative to base_dir (usually config_path.parent).
+        Absolute paths are left unchanged.
+        """
+        path_fields = ["docker_compose_file", "report_dir"]
+
+        for field in path_fields:
+            if field in config and isinstance(config[field], str):
+                path = Path(config[field])
+                if not path.is_absolute():
+                    resolved = base_dir / path
+                    if resolved.exists() or field == "report_dir":
+                        # Use resolved path (for report_dir, always resolve even if not exists)
+                        config[field] = str(resolved)
+                    # If not exists, leave as-is for validation to catch
+
+        return config
+
     def get_raw_config(self) -> dict[str, Any]:
         """Return the raw configuration before interpolation and overrides."""
         return self._raw_config.copy()
