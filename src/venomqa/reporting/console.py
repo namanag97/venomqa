@@ -60,9 +60,11 @@ class ConsoleReporter:
         """Initialize the console reporter.
 
         Args:
-            file: Output file (default: stdout). Only used by print_report().
+            file: Output file (default: stdout). For backward compatibility,
+                  if a file is provided, report() will write to it.
             color: Whether to use ANSI colors (default: True).
         """
+        self._custom_file = file is not None
         self.file = file or sys.stdout
         self.color = color
 
