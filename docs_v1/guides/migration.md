@@ -58,7 +58,7 @@ journey = Journey(
     name="checkout",
     steps=[
         Step("login", login_action),
-        Checkpoint("logged_in"),
+        JourneyCheckpoint("logged_in"),
     ],
 )
 ```
