@@ -24,11 +24,10 @@ _ROOT = os.path.join(_HERE, "..", "..")
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, _HERE)
 
-from venomqa.v1 import Agent, World
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.mock_queue import MockQueue
-from venomqa.v1.core.action import Action
-from venomqa.v1.agent.strategies import BFS, DFS
+from venomqa import Agent, World
+from venomqa.adapters.http import HttpClient
+from venomqa.core.action import Action
+from venomqa.agent.strategies import BFS, DFS
 from stripe_proxy import StripeProxy
 
 import mock_github
