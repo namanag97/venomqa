@@ -184,8 +184,13 @@ class AutonomousRunner:
         if api_service:
             self._log(f"       ✓ Detected API service: {api_service.name}", "green")
 
-        # Step 2: Create isolated test environment
-        self._log_step(2, 6, "Creating isolated test environment...")
+        # Step 2: Run preflight checks
+        self._log_step(2, 7, "Running preflight checks...")
+        if not self._run_preflight(compose_path, openapi_path):
+            raise RuntimeError("Preflight checks failed. See above for details.")
+
+        # Step 3: Create isolated test environment
+        self._log_step(3, 7, "Creating isolated test environment...")
 
         self._infra = IsolatedInfrastructureManager(compose_path)
         test_compose = self._infra.create_test_compose()
