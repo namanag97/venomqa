@@ -94,6 +94,7 @@ from venomqa.exploration import Graph
 from venomqa.v1.core.hyperedge import Hyperedge
 from venomqa.v1.core.hypergraph import Hypergraph
 from venomqa.v1.core.invariant import (
+    Bug,
     Invariant,
     InvariantTiming,
     ResponseAssertion,
