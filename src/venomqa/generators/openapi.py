@@ -667,8 +667,28 @@ class OpenAPIGenerator:
         return resp_info
 
     def _generate_operation_id(self, path: str, method: str) -> str:
-        """Generate an operation ID from path and method."""
-        # Remove path parameters and convert to snake_case
+        """Generate an operation ID from path and method.
+
+        Handles path parameters to avoid name collisions:
+        - GET /items -> get_items
+        - GET /items/{id} -> get_item_by_id
+        - DELETE /items/{id} -> delete_item_by_id
+        """
+        # Check if path ends with a parameter (single resource operation)
+        if re.search(r"/\{[^}]+\}$", path):
+            # Extract the param name and resource name
+            param_match = re.search(r"/\{([^}]+)\}$", path)
+            param_name = param_match.group(1) if param_match else "id"
+            # Get path without the final parameter
+            base_path = re.sub(r"/\{[^}]+\}$", "", path)
+            # Singularize the resource name if it ends with 's'
+            clean_path = re.sub(r"[^a-zA-Z0-9]", "_", base_path)
+            clean_path = re.sub(r"_+", "_", clean_path).strip("_")
+            if clean_path.endswith("s"):
+                clean_path = clean_path[:-1]  # Simple singularize
+            return f"{method}_{clean_path}_by_{param_name}"
+
+        # Collection operation (no path parameter at end)
         clean_path = re.sub(r"\{[^}]+\}", "", path)
         clean_path = re.sub(r"[^a-zA-Z0-9]", "_", clean_path)
         clean_path = re.sub(r"_+", "_", clean_path).strip("_")
