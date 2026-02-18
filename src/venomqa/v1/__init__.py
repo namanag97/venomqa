@@ -87,6 +87,10 @@ from venomqa.v1.dsl import Branch, Journey, Path, Step
 from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
 from venomqa.v1.dsl.compiler import compile as compile_journey
 from venomqa.v1.dsl.decorators import action, invariant
+from venomqa.v1.generators.openapi_actions import (
+    generate_actions,
+    generate_schema_and_actions,
+)
 from venomqa.v1.invariants import OpenAPISchemaInvariant
 
 # Testing modes (deployment topology)
