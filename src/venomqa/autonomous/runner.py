@@ -242,8 +242,8 @@ class AutonomousRunner:
             invariants = create_default_invariants()
             self._log(f"       ✓ Created {len(invariants)} default invariants", "green")
 
-            # Step 5: Run exploration
-            self._log_step(5, 6, f"Exploring API sequences ({self._get_strategy_name()} strategy)...")
+            # Step 6: Run exploration
+            self._log_step(6, 7, f"Exploring API sequences ({self._get_strategy_name()} strategy)...")
 
             from venomqa import Agent, World, DFS, BFS, CoverageGuided
             from venomqa.adapters import HttpClient
