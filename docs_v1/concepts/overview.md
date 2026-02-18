@@ -120,10 +120,10 @@ An **Action** is something that changes the World. Usually an API call.
 ```python
 Action(
     name="create_order",
-    execute=lambda api: api.post("/orders", json={"product_id": 1, "quantity": 2}),
+    execute=lambda api, context: api.post("/orders", json={"product_id": 1, "quantity": 2}),
     preconditions=[
-        lambda state: state.observations["db"].data.get("logged_in", False),
-        lambda state: state.observations["db"].data.get("cart_items", 0) > 0,
+        lambda ctx: ctx.get("logged_in", False),
+        lambda ctx: ctx.get("cart_items", 0) > 0,
     ],
     description="Create a new order from the current cart",
 )
