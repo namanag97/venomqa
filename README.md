@@ -357,12 +357,16 @@ cd examples/github_stripe_qa && python3 main.py
 ## CLI
 
 ```bash
-venomqa                            # friendly intro
+venomqa                            # auto-run if docker-compose + openapi exist
 venomqa demo                       # see it find a bug (30 seconds)
 venomqa init --with-sample         # create project with examples
 venomqa doctor                     # system diagnostics
-venomqa llm-docs                   # context doc for AI assistants
-venomqa explore journey.py         # run exploration
+
+# Authentication options
+venomqa --api-key KEY              # X-API-Key header
+venomqa --auth-token TOKEN         # Bearer token
+venomqa --basic-auth user:pass     # Basic auth
+venomqa --skip-preflight           # skip Docker/auth checks
 ```
 
 ---
