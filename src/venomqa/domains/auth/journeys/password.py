@@ -6,7 +6,7 @@ Demonstrates:
 - Password strength enforcement
 """
 
-from venomqa import Checkpoint, Journey, Step
+from venomqa import JourneyCheckpoint as Checkpoint, Journey, Step
 from venomqa.http import Client
 
 
