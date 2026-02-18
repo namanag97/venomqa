@@ -1,0 +1,606 @@
+"""Preflight checks for autonomous mode.
+
+Validates environment before starting containers:
+- Docker daemon running
+- Docker Compose available
+- Compose file valid
+- OpenAPI spec valid
+- API reachable (if already running)
+- Database connection (if detected)
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+class CheckResult(Enum):
+    """Result of a preflight check."""
+
+    PASS = "pass"
+    FAIL = "fail"
+    WARN = "warn"
+    SKIP = "skip"
+
+
+@dataclass
+class PreflightCheckResult:
+    """Result of a single preflight check."""
+
+    name: str
+    result: CheckResult
+    message: str
+    fix_suggestion: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def passed(self) -> bool:
+        return self.result in (CheckResult.PASS, CheckResult.WARN, CheckResult.SKIP)
+
+    @property
+    def failed(self) -> bool:
+        return self.result == CheckResult.FAIL
+
+
+@dataclass
+class PreflightReport:
+    """Aggregated report of all preflight checks."""
+
+    checks: list[PreflightCheckResult] = field(default_factory=list)
+
+    @property
+    def passed(self) -> bool:
+        """All checks passed (no FAIL results)."""
+        return not any(c.failed for c in self.checks)
+
+    @property
+    def failed_checks(self) -> list[PreflightCheckResult]:
+        """Get list of failed checks."""
+        return [c for c in self.checks if c.failed]
+
+    @property
+    def warning_checks(self) -> list[PreflightCheckResult]:
+        """Get list of warning checks."""
+        return [c for c in self.checks if c.result == CheckResult.WARN]
+
+    def add(self, check: PreflightCheckResult) -> None:
+        """Add a check result."""
+        self.checks.append(check)
+
+
+# Common fix suggestions (pattern from cli/doctor.py)
+FIXES = {
+    "docker_not_installed": (
+        "Docker is not installed.\n\n"
+        "Install Docker:\n"
+        "  macOS: brew install --cask docker\n"
+        "  Linux: https://docs.docker.com/engine/install/\n"
+        "  Windows: https://docs.docker.com/desktop/install/windows-install/"
+    ),
+    "docker_not_running": (
+        "Docker daemon is not running.\n\n"
+        "Start Docker:\n"
+        "  macOS/Windows: Open Docker Desktop\n"
+        "  Linux: sudo systemctl start docker"
+    ),
+    "compose_not_found": (
+        "Docker Compose not found.\n\n"
+        "Docker Compose v2 is included with Docker Desktop.\n"
+        "For standalone install:\n"
+        "  https://docs.docker.com/compose/install/"
+    ),
+    "compose_invalid": (
+        "docker-compose.yml has syntax errors.\n\n"
+        "Validate with:\n"
+        "  docker compose config"
+    ),
+    "openapi_invalid": (
+        "OpenAPI spec is invalid or missing required fields.\n\n"
+        "Ensure your spec has:\n"
+        "  - 'openapi' or 'swagger' version field\n"
+        "  - 'paths' with at least one endpoint"
+    ),
+    "api_not_reachable": (
+        "API is not responding at the expected URL.\n\n"
+        "VenomQA will start the API via docker-compose.\n"
+        "This check can be skipped."
+    ),
+    "api_auth_required": (
+        "API requires authentication (401 Unauthorized).\n\n"
+        "Provide auth via:\n"
+        "  --auth-token TOKEN    # Bearer token\n"
+        "  --api-key KEY         # API key\n"
+        "  --basic-auth user:pass\n\n"
+        "Or set environment variables:\n"
+        "  VENOMQA_AUTH_TOKEN=...\n"
+        "  VENOMQA_API_KEY=..."
+    ),
+    "db_connection_failed": (
+        "Could not connect to the database.\n\n"
+        "Check docker-compose.yml for database credentials:\n"
+        "  POSTGRES_PASSWORD, POSTGRES_USER, etc.\n\n"
+        "Or override with:\n"
+        "  --db-password PASSWORD"
+    ),
+}
+
+
+class PreflightRunner:
+    """Runs preflight checks before autonomous exploration.
+
+    Usage:
+        runner = PreflightRunner(
+            compose_path=Path("docker-compose.yml"),
+            openapi_path=Path("openapi.yaml"),
+        )
+        report = runner.run_all()
+        if not report.passed:
+            for check in report.failed_checks:
+                print(f"{check.name}: {check.fix_suggestion}")
+    """
+
+    def __init__(
+        self,
+        *,
+        compose_path: Path | None = None,
+        openapi_path: Path | None = None,
+        api_url: str | None = None,
+        credentials: Any | None = None,  # Credentials object
+        check_api_auth: bool = True,
+        check_database: bool = True,
+    ) -> None:
+        self.compose_path = compose_path
+        self.openapi_path = openapi_path
+        self.api_url = api_url
+        self.credentials = credentials
+        self._check_api_auth = check_api_auth
+        self._check_database = check_database
+
+    def run_all(self) -> PreflightReport:
+        """Run all preflight checks."""
+        report = PreflightReport()
+
+        # Core infrastructure checks (required)
+        report.add(self._check_docker())
+        report.add(self._check_docker_compose())
+
+        # If docker isn't working, skip remaining checks
+        if any(c.failed for c in report.checks):
+            return report
+
+        # Compose file check
+        if self.compose_path:
+            report.add(self._check_compose_valid())
+
+        # OpenAPI spec check
+        if self.openapi_path:
+            report.add(self._check_openapi_valid())
+
+        # API checks (optional - API might not be running yet)
+        if self.api_url:
+            api_check = self._check_api_reachable()
+            report.add(api_check)
+
+            # Only check auth if API is reachable
+            if api_check.result == CheckResult.PASS and self._check_api_auth:
+                report.add(self._check_api_auth_status())
+
+        return report
+
+    def _check_docker(self) -> PreflightCheckResult:
+        """Check if Docker is installed and daemon is running."""
+        # Check if docker binary exists
+        if not shutil.which("docker"):
+            return PreflightCheckResult(
+                name="Docker",
+                result=CheckResult.FAIL,
+                message="Docker not found in PATH",
+                fix_suggestion=FIXES["docker_not_installed"],
+            )
+
+        # Check if daemon is running
+        try:
+            result = subprocess.run(
+                ["docker", "info"],
+                capture_output=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                return PreflightCheckResult(
+                    name="Docker",
+                    result=CheckResult.FAIL,
+                    message="Docker daemon not running",
+                    fix_suggestion=FIXES["docker_not_running"],
+                )
+        except subprocess.TimeoutExpired:
+            return PreflightCheckResult(
+                name="Docker",
+                result=CheckResult.FAIL,
+                message="Docker daemon not responding (timeout)",
+                fix_suggestion=FIXES["docker_not_running"],
+            )
+        except Exception as e:
+            return PreflightCheckResult(
+                name="Docker",
+                result=CheckResult.FAIL,
+                message=f"Docker check failed: {e}",
+                fix_suggestion=FIXES["docker_not_running"],
+            )
+
+        # Get version info
+        try:
+            version_result = subprocess.run(
+                ["docker", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            version = version_result.stdout.strip()
+        except Exception:
+            version = "Docker running"
+
+        return PreflightCheckResult(
+            name="Docker",
+            result=CheckResult.PASS,
+            message=version,
+        )
+
+    def _check_docker_compose(self) -> PreflightCheckResult:
+        """Check if Docker Compose is available (v2 or v1)."""
+        # Try docker compose (v2)
+        try:
+            result = subprocess.run(
+                ["docker", "compose", "version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return PreflightCheckResult(
+                    name="Docker Compose",
+                    result=CheckResult.PASS,
+                    message=result.stdout.strip(),
+                )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        # Try docker-compose (v1)
+        if shutil.which("docker-compose"):
+            try:
+                result = subprocess.run(
+                    ["docker-compose", "--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    return PreflightCheckResult(
+                        name="Docker Compose",
+                        result=CheckResult.PASS,
+                        message=result.stdout.strip(),
+                    )
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+
+        return PreflightCheckResult(
+            name="Docker Compose",
+            result=CheckResult.FAIL,
+            message="Docker Compose not found",
+            fix_suggestion=FIXES["compose_not_found"],
+        )
+
+    def _check_compose_valid(self) -> PreflightCheckResult:
+        """Check if docker-compose.yml is valid YAML and has services."""
+        if not self.compose_path or not self.compose_path.exists():
+            return PreflightCheckResult(
+                name="Compose File",
+                result=CheckResult.SKIP,
+                message="No compose file to validate",
+            )
+
+        try:
+            with open(self.compose_path) as f:
+                config = yaml.safe_load(f)
+
+            if not isinstance(config, dict):
+                return PreflightCheckResult(
+                    name="Compose File",
+                    result=CheckResult.FAIL,
+                    message="Compose file is not a valid YAML dictionary",
+                    fix_suggestion=FIXES["compose_invalid"],
+                )
+
+            services = config.get("services", {})
+            if not services:
+                return PreflightCheckResult(
+                    name="Compose File",
+                    result=CheckResult.WARN,
+                    message="Compose file has no services defined",
+                    fix_suggestion=FIXES["compose_invalid"],
+                )
+
+            return PreflightCheckResult(
+                name="Compose File",
+                result=CheckResult.PASS,
+                message=f"Valid ({len(services)} service(s))",
+                details={"services": list(services.keys())},
+            )
+
+        except yaml.YAMLError as e:
+            return PreflightCheckResult(
+                name="Compose File",
+                result=CheckResult.FAIL,
+                message=f"YAML parse error: {e}",
+                fix_suggestion=FIXES["compose_invalid"],
+            )
+        except Exception as e:
+            return PreflightCheckResult(
+                name="Compose File",
+                result=CheckResult.FAIL,
+                message=f"Error reading file: {e}",
+                fix_suggestion=FIXES["compose_invalid"],
+            )
+
+    def _check_openapi_valid(self) -> PreflightCheckResult:
+        """Check if OpenAPI spec is valid and has endpoints."""
+        if not self.openapi_path or not self.openapi_path.exists():
+            return PreflightCheckResult(
+                name="OpenAPI Spec",
+                result=CheckResult.SKIP,
+                message="No OpenAPI spec to validate",
+            )
+
+        try:
+            with open(self.openapi_path) as f:
+                if self.openapi_path.suffix == ".json":
+                    import json
+
+                    spec = json.load(f)
+                else:
+                    spec = yaml.safe_load(f)
+
+            if not isinstance(spec, dict):
+                return PreflightCheckResult(
+                    name="OpenAPI Spec",
+                    result=CheckResult.FAIL,
+                    message="OpenAPI spec is not a valid dictionary",
+                    fix_suggestion=FIXES["openapi_invalid"],
+                )
+
+            # Check for openapi or swagger version
+            version = spec.get("openapi") or spec.get("swagger")
+            if not version:
+                return PreflightCheckResult(
+                    name="OpenAPI Spec",
+                    result=CheckResult.FAIL,
+                    message="Missing 'openapi' or 'swagger' version field",
+                    fix_suggestion=FIXES["openapi_invalid"],
+                )
+
+            paths = spec.get("paths", {})
+            if not paths:
+                return PreflightCheckResult(
+                    name="OpenAPI Spec",
+                    result=CheckResult.WARN,
+                    message=f"OpenAPI {version} - no paths defined",
+                    fix_suggestion=FIXES["openapi_invalid"],
+                )
+
+            # Count endpoints
+            endpoint_count = sum(
+                len([m for m in path.keys() if m in ("get", "post", "put", "patch", "delete")])
+                for path in paths.values()
+                if isinstance(path, dict)
+            )
+
+            return PreflightCheckResult(
+                name="OpenAPI Spec",
+                result=CheckResult.PASS,
+                message=f"OpenAPI {version} ({endpoint_count} endpoint(s))",
+                details={"version": version, "endpoints": endpoint_count},
+            )
+
+        except yaml.YAMLError as e:
+            return PreflightCheckResult(
+                name="OpenAPI Spec",
+                result=CheckResult.FAIL,
+                message=f"YAML parse error: {e}",
+                fix_suggestion=FIXES["openapi_invalid"],
+            )
+        except Exception as e:
+            return PreflightCheckResult(
+                name="OpenAPI Spec",
+                result=CheckResult.FAIL,
+                message=f"Error reading spec: {e}",
+                fix_suggestion=FIXES["openapi_invalid"],
+            )
+
+    def _check_api_reachable(self) -> PreflightCheckResult:
+        """Check if API is reachable (if already running)."""
+        if not self.api_url:
+            return PreflightCheckResult(
+                name="API Reachable",
+                result=CheckResult.SKIP,
+                message="No API URL to check",
+            )
+
+        try:
+            import httpx
+
+            # Try common health check endpoints
+            for path in ["/health", "/healthz", "/", "/api/health"]:
+                try:
+                    url = self.api_url.rstrip("/") + path
+                    response = httpx.get(url, timeout=5.0)
+                    # Any response (even 404) means API is up
+                    if response.status_code < 500:
+                        return PreflightCheckResult(
+                            name="API Reachable",
+                            result=CheckResult.PASS,
+                            message=f"API responding at {self.api_url}",
+                            details={"status_code": response.status_code},
+                        )
+                except httpx.HTTPError:
+                    continue
+
+            return PreflightCheckResult(
+                name="API Reachable",
+                result=CheckResult.WARN,
+                message=f"API not responding at {self.api_url}",
+                fix_suggestion=FIXES["api_not_reachable"],
+            )
+
+        except ImportError:
+            return PreflightCheckResult(
+                name="API Reachable",
+                result=CheckResult.SKIP,
+                message="httpx not available for API check",
+            )
+        except Exception as e:
+            return PreflightCheckResult(
+                name="API Reachable",
+                result=CheckResult.WARN,
+                message=f"Could not reach API: {e}",
+                fix_suggestion=FIXES["api_not_reachable"],
+            )
+
+    def _check_api_auth_status(self) -> PreflightCheckResult:
+        """Check if API requires authentication and if we have credentials."""
+        if not self.api_url:
+            return PreflightCheckResult(
+                name="API Auth",
+                result=CheckResult.SKIP,
+                message="No API URL to check auth",
+            )
+
+        try:
+            import httpx
+
+            # Make request without auth
+            for path in ["/", "/api", "/health"]:
+                try:
+                    url = self.api_url.rstrip("/") + path
+                    response = httpx.get(url, timeout=5.0)
+
+                    if response.status_code == 401:
+                        # Auth required - check if we have credentials
+                        if self.credentials and self.credentials.has_api_auth():
+                            return PreflightCheckResult(
+                                name="API Auth",
+                                result=CheckResult.PASS,
+                                message=f"Auth required, credentials provided ({self.credentials.auth_type.value})",
+                            )
+                        else:
+                            return PreflightCheckResult(
+                                name="API Auth",
+                                result=CheckResult.FAIL,
+                                message="API requires authentication (401)",
+                                fix_suggestion=FIXES["api_auth_required"],
+                            )
+
+                    elif response.status_code == 403:
+                        return PreflightCheckResult(
+                            name="API Auth",
+                            result=CheckResult.FAIL,
+                            message="API access forbidden (403)",
+                            fix_suggestion=FIXES["api_auth_required"],
+                        )
+
+                    elif response.status_code < 400:
+                        return PreflightCheckResult(
+                            name="API Auth",
+                            result=CheckResult.PASS,
+                            message="API accessible (no auth required)",
+                        )
+
+                except httpx.HTTPError:
+                    continue
+
+            return PreflightCheckResult(
+                name="API Auth",
+                result=CheckResult.WARN,
+                message="Could not determine auth requirements",
+            )
+
+        except ImportError:
+            return PreflightCheckResult(
+                name="API Auth",
+                result=CheckResult.SKIP,
+                message="httpx not available",
+            )
+        except Exception as e:
+            return PreflightCheckResult(
+                name="API Auth",
+                result=CheckResult.WARN,
+                message=f"Auth check failed: {e}",
+            )
+
+
+def display_preflight_report(report: PreflightReport, verbose: bool = False) -> None:
+    """Display preflight report using Rich console."""
+    try:
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.table import Table
+
+        console = Console()
+
+        table = Table(show_header=False, box=None)
+        table.add_column("Status", width=3)
+        table.add_column("Check", width=20)
+        table.add_column("Result")
+
+        for check in report.checks:
+            if check.result == CheckResult.PASS:
+                status = "[green]OK[/green]"
+                message = f"[green]{check.message}[/green]"
+            elif check.result == CheckResult.WARN:
+                status = "[yellow]--[/yellow]"
+                message = f"[yellow]{check.message}[/yellow]"
+            elif check.result == CheckResult.FAIL:
+                status = "[red]!![/red]"
+                message = f"[red]{check.message}[/red]"
+            else:  # SKIP
+                status = "[dim]--[/dim]"
+                message = f"[dim]{check.message}[/dim]"
+
+            table.add_row(status, check.name, message)
+
+        console.print()
+        console.print(table)
+
+        # Show fix suggestions for failures
+        if report.failed_checks:
+            console.print()
+            for check in report.failed_checks:
+                if check.fix_suggestion:
+                    console.print(Panel(
+                        check.fix_suggestion,
+                        title=f"[red]Fix: {check.name}[/red]",
+                        border_style="red",
+                    ))
+
+    except ImportError:
+        # Fallback without Rich
+        for check in report.checks:
+            status = {
+                CheckResult.PASS: "[OK]",
+                CheckResult.WARN: "[WARN]",
+                CheckResult.FAIL: "[FAIL]",
+                CheckResult.SKIP: "[SKIP]",
+            }[check.result]
+            print(f"{status} {check.name}: {check.message}")
+
+        if report.failed_checks:
+            print("\nFix suggestions:")
+            for check in report.failed_checks:
+                if check.fix_suggestion:
+                    print(f"\n{check.name}:")
+                    print(check.fix_suggestion)
