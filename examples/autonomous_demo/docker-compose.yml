@@ -1,0 +1,26 @@
+# VenomQA Autonomous Demo - Docker Compose
+#
+# This compose file sets up a simple API for VenomQA to test.
+# The API has X-API-Key authentication and a planted bug.
+#
+# Usage:
+#   docker compose up -d
+#   venomqa --api-key demo-api-key-12345
+#
+# Or with .env file:
+#   cp .env.example .env
+#   venomqa
+
+services:
+  api:
+    build: ./app
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY:-demo-api-key-12345}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
