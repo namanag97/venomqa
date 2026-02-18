@@ -859,7 +859,7 @@ class OpenAPIGenerator:
         if headers_code:
             call_args.append("headers=headers")
 
-        call_code = f"return client.{method_lower}({', '.join(call_args)})"
+        call_code = f"return api.{method_lower}({', '.join(call_args)})"
 
         # Assemble function body
         body_parts = []
