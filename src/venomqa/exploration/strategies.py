@@ -157,6 +157,11 @@ class DFS(BaseStrategy):
         self._frontier = StackFrontier()
         self._initialized = False
 
+    @property
+    def _stack(self) -> list:
+        """Backward compatibility: expose internal stack."""
+        return self._frontier._stack
+
     def pick(self, graph: Graph) -> tuple[State, Action] | None:
         # Initialize frontier with initial state actions
         if not self._initialized:
