@@ -243,9 +243,9 @@ Create `venomqa/journeys/explore_users.py`:
 """Explore the user API."""
 
 import os
-from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.postgres import PostgresAdapter
+from venomqa import Action, Invariant, Agent, World, DFS, Severity
+from venomqa.adapters.http import HttpClient
+from venomqa.adapters.postgres import PostgresAdapter
 
 from actions.user_actions import (
     create_user, get_user, delete_user, list_users,
