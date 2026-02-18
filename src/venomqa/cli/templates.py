@@ -745,10 +745,6 @@ if __name__ == "__main__":
     print()
     print("HTML trace saved to: exploration_trace.html")
     print("Open in browser to see the state graph visualization.")
-            print(f"      {v.message}")
-    else:
-        print()
-        print("All invariants passed.")
 
     # Exit with error if violations found (useful for CI)
     sys.exit(1 if result.violations else 0)
