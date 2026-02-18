@@ -383,7 +383,7 @@ class GeneratorConfig:
     group_by_tags: bool = False
     generate_fixtures: bool = True
     fixture_prefix: str = "create_"
-    action_decorator: str = "action"
+    action_decorator: str = ""  # VenomQA uses Action(execute=fn), not decorators
 
 
 class OpenAPIGenerator:
