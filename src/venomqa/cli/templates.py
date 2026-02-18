@@ -43,8 +43,8 @@ log_lines: 50
 # Report settings
 report_dir: "reports"
 
-# Docker Compose file for test infrastructure (optional)
-# docker_compose_file: "docker-compose.qa.yml"
+# Docker Compose file for test infrastructure
+docker_compose_file: "docker-compose.qa.yml"
 
 # Notifications configuration (optional)
 # notifications:
