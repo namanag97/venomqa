@@ -108,7 +108,7 @@ from venomqa.v1.core.observers import (
     row_with_status,
 )
 from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.core.state import Observation, State
+from venomqa.sandbox import Observation, State
 from venomqa.v1.core.transition import Transition
 
 # DSL (Journey definition)
