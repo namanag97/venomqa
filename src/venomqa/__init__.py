@@ -308,6 +308,7 @@ __all__ = [
     "HTTPResponse",
     "Transition",
     "Graph",
+    "Bug",
     "Invariant",
     "Violation",
     "Severity",
