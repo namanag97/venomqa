@@ -24,7 +24,6 @@ VENOMQA_CONFIG_SCHEMA: dict[str, Any] = {
         },
         "db_url": {
             "type": "string",
-            "pattern": "^postgresql://.*|^postgres://.*$",
             "description": "PostgreSQL connection string for database state management",
             "examples": [
                 "postgresql://user:password@localhost:5432/venomqa_test",
