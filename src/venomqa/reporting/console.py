@@ -93,6 +93,9 @@ class ConsoleReporter:
     def report(self, result: ExplorationResult) -> str:
         """Format the exploration result as a string.
 
+        For backward compatibility, if a file was provided in __init__,
+        the output is also written to that file.
+
         Args:
             result: The exploration result to format.
 
@@ -105,16 +108,25 @@ class ConsoleReporter:
         # Build the report into the buffer
         self._write_report(result, buffer)
 
-        return buffer.getvalue()
+        output = buffer.getvalue()
+
+        # Backward compatibility: also write to file if provided
+        # (old code expected report() to write to file)
+        if self.file is not sys.stdout:
+            self.file.write(output)
+
+        return output
 
     def print_report(self, result: ExplorationResult) -> None:
-        """Print the exploration result to the configured file.
+        """Print the exploration result to stdout.
 
         Args:
             result: The exploration result to print.
         """
         output = self.report(result)
-        print(output, file=self.file, end="")
+        if self.file is sys.stdout:
+            # Already handled by report() for non-stdout files
+            print(output, end="")
 
     def _write_report(self, result: ExplorationResult, buffer: io.StringIO) -> None:
         """Write the report to a buffer."""
