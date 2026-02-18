@@ -442,12 +442,15 @@ def cli(
 
         console = Console()
 
-        # Check if we can run autonomously (docker-compose + openapi exist)
+        # Check what files exist and guide user accordingly
         try:
             from venomqa.autonomous.discovery import ProjectDiscovery
             discovery = ProjectDiscovery(Path.cwd())
 
-            if discovery.has_compose_file() and discovery.has_openapi_spec():
+            has_compose = discovery.has_compose_file()
+            has_openapi = discovery.has_openapi_spec()
+
+            if has_compose and has_openapi:
                 # Run autonomous mode!
                 console.print()
                 console.print(Panel.fit(
@@ -470,8 +473,38 @@ def cli(
 
                 # Exit with error if violations found
                 sys.exit(EXIT_FAILURE if result.violations else EXIT_SUCCESS)
+
+            # Missing files - show specific guidance
+            console.print()
+            console.print("[bold cyan]VenomQA[/bold cyan] — Autonomous API Testing\n")
+
+            if has_compose and not has_openapi:
+                console.print("[green]✓[/green] Found docker-compose.yml")
+                console.print("[red]✗[/red] Missing openapi.yaml (or swagger.json)\n")
+                console.print("VenomQA needs your API spec to generate test actions.\n")
+                console.print("[bold]To get your OpenAPI spec:[/bold]")
+                console.print("  • Export from Swagger UI (usually at /api-docs)")
+                console.print("  • Ask your backend team")
+                console.print("  • Generate: [cyan]venomqa generate --from-url http://localhost:8000[/cyan]")
+                console.print()
+                sys.exit(EXIT_CONFIG_ERROR)
+
+            elif has_openapi and not has_compose:
+                console.print("[red]✗[/red] Missing docker-compose.yml")
+                console.print("[green]✓[/green] Found OpenAPI spec\n")
+                console.print("VenomQA needs docker-compose.yml to understand your stack.\n")
+                console.print("[bold]Quick fix:[/bold]")
+                console.print("  [cyan]venomqa init[/cyan]  — creates a template\n")
+                sys.exit(EXIT_CONFIG_ERROR)
+
+            # Neither file - fall through to intro
+
         except ImportError:
             pass  # Autonomous module not available, show intro
+        except RuntimeError as e:
+            # Auth or preflight failure - error already displayed
+            console.print(f"\n[red]{e}[/red]")
+            sys.exit(EXIT_FAILURE)
         except Exception as e:
             # Log error and fall through to intro
             console.print(f"[yellow]Autonomous mode failed: {e}[/yellow]")
