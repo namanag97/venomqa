@@ -113,7 +113,7 @@ from venomqa.v1.core.observers import (
 )
 from venomqa.exploration import ExplorationResult
 from venomqa.sandbox import Observation, State
-from venomqa.v1.core.transition import Transition
+from venomqa.exploration import Transition
 
 # DSL (Journey definition)
 from venomqa.v1.dsl import Branch, Journey, Path, Step
