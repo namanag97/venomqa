@@ -453,20 +453,6 @@ class Agent:
             if action:
                 self.world.act(action)
 
-    def _check_invariants(
-        self,
-        state: State,
-        action: Action,
-        transition: Transition,
-    ) -> None:
-        """Check all POST_ACTION invariants and record violations.
-
-        Deprecated: Use _check_invariants_with_timing instead.
-        """
-        self._check_invariants_with_timing(
-            state, action, transition, InvariantTiming.POST_ACTION
-        )
-
     def _check_invariants_with_timing(
         self,
         state: State,
