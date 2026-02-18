@@ -10,7 +10,7 @@ v1 simplifies the API from ~300 exports to ~18 exports. The core concepts remain
 
 | Old API | v1 API |
 |---------|--------|
-| `from venomqa import Journey, JourneyRunner` | `from venomqa.v1 import Journey, explore` |
+| `from venomqa import Journey, JourneyRunner` | `from venomqa import Journey, explore` |
 | `StateManager` | `Rollbackable` protocol |
 | Multiple client types | `HttpClient` |
 | Complex configuration | Simple function arguments |
@@ -29,11 +29,11 @@ from venomqa import (
 
 **After:**
 ```python
-from venomqa.v1 import (
-    Journey, Step, Checkpoint, explore,
+from venomqa import (
+    Journey, Step, JourneyCheckpoint, explore,
     World, Agent, Invariant,
 )
-from venomqa.v1.adapters import (
+from venomqa.adapters import (
     HttpClient, PostgresAdapter, RedisAdapter,
 )
 ```
@@ -80,7 +80,7 @@ def login_action(api):
 
 Or using the decorator:
 ```python
-from venomqa.v1 import action
+from venomqa import action
 
 @action(name="login", description="Log in a user")
 def login(api):
@@ -100,7 +100,7 @@ class OrderCountInvariant(InvariantBase):
 
 **After:**
 ```python
-from venomqa.v1 import invariant, Severity
+from venomqa import invariant, Severity
 
 @invariant(
     name="order_count_matches",
@@ -118,7 +118,7 @@ def order_count_inv(world):
 If you have a custom StateManager, use the bridge:
 
 ```python
-from venomqa.v1.bridge import adapt_state_manager
+from venomqa.bridge import adapt_state_manager
 
 old_manager = MyLegacyStateManager()
 rollbackable = adapt_state_manager(old_manager, "db")
@@ -151,8 +151,8 @@ result = explore(
 
 Or with more control:
 ```python
-from venomqa.v1 import World, Agent, BFS
-from venomqa.v1.adapters import HttpClient, PostgresAdapter
+from venomqa import World, Agent, BFS
+from venomqa.adapters import HttpClient, PostgresAdapter
 
 api = HttpClient("http://localhost:8000")
 world = World(
@@ -179,7 +179,7 @@ You can use both APIs during migration:
 from venomqa import Journey as OldJourney
 
 # Convert when ready
-from venomqa.v1.bridge.journey import adapt_journey
+from venomqa.bridge.journey import adapt_journey
 
 old_journey = OldJourney(...)
 new_journey = adapt_journey(old_journey)
