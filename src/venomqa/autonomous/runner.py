@@ -248,8 +248,11 @@ class AutonomousRunner:
             from venomqa import Agent, World, DFS, BFS, CoverageGuided
             from venomqa.adapters import HttpClient
 
-            # Create World with API client
-            api = HttpClient(base_url=api_endpoint)
+            # Create World with API client (with auth headers if configured)
+            auth_headers = credentials.get_http_headers()
+            api = HttpClient(base_url=api_endpoint, headers=auth_headers)
+            if auth_headers:
+                self._log(f"       ✓ Auth headers configured", "green")
 
             # Try to set up database adapter for real rollback
             world_kwargs = {"api": api}
