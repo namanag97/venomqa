@@ -732,21 +732,19 @@ if __name__ == "__main__":
 
     result = agent.explore()
 
-    print()
-    print("=" * 60)
-    print("RESULTS")
-    print("=" * 60)
-    print(f"  States visited    : {result.states_visited}")
-    print(f"  Transitions       : {result.transitions_taken}")
-    print(f"  Action coverage   : {result.action_coverage_percent:.0f}%")
-    print(f"  Duration          : {result.duration_ms:.0f}ms")
-    print(f"  Violations        : {len(result.violations)}")
+    # --- Report results ---
+    from venomqa.reporters import ConsoleReporter, HTMLTraceReporter
 
-    if result.violations:
-        print()
-        print("VIOLATIONS FOUND:")
-        for v in result.violations:
-            print(f"  [{v.severity.value.upper()}] {v.invariant_name}")
+    # Console output (default)
+    ConsoleReporter().report(result)
+
+    # HTML trace (visual graph of exploration)
+    html = HTMLTraceReporter().report(result)
+    with open("exploration_trace.html", "w") as f:
+        f.write(html)
+    print()
+    print("HTML trace saved to: exploration_trace.html")
+    print("Open in browser to see the state graph visualization.")
             print(f"      {v.message}")
     else:
         print()
