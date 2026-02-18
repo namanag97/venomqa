@@ -38,6 +38,16 @@ venomqa --help
 venomqa demo              # Demo with planted bug
 venomqa doctor            # System diagnostics
 venomqa init              # Create project
+
+# Authentication (for APIs requiring auth)
+venomqa --api-key KEY           # X-API-Key header
+venomqa --auth-token TOKEN      # Bearer token
+venomqa --basic-auth user:pass  # Basic auth
+venomqa --skip-preflight        # Skip Docker/auth checks
+
+# Or use environment variables
+export VENOMQA_API_KEY=your-key
+export VENOMQA_AUTH_TOKEN=your-token
 ```
 
 ## Architecture
