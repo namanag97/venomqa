@@ -23,6 +23,7 @@ __all__ = [
     "ActionResult",
     "Transition",
     "Graph",
+    "Bug",
     "Invariant",
     "Violation",
     "Severity",
