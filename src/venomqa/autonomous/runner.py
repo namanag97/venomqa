@@ -183,6 +183,37 @@ class AutonomousRunner:
         if api_service:
             self._log(f"       ✓ Detected API service: {api_service.name}", "green")
 
+        # Check auth requirements from OpenAPI BEFORE starting anything
+        auth_requirements = detect_auth_from_openapi(openapi_path)
+        if auth_requirements:
+            auth_ok, fix_msg = check_auth_configured(auth_requirements, credentials)
+            if auth_ok:
+                self._log(
+                    f"       ✓ Auth configured ({credentials.auth_type.value})",
+                    "green",
+                )
+            else:
+                self._log(
+                    f"       ✗ API requires authentication",
+                    "red",
+                )
+                self._log("")
+                if self._console:
+                    from rich.panel import Panel
+                    self._console.print(Panel(
+                        fix_msg,
+                        title="[red]Authentication Required[/red]",
+                        border_style="red",
+                    ))
+                raise RuntimeError(
+                    "API requires authentication. See above for options."
+                )
+        elif credentials.has_api_auth():
+            self._log(
+                f"       ✓ Auth configured ({credentials.auth_type.value})",
+                "green",
+            )
+
         # Step 2: Run preflight checks
         self._log_step(2, 7, "Running preflight checks...")
         if not self._run_preflight(compose_path, openapi_path):
