@@ -34,15 +34,18 @@ from venomqa.v1.adapters.sqlite import SQLiteAdapter
 
 # Agent (exploration engine)
 from venomqa.v1.agent import Agent, Scheduler
-from venomqa.v1.agent.strategies import (
+
+# Exploration strategies (canonical location is venomqa.exploration)
+from venomqa.exploration import (
     BFS,
     DFS,
     CoverageGuided,
-    DimensionNoveltyStrategy,
+    ExplorationStrategy,
     Random,
     Strategy,
     Weighted,
 )
+from venomqa.v1.agent.dimension_strategy import DimensionNoveltyStrategy
 
 # Auth helpers
 from venomqa.v1.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
