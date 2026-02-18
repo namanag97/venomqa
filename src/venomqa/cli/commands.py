@@ -2486,6 +2486,12 @@ def generate(
 
         click.echo(f"\nSuccessfully generated {len(generated_files)} file(s)!")
 
+        # Show auth guidance if security schemes detected
+        if schema.security_schemes:
+            click.echo("\nNote: This API uses authentication.")
+            click.echo("  Set token in context: context.set('token', 'your-bearer-token')")
+            click.echo("  Or use CLI: venomqa run --auth-token YOUR_TOKEN")
+
     except OpenAPIParseError as e:
         click.echo(f"Error parsing OpenAPI specification: {e}", err=True)
         sys.exit(1)
