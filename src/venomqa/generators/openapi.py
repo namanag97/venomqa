@@ -794,10 +794,10 @@ class OpenAPIGenerator:
         path_code = f'"{endpoint.path}"'
         for param in endpoint.path_parameters:
             placeholder = f"{{{param.name}}}"
-            ctx_get = f'ctx.get("{param.name}")'
+            ctx_get = f'context.get("{param.name}")'
             if param.default is not None:
                 default = repr(param.default) if isinstance(param.default, str) else param.default
-                ctx_get = f'ctx.get("{param.name}", {default})'
+                ctx_get = f'context.get("{param.name}", {default})'
             path_code = f'{path_code}.replace("{placeholder}", str({ctx_get}))'
 
         if endpoint.path_parameters:
@@ -813,13 +813,13 @@ class OpenAPIGenerator:
                 if param.default is not None:
                     default = f'"{param.default}"' if isinstance(param.default, str) else param.default
                     query_lines.append(
-                        f'if ctx.get("{param.name}") is not None:\n'
-                        f'        params["{param.name}"] = ctx.get("{param.name}", {default})'
+                        f'if context.get("{param.name}") is not None:\n'
+                        f'        params["{param.name}"] = context.get("{param.name}", {default})'
                     )
                 else:
                     query_lines.append(
-                        f'if ctx.get("{param.name}") is not None:\n'
-                        f'        params["{param.name}"] = ctx.get("{param.name}")'
+                        f'if context.get("{param.name}") is not None:\n'
+                        f'        params["{param.name}"] = context.get("{param.name}")'
                     )
             query_params_code = "\n    ".join(query_lines)
 
@@ -837,7 +837,7 @@ class OpenAPIGenerator:
 
             for prop in properties:
                 default_val = prop.get_default_value()
-                body_lines.append(f'        "{prop.name}": ctx.get("{prop.name}", {default_val}),')
+                body_lines.append(f'        "{prop.name}": context.get("{prop.name}", {default_val}),')
 
             body_lines.append("    }")
             body_code = "\n".join(body_lines)
@@ -846,8 +846,8 @@ class OpenAPIGenerator:
         headers_code = ""
         if endpoint.requires_auth:
             headers_code = """headers = {}
-    if ctx.get("token"):
-        headers["Authorization"] = f"Bearer {ctx.get('token')}\""""
+    if context.get("token"):
+        headers["Authorization"] = f"Bearer {context.get('token')}\""""
 
         # Build the HTTP call
         method_lower = endpoint.method.lower()
