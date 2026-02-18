@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from venomqa import Checkpoint, Journey, Step
+from venomqa import JourneyCheckpoint as Checkpoint, Journey, Step
 from venomqa.http import Client
 
 
