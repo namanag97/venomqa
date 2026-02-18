@@ -159,6 +159,9 @@ from venomqa.v1.reporters.json import JSONReporter
 from venomqa.v1.reporters.junit import JUnitReporter
 from venomqa.v1.reporters.markdown import MarkdownReporter
 
+# Runtime context (service lifecycle)
+from venomqa.runtime import HealthStatus, Orchestrator, Service, ServiceType
+
 # Setup helpers (high-level API)
 from venomqa.v1.setup import connect_to_api, connect_to_app, connect_to_protocol, setup_from_config
 
