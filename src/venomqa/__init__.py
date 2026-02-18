@@ -151,13 +151,16 @@ from venomqa.v1.modes import (
 # Recording
 from venomqa.v1.recording import RecordedRequest, RequestRecorder, generate_journey_code
 
-# Reporters
-from venomqa.v1.reporters.console import ConsoleReporter
-from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
-from venomqa.v1.reporters.html_trace import HTMLTraceReporter
-from venomqa.v1.reporters.json import JSONReporter
-from venomqa.v1.reporters.junit import JUnitReporter
-from venomqa.v1.reporters.markdown import MarkdownReporter
+# Reporters (canonical location is venomqa.reporting)
+from venomqa.reporting import (
+    ConsoleReporter,
+    DimensionCoverageReporter,
+    HTMLTraceReporter,
+    JSONReporter,
+    JUnitReporter,
+    MarkdownReporter,
+    Reporter,
+)
 
 # Runtime context (service lifecycle)
 from venomqa.runtime import HealthStatus, Orchestrator, Service, ServiceType
