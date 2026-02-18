@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from venomqa import Branch, Checkpoint, Journey, Path, Step
+from venomqa import Branch, JourneyCheckpoint as Checkpoint, Journey, Path, Step
 from venomqa.http import Client
 from venomqa.http.websocket import AsyncWebSocketClient
 
