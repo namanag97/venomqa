@@ -142,17 +142,16 @@ class AutonomousRunner:
         from venomqa.autonomous.discovery import ProjectDiscovery
         from venomqa.autonomous.isolated_infra import IsolatedInfrastructureManager
         from venomqa.autonomous.invariants import create_default_invariants
+        from venomqa.autonomous.auth_detection import (
+            detect_auth_from_openapi,
+            check_auth_configured,
+        )
 
         self._log("\n [bold cyan]VenomQA - Autonomous API Testing[/bold cyan]")
         self._log(" " + "─" * 40)
 
         # Step 0: Load credentials
         credentials = self._load_credentials()
-        if credentials.has_api_auth():
-            self._log(
-                f"       ✓ Auth configured ({credentials.auth_type.value})",
-                "green",
-            )
 
         # Step 1: Discover project structure
         self._log_step(1, 7, "Discovering project structure...")
