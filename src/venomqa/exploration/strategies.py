@@ -143,6 +143,10 @@ class BFS(BaseStrategy):
         for action in actions:
             self._frontier.add(state.id, action.name)
 
+    def enqueue(self, state: State, actions: list[Action]) -> None:
+        """Backward compatibility alias for notify."""
+        self.notify(state, actions)
+
 
 class DFS(BaseStrategy):
     """Depth-first search strategy.
