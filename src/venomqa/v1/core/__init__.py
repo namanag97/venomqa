@@ -11,7 +11,7 @@ This module contains the fundamental data structures:
 
 from venomqa.v1.core.action import Action, ActionResult
 from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import Invariant, Severity, Violation
+from venomqa.v1.core.invariant import Bug, Invariant, Severity, Violation
 from venomqa.v1.core.result import ExplorationResult
 from venomqa.v1.core.state import Observation, State
 from venomqa.v1.core.transition import Transition
