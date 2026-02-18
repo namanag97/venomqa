@@ -89,7 +89,8 @@ from venomqa.v1.core.dimensions import (
     UsageClass,
     UserRole,
 )
-from venomqa.v1.core.graph import Graph
+# Exploration types (canonical location is venomqa.exploration)
+from venomqa.exploration import Graph
 from venomqa.v1.core.hyperedge import Hyperedge
 from venomqa.v1.core.hypergraph import Hypergraph
 from venomqa.v1.core.invariant import (
