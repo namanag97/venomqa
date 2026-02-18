@@ -16,6 +16,11 @@ What happens:
     7. Tears down containers
 """
 
+from venomqa.autonomous.auth_detection import (
+    AuthRequirement,
+    check_auth_configured,
+    detect_auth_from_openapi,
+)
 from venomqa.autonomous.credentials import AuthType, CredentialLoader, Credentials
 from venomqa.autonomous.discovery import ProjectDiscovery
 from venomqa.autonomous.preflight import (
@@ -37,6 +42,10 @@ __all__ = [
     "AuthType",
     "Credentials",
     "CredentialLoader",
+    # Auth Detection
+    "AuthRequirement",
+    "detect_auth_from_openapi",
+    "check_auth_configured",
     # Preflight
     "CheckResult",
     "PreflightCheckResult",
