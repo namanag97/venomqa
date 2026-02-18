@@ -1697,18 +1697,10 @@ the same starting point, it must ROLLBACK the database between branches.
 """)
         console.print("=" * 70)
 
-    console.print("\n[bold]Next steps:[/bold]")
-    console.print("  [bold red]1. Set up database rollback first![/bold red] (see above)")
-    console.print(f"  2. Edit [cyan]{base}/venomqa.yaml[/cyan] — set base_url and db_url")
-    console.print(f"  3. Write actions in [cyan]{base}/actions/[/cyan]")
-    console.print("  4. Write invariants and run [cyan]Agent.explore()[/cyan]")
-
     if with_sample:
-        console.print("\n[bold]Run the sample exploration:[/bold]")
-        console.print(f"  python3 {base}/journeys/sample_journey.py")
+        console.print(f"\n[bold]Next:[/bold]  python3 {base}/journeys/sample_journey.py")
     else:
-        console.print("\n[bold]Generate sample files:[/bold]")
-        console.print(f"  venomqa init --force --with-sample -p {base}")
+        console.print(f"\n[bold]Next:[/bold]  venomqa init --with-sample")
 
     console.print(
         f"\n[bold cyan]AI assistant?[/bold cyan] Paste [cyan]{base}/llm-context.md[/cyan] "
