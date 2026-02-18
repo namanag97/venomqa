@@ -6,7 +6,7 @@ Demonstrates:
 - Inventory reconciliation
 """
 
-from venomqa import Branch, Checkpoint, Journey, Path, Step
+from venomqa import Branch, JourneyCheckpoint as Checkpoint, Journey, Path, Step
 from venomqa.http import Client
 
 
