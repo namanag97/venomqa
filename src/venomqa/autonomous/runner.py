@@ -146,8 +146,16 @@ class AutonomousRunner:
         self._log("\n [bold cyan]VenomQA - Autonomous API Testing[/bold cyan]")
         self._log(" " + "─" * 40)
 
+        # Step 0: Load credentials
+        credentials = self._load_credentials()
+        if credentials.has_api_auth():
+            self._log(
+                f"       ✓ Auth configured ({credentials.auth_type.value})",
+                "green",
+            )
+
         # Step 1: Discover project structure
-        self._log_step(1, 6, "Discovering project structure...")
+        self._log_step(1, 7, "Discovering project structure...")
 
         self._discovery = ProjectDiscovery(self.project_dir)
 
