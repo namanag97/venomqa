@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-02-18
+
+### Fixed
+
+- **`venomqa init` no longer runs preflight checks** — Users can scaffold a project without needing a database running. Preflight checks still run on `venomqa run` and `venomqa demo`.
+
+- **Sample journey template syntax error** — Fixed `IndentationError` in generated `sample_journey.py` caused by orphaned code block.
+
+- **Docker compose path resolution** — `docker_compose_file` paths in `venomqa.yaml` now resolve relative to the config file location, not the current directory.
+
+- **OpenAPI generator duplicate function names** — `GET /items` and `GET /items/{id}` now generate unique names (`get_items` vs `get_item_by_id`).
+
+- **OpenAPI generator removed @action decorator** — Generated code no longer uses undefined `@action` decorator. VenomQA uses `Action(execute=fn)` pattern.
+
+- **GraphQL command shows helpful message** — `venomqa generate-graphql` now shows "not yet available" with a workaround instead of crashing with `ModuleNotFoundError`.
+
+### Added
+
+- **Security scheme detection** — `venomqa generate --from-openapi` now detects and displays OpenAPI security schemes, with guidance on how to pass auth tokens.
+
+## [0.6.0] - 2026-02-18
+
+### Added
+
+- **Hypergraph exploration system** — Multi-dimensional state coverage with `DimensionNoveltyStrategy` and `DimensionCoverageReporter`.
+
+- **HTMLTraceReporter** — Interactive D3 force graph visualization of exploration traces.
+
+- **RequestRecorder** — Record HTTP requests and generate journey code from real API interactions.
+
 ## [0.5.0] - 2026-02-17
 
 ### Added
