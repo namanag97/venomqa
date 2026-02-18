@@ -101,6 +101,11 @@ class BFS(BaseStrategy):
         self._frontier = QueueFrontier()
         self._initialized = False
 
+    @property
+    def _queue(self) -> deque:
+        """Backward compatibility: expose internal queue."""
+        return self._frontier._queue
+
     def pick(self, graph: Graph) -> tuple[State, Action] | None:
         # Initialize frontier with initial state actions
         if not self._initialized:
