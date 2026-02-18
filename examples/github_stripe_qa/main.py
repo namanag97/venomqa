@@ -31,11 +31,10 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from venomqa.v1 import Agent, World
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.mock_queue import MockQueue
-from venomqa.v1.core.action import Action
-from venomqa.v1.agent.strategies import BFS
+from venomqa import Agent, World
+from venomqa.adapters.http import HttpClient
+from venomqa.core.action import Action
+from venomqa.agent.strategies import BFS
 from stripe_proxy import StripeProxy
 from api_observers import GitHubObserver, StripeObserver
 
