@@ -326,6 +326,7 @@ __all__ = [
     "Strategy",
     "BFS",
     "DFS",
+    "MCTS",
     "Random",
     "CoverageGuided",
     "Weighted",
