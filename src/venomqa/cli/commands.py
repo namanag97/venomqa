@@ -1482,16 +1482,13 @@ def _send_notifications(
     "--with-sample", "-s", is_flag=True, help="Include sample journey and actions"
 )
 @click.option(
-    "--skip-checks", is_flag=True, help="Skip preflight checks"
-)
-@click.option(
     "--update", "-u", is_flag=True, help="Update framework files only (llm-context.md, README.md) — preserves your actions/journeys"
 )
 @click.option(
     "--yes", "-y", is_flag=True, help="Skip interactive setup, use defaults"
 )
 @click.pass_context
-def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, skip_checks: bool, update: bool, yes: bool) -> None:
+def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, update: bool, yes: bool) -> None:
     """Initialize a new VenomQA project.
 
     \b
