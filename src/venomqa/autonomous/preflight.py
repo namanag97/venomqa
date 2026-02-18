@@ -75,60 +75,16 @@ class PreflightReport:
         self.checks.append(check)
 
 
-# Common fix suggestions (pattern from cli/doctor.py)
+# Simple fix commands - ONE action each
 FIXES = {
-    "docker_not_installed": (
-        "Docker is not installed.\n\n"
-        "Install Docker:\n"
-        "  macOS: brew install --cask docker\n"
-        "  Linux: https://docs.docker.com/engine/install/\n"
-        "  Windows: https://docs.docker.com/desktop/install/windows-install/"
-    ),
-    "docker_not_running": (
-        "Docker daemon is not running.\n\n"
-        "Start Docker:\n"
-        "  macOS/Windows: Open Docker Desktop\n"
-        "  Linux: sudo systemctl start docker"
-    ),
-    "compose_not_found": (
-        "Docker Compose not found.\n\n"
-        "Docker Compose v2 is included with Docker Desktop.\n"
-        "For standalone install:\n"
-        "  https://docs.docker.com/compose/install/"
-    ),
-    "compose_invalid": (
-        "docker-compose.yml has syntax errors.\n\n"
-        "Validate with:\n"
-        "  docker compose config"
-    ),
-    "openapi_invalid": (
-        "OpenAPI spec is invalid or missing required fields.\n\n"
-        "Ensure your spec has:\n"
-        "  - 'openapi' or 'swagger' version field\n"
-        "  - 'paths' with at least one endpoint"
-    ),
-    "api_not_reachable": (
-        "API is not responding at the expected URL.\n\n"
-        "VenomQA will start the API via docker-compose.\n"
-        "This check can be skipped."
-    ),
-    "api_auth_required": (
-        "API requires authentication (401 Unauthorized).\n\n"
-        "Provide auth via:\n"
-        "  --auth-token TOKEN    # Bearer token\n"
-        "  --api-key KEY         # API key\n"
-        "  --basic-auth user:pass\n\n"
-        "Or set environment variables:\n"
-        "  VENOMQA_AUTH_TOKEN=...\n"
-        "  VENOMQA_API_KEY=..."
-    ),
-    "db_connection_failed": (
-        "Could not connect to the database.\n\n"
-        "Check docker-compose.yml for database credentials:\n"
-        "  POSTGRES_PASSWORD, POSTGRES_USER, etc.\n\n"
-        "Or override with:\n"
-        "  --db-password PASSWORD"
-    ),
+    "docker_not_installed": "Install Docker Desktop: https://docker.com/get-started",
+    "docker_not_running": "Open Docker Desktop",
+    "compose_not_found": "Install Docker Desktop (includes Compose)",
+    "compose_invalid": "Fix syntax: docker compose config",
+    "openapi_invalid": "Add 'openapi: 3.0.0' and 'paths:' to your spec",
+    "api_not_reachable": "VenomQA will start it. Use --skip-preflight to continue.",
+    "api_auth_required": "venomqa --api-key YOUR_KEY",
+    "db_connection_failed": "venomqa --db-password YOUR_PASSWORD",
 }
 
 
