@@ -1,231 +1,203 @@
 # VenomQA Examples
 
-Welcome to the VenomQA examples directory! This guide helps you find the right example to start with based on your needs.
+This directory contains working examples demonstrating VenomQA's capabilities.
 
-## Which Example Should I Use?
+## Quick Start
 
+### Fastest Way to See VenomQA
+
+```bash
+# No setup required - uses mock servers
+venomqa demo
 ```
-New to VenomQA?
-    │
-    ▼
-quickstart/         ← First experience (<2 min)
-    │
-    ▼
-Want to learn patterns?
-    │
-    ▼
-todo_app/           ← Learn actions, journeys, branching (<5 min)
-    │
-    ▼
-Need all features?
-    │
-    ▼
-full_featured_app/  ← All ports, enterprise patterns (<10 min)
-    │
-    ▼
-Integrating with a platform?
-    │
-    ▼
-integrations/       ← Real-world integration examples
+
+This runs a self-contained demo that finds a real bug in 30 seconds.
+
+### Run a Working Example
+
+```bash
+# Self-contained, no external dependencies
+python3 examples/v1_quickstart/with_mock_systems.py
+
+# Or run the full github_stripe_qa suite
+pytest examples/github_stripe_qa/
 ```
 
 ## Examples Overview
 
-| Example | Time | Best For |
-|---------|------|----------|
-| **quickstart/** | 2 min | Your first VenomQA experience |
-| **todo_app/** | 5 min | Learning journeys, checkpoints, branches |
-| **full_featured_app/** | 10 min | All VenomQA features, enterprise patterns |
-| **integrations/medusa/** | 10 min | E-commerce platform integration |
+| Example | Works Out of Box | Description |
+|---------|-----------------|-------------|
+| **v1_quickstart/** | YES | Basic VenomQA patterns with mock systems |
+| **github_stripe_qa/** | YES | Full example with 2 planted bugs |
+| **v1/** | YES | Tests against real GitHub API |
+| **subscriptions_qa/** | Needs Docker | PostgreSQL + Redis, 3 planted bugs |
+| **full_featured_app/** | Needs Docker | Enterprise patterns, all adapters |
 
-## Quick Start
+## v1_quickstart/ (Start Here)
 
-### Option 1: Quickstart (Fastest)
-
-```bash
-cd examples/quickstart
-pip install venomqa
-venomqa run hello_journey
-```
-
-### Option 2: Todo App (Most Educational)
+Two files demonstrating core concepts:
 
 ```bash
-cd examples/todo_app
-docker compose up -d
-cd qa
-venomqa run
+# Works immediately - uses mock adapters
+python3 examples/v1_quickstart/with_mock_systems.py
+
+# Requires running API server
+python3 examples/v1_quickstart/simple_test.py
 ```
 
-See the [todo_app README](./todo_app/README.md) for complete instructions.
+**`with_mock_systems.py`** shows:
+- Actions with `(api, context)` signature
+- Invariants that check state
+- MockMail, MockStorage, MockTime adapters
+- BFS exploration
 
-## What Each Example Demonstrates
+## github_stripe_qa/ (Best Full Example)
 
-### quickstart/
-
-Your first VenomQA experience in under 2 minutes:
-
-- **Minimal setup** - Just pip install and run
-- **Hello World journey** - See the core concepts
-- **Clean code structure** - Actions and journeys organized
-- **Real API patterns** - Health checks, CRUD operations
-
-Perfect for: Getting started quickly, understanding the basics.
-
-**See**: [quickstart/qa/journeys/hello_journey.py](./quickstart/qa/journeys/hello_journey.py)
-
-### todo_app/
-
-A complete, production-ready example:
-
-- **Flask REST API** with CRUD operations
-- **File upload/download** handling
-- **PostgreSQL** database integration
-- **Journey tests** with checkpoints and branches
-- **Error handling** and validation testing
-- **Docker Compose** for local development
-
-Perfect for: Understanding how to structure a VenomQA project.
-
-**See**: [todo_app/README.md](./todo_app/README.md)
-
-### full_featured_app/
-
-An enterprise example demonstrating ALL VenomQA capabilities:
-
-- **All 10 VenomQA ports** (Client, Database, State, File, Mail, Queue, Cache, Search, WebSocket, Time)
-- **FastAPI** application (more advanced than Flask)
-- **Real-time** communication with WebSocket
-- **Background jobs** with Celery
-- **Email testing** with Mailhog
-- **Caching** with Redis
-- **Search** with Elasticsearch
-- **Rate limiting** and webhooks
-
-Perfect for: Advanced patterns and understanding how different ports work together.
-
-**See**: [full_featured_app/README.md](./full_featured_app/README.md)
-
-### integrations/medusa/
-
-Real-world e-commerce platform integration:
-
-- **Medusa JS** e-commerce backend testing
-- **Customer authentication** flows
-- **Cart management** and checkout
-- **Order processing** with branching paths
-- **Production-like** test scenarios
-
-Perfect for: Seeing how VenomQA integrates with real platforms.
-
-**See**: [integrations/medusa/README.md](./integrations/medusa/README.md)
-
-## Project Structure
-
-```
-examples/
-├── quickstart/              # START HERE - 2 minute intro
-│   ├── app/                 # Simple API server
-│   └── qa/
-│       ├── actions/         # Reusable action functions
-│       └── journeys/        # Test journeys
-│
-├── todo_app/                # NEXT - complete Flask example
-│   ├── app/                 # Flask REST API
-│   ├── docker-compose.yml   # Docker setup
-│   └── qa/
-│       ├── actions/         # CRUD actions
-│       └── journeys/        # Comprehensive journeys
-│
-├── full_featured_app/       # ADVANCED - all features
-│   ├── app/                 # FastAPI application
-│   ├── docker/              # Full stack Compose
-│   └── qa/                  # All port examples
-│
-├── integrations/            # PLATFORM INTEGRATIONS
-│   └── medusa/              # E-commerce platform
-│       ├── qa/              # Integration tests
-│       └── README.md
-│
-├── test-server/             # Mock server for testing
-│   └── test_server.py       # Runnable FastAPI server
-│
-├── seeds/                   # Data seeding examples
-├── plugins/                 # Custom plugin examples
-└── README.md                # This file
-```
-
-## Running Examples
-
-### With Docker (Recommended)
+Complete QA setup with planted bugs that VenomQA finds:
 
 ```bash
-cd examples/<example_name>
-docker compose up -d          # Start app
-cd qa
-venomqa run                   # Run tests
+# Run all 15 tests
+pytest examples/github_stripe_qa/
+
+# Or run the main exploration script
+python3 examples/github_stripe_qa/main.py
 ```
 
-### Without Docker
+**Planted Bugs:**
+1. GitHub open-issues endpoint leaks closed issues
+2. Stripe allows over-refunds (refund > original amount)
+
+**Demonstrates:**
+- MockHTTPServer pattern for in-process mock APIs
+- Real checkpoint/rollback for state exploration
+- Focused sub-explorations for efficiency
+- Bug detection through BFS
+
+## v1/ (Real API Testing)
+
+Tests against the real GitHub public API:
 
 ```bash
-cd examples/<example_name>
-pip install -r requirements.txt
-python -m app.app             # Start app
-cd qa
-venomqa run                   # Run tests
+python3 examples/v1/test_github_api.py
 ```
 
-## Common Tasks
+**Demonstrates:**
+- Custom Rollbackable adapter for read-only APIs
+- Data structure validation invariants
+- Mermaid diagram generation
 
-### Learning VenomQA
+## subscriptions_qa/ (Requires Docker)
 
-1. Start with `quickstart/` to see the basics
-2. Move to `todo_app/` for real-world patterns
-3. Study `full_featured_app/` for advanced features
+SaaS subscription management with 3 planted bugs:
 
-### Writing Your Own Tests
+```bash
+# Start services
+docker compose -f examples/subscriptions_qa/docker-compose.yml up -d
 
-1. Copy the structure from `todo_app/qa/`
-2. Create `actions/` folder for reusable functions
-3. Create `journeys/` folder for test scenarios
-4. Add `venomqa.yaml` for configuration
+# Run tests
+pytest examples/subscriptions_qa/
+```
 
-### Integrating with Your Platform
+**Requires:** PostgreSQL, Redis
 
-1. Check `integrations/` for similar platforms
-2. Copy the structure and adapt to your API
-3. Use actions from your closest match as templates
+**Demonstrates:**
+- PostgresAdapter for database rollback
+- RedisAdapter for cache rollback
+- MockMail, MockQueue, MockStorage, MockTime
+- All adapter types working together
+
+## full_featured_app/ (Requires Docker)
+
+Enterprise patterns with all VenomQA features:
+
+```bash
+# Start services
+docker compose -f examples/full_featured_app/docker/docker-compose.yml up -d
+
+# Run tests
+python3 examples/full_featured_app/qa/test_full_app_v1.py
+```
+
+**Demonstrates:**
+- Full stack testing (API + PostgreSQL)
+- Multiple system adapters
+- Production-like patterns
+
+## Writing Your Own Tests
+
+### Basic Pattern
+
+```python
+from venomqa import Action, Invariant, Agent, World, BFS, Severity
+from venomqa.adapters import HttpClient
+
+# 1. Define actions
+def create_user(api, context):
+    return api.post("/users", json={"name": "Test"})
+
+def get_user(api, context):
+    user_id = context.get("user_id")
+    return api.get(f"/users/{user_id}")
+
+# 2. Define invariants
+def no_500_errors(world):
+    return True  # Check something meaningful
+
+# 3. Set up world and agent
+api = HttpClient("http://localhost:8000")
+world = World(api=api, state_from_context=["user_id"])
+
+agent = Agent(
+    world=world,
+    actions=[
+        Action(name="create_user", execute=create_user),
+        Action(name="get_user", execute=get_user),
+    ],
+    invariants=[
+        Invariant(name="no_500", check=no_500_errors, severity=Severity.CRITICAL)
+    ],
+    strategy=BFS(),
+    max_steps=50,
+)
+
+result = agent.explore()
+print(f"Violations: {len(result.violations)}")
+```
+
+### With Database Rollback
+
+```python
+from venomqa.adapters.postgres import PostgresAdapter
+
+db = PostgresAdapter("postgresql://user:pass@localhost/dbname")
+world = World(api=api, systems={"db": db})
+```
 
 ## Troubleshooting
-
-### Services Won't Start
-
-```bash
-docker compose logs app
-docker compose down -v
-docker compose up -d
-```
 
 ### Import Errors
 
 ```bash
-pip install -e ../../..
-python -c "import venomqa; print(venomqa.__version__)"
+pip install -e .
+python3 -c "import venomqa; print(venomqa.__version__)"
 ```
 
-### Tests Failing
+### Docker Services
 
 ```bash
-curl http://localhost:PORT/health  # Check app is running
-venomqa run --verbose              # Get detailed output
+docker compose logs
+docker compose down -v && docker compose up -d
+```
+
+### Tests Timing Out
+
+```bash
+curl http://localhost:PORT/health  # Check API is running
 ```
 
 ## Next Steps
 
-After exploring the examples:
-
-1. **Read the docs**: See `/docs/` in the root directory
-2. **Build your journey**: Follow patterns from todo_app
-3. **Set up CI/CD**: Check `/docs/ci-cd.md`
-4. **Join the community**: See CONTRIBUTING.md
+1. Run `venomqa demo` to see bug detection in action
+2. Study `github_stripe_qa/` for the best complete example
+3. Read `docs_v1/guides/quickstart.md` for detailed guides
+4. Check `src/venomqa/v1/` for the framework implementation
