@@ -777,7 +777,7 @@ class OpenAPIGenerator:
         imports: set[str] = {"from typing import Any"}
 
         # Build function signature
-        params = ["client: Client", "ctx: Context"]
+        params = ["api: HttpClient", "context: Context"]
 
         # Build docstring
         docstring_parts = []
