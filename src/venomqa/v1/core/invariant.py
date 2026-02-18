@@ -136,8 +136,62 @@ class ResponseAssertion:
 
 
 @dataclass
+class Bug:
+    """Structured bug description with expected vs actual behavior.
+
+    A Bug captures the semantic meaning of a failure, making it clear
+    what was expected and what actually happened. This is used by
+    Violation to provide structured bug information alongside the
+    free-text message.
+
+    Example::
+
+        bug = Bug(
+            expected="Refund amount should never exceed charge amount",
+            actual="Refunded $150 on a $100 charge",
+            category="over-refund",
+        )
+        violation = Violation.create(invariant, state, bug=bug)
+
+    Attributes:
+        expected: What the system should have done.
+        actual: What the system actually did.
+        category: Optional category for grouping similar bugs
+            (e.g., "data-leak", "over-refund", "auth-bypass").
+    """
+
+    expected: str
+    actual: str
+    category: str = ""
+
+    @property
+    def description(self) -> str:
+        """Human-readable one-line description."""
+        return f"Expected: {self.expected} | Actual: {self.actual}"
+
+    def __str__(self) -> str:
+        return self.description
+
+
+@dataclass
 class Violation:
-    """A failed invariant check."""
+    """A failed invariant check.
+
+    Violations record both a free-text message and optional structured
+    Bug data with expected/actual fields for programmatic analysis.
+
+    Attributes:
+        id: Unique identifier for this violation.
+        invariant_name: Name of the invariant that was violated.
+        state: The state in which the violation occurred.
+        message: Free-text description of the violation.
+        severity: How serious this violation is.
+        action: The action that caused the violation (if any).
+        action_result: The result of the action (if any).
+        reproduction_path: Sequence of transitions to reproduce.
+        timestamp: When the violation was detected.
+        bug: Structured bug info with expected/actual fields.
+    """
 
     id: str
     invariant_name: str
@@ -148,6 +202,7 @@ class Violation:
     action_result: ActionResult | None = None
     reproduction_path: list[Transition] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)
+    bug: Bug | None = None
 
     @classmethod
     def create(
@@ -158,18 +213,47 @@ class Violation:
         reproduction_path: list[Transition] | None = None,
         action_result: ActionResult | None = None,
         message_override: str = "",
+        bug: Bug | None = None,
     ) -> Violation:
-        """Create a violation from an invariant and state."""
+        """Create a violation from an invariant and state.
+
+        Args:
+            invariant: The invariant that was violated.
+            state: The state in which the violation occurred.
+            action: The action that triggered the violation.
+            reproduction_path: Sequence of transitions to reproduce.
+            action_result: The result of the triggering action.
+            message_override: Override the invariant's default message.
+            bug: Optional structured bug with expected/actual fields.
+
+        Returns:
+            A new Violation instance.
+        """
+        message = message_override or invariant.message
+        # If bug is provided but no message, derive message from bug
+        if bug and not message:
+            message = bug.description
         return cls(
             id=f"v_{uuid.uuid4().hex[:12]}",
             invariant_name=invariant.name,
             state=state,
-            message=message_override or invariant.message,
+            message=message,
             severity=invariant.severity,
             action=action,
             action_result=action_result,
             reproduction_path=reproduction_path or [],
+            bug=bug,
         )
+
+    @property
+    def expected(self) -> str | None:
+        """What was expected (from the bug, if set)."""
+        return self.bug.expected if self.bug else None
+
+    @property
+    def actual(self) -> str | None:
+        """What actually happened (from the bug, if set)."""
+        return self.bug.actual if self.bug else None
 
     @property
     def is_critical(self) -> bool:
