@@ -123,6 +123,10 @@ from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
 from venomqa.v1.dsl.compiler import compile as compile_journey
 from venomqa.v1.dsl.decorators import action, invariant
 
+# Discovery context (OpenAPI parsing)
+from venomqa.discovery import OpenAPISpec
+from venomqa.discovery.endpoint import CrudType, Endpoint
+
 # Generators (OpenAPI action generation)
 from venomqa.v1.generators.openapi_actions import (
     generate_actions,
