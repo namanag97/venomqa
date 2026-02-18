@@ -474,27 +474,22 @@ def cli(
                 # Exit with error if violations found
                 sys.exit(EXIT_FAILURE if result.violations else EXIT_SUCCESS)
 
-            # Missing files - show specific guidance
+            # Missing files - show ONE clear next step
             console.print()
-            console.print("[bold cyan]VenomQA[/bold cyan] — Autonomous API Testing\n")
 
             if has_compose and not has_openapi:
                 console.print("[green]✓[/green] Found docker-compose.yml")
-                console.print("[red]✗[/red] Missing openapi.yaml (or swagger.json)\n")
-                console.print("VenomQA needs your API spec to generate test actions.\n")
-                console.print("[bold]To get your OpenAPI spec:[/bold]")
-                console.print("  • Export from Swagger UI (usually at /api-docs)")
-                console.print("  • Ask your backend team")
-                console.print("  • Generate: [cyan]venomqa generate --from-url http://localhost:8000[/cyan]")
+                console.print("[red]✗[/red] Missing openapi.yaml\n")
+                console.print("[bold]Next:[/bold]  Add openapi.yaml to this directory")
+                console.print("[dim]       Export from Swagger UI, or ask your backend team[/dim]")
                 console.print()
                 sys.exit(EXIT_CONFIG_ERROR)
 
             elif has_openapi and not has_compose:
                 console.print("[red]✗[/red] Missing docker-compose.yml")
                 console.print("[green]✓[/green] Found OpenAPI spec\n")
-                console.print("VenomQA needs docker-compose.yml to understand your stack.\n")
-                console.print("[bold]Quick fix:[/bold]")
-                console.print("  [cyan]venomqa init[/cyan]  — creates a template\n")
+                console.print("[bold]Next:[/bold]  [green]venomqa init[/green]")
+                console.print()
                 sys.exit(EXIT_CONFIG_ERROR)
 
             # Neither file - fall through to intro
