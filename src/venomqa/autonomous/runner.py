@@ -81,6 +81,58 @@ class AutonomousRunner:
         """Log a step in the process."""
         self._log(f"\n [{step}/{total}] {message}", "bold cyan")
 
+    def _load_credentials(self) -> "Credentials":
+        """Load credentials from all sources."""
+        if self._credentials:
+            return self._credentials
+
+        from venomqa.autonomous.credentials import CredentialLoader
+
+        loader = CredentialLoader(
+            auth_token=self._auth_token,
+            api_key=self._api_key,
+            basic_auth=self._basic_auth,
+            db_password=self._db_password,
+            project_dir=self.project_dir,
+        )
+        return loader.load()
+
+    def _run_preflight(
+        self, compose_path: Path | None, openapi_path: Path | None
+    ) -> bool:
+        """Run preflight checks. Returns True if all passed."""
+        if self.skip_preflight:
+            self._log("       (skipping preflight checks)", "dim")
+            return True
+
+        from venomqa.autonomous.preflight import (
+            PreflightRunner,
+            display_preflight_report,
+        )
+
+        credentials = self._load_credentials()
+
+        runner = PreflightRunner(
+            compose_path=compose_path,
+            openapi_path=openapi_path,
+            credentials=credentials,
+        )
+
+        report = runner.run_all()
+
+        if self.verbose:
+            display_preflight_report(report)
+
+        if not report.passed:
+            self._log("\n[red]Preflight checks failed.[/red]", "")
+            self._log(
+                "Fix the issues above or use --skip-preflight to proceed anyway.\n",
+                "dim",
+            )
+            return False
+
+        return True
+
     def run(self) -> "ExplorationResult":
         """Run autonomous exploration.
 
