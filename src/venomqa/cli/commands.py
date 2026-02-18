@@ -1461,9 +1461,10 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
     else:
         console.print(f"[bold]Initializing VenomQA project in '{base}/'[/bold]\n")
 
-    # Run interactive setup unless --yes flag is used or in update mode
+    # Run interactive setup unless --yes flag is used, --with-sample, or in update mode
+    # --with-sample implies --yes for smoother onboarding
     setup_config = None
-    if not yes and not update:
+    if not yes and not with_sample and not update:
         setup_config = _run_interactive_setup(console)
 
     # Generate config files based on interactive setup
