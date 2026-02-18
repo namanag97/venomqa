@@ -1607,9 +1607,27 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
         (base / "README.md", _get_readme_template(base_path)),
     ]
 
+    # .env.example with all VenomQA environment variables
+    env_example = """# VenomQA Environment Variables
+# Copy this file to .env and fill in your values:
+#   cp .env.example .env
+
+# API Authentication (choose one)
+# VENOMQA_API_KEY=your-api-key-here
+# VENOMQA_AUTH_TOKEN=your-bearer-token-here
+# VENOMQA_BASIC_AUTH=username:password
+
+# Database password (if different from docker-compose default)
+# VENOMQA_DB_PASSWORD=your-db-password
+
+# API Key header name (default: X-API-Key)
+# VENOMQA_API_KEY_HEADER=X-API-Key
+"""
+
     user_files = [
         (base / "venomqa.yaml", yaml_content),
         (base / "docker-compose.qa.yml", docker_content),
+        (base / ".env.example", env_example),
         (base / "actions" / "__init__.py", ACTIONS_INIT_PY),
         (base / "fixtures" / "__init__.py", FIXTURES_INIT_PY),
         (base / "journeys" / "__init__.py", JOURNEYS_INIT_PY),
