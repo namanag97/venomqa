@@ -63,9 +63,14 @@ STRIPE_PORT = 8102
 
 
 def build_actions() -> list[Action]:
-    """Wrap bare functions as VenomQA Action objects."""
+    """Wrap bare functions as VenomQA Action objects.
+
+    Note: preconditions define action ordering constraints.
+    VenomQA only runs an action if ALL its preconditions have succeeded.
+    """
     return [
         # --- GitHub ---------------------------------------------------------
+        # Dependency chain: create_user -> create_repo -> create_issue -> close_issue
         Action(
             name="create_user",
             execute=create_user,
@@ -78,6 +83,7 @@ def build_actions() -> list[Action]:
             execute=create_repo,
             description="Create a repository owned by the current user",
             tags=["github", "write"],
+            preconditions=["create_user"],  # Must have a user first
         ),
         Action(
             name="list_repos",
@@ -85,32 +91,38 @@ def build_actions() -> list[Action]:
             description="List repositories for the current user",
             tags=["github", "read"],
             expected_status=[200],
+            preconditions=["create_user"],
         ),
         Action(
             name="create_issue",
             execute=create_issue,
             description="Open a new issue in the current repo",
             tags=["github", "write"],
+            preconditions=["create_repo"],  # Must have a repo first
         ),
         Action(
             name="list_open_issues",
             execute=list_open_issues,
             description="List open issues for the current repo",
             tags=["github", "read"],
+            preconditions=["create_repo"],
         ),
         Action(
             name="close_issue",
             execute=close_issue,
             description="Close the most recently created issue",
             tags=["github", "write"],
+            preconditions=["create_issue"],  # Must have an issue first
         ),
         Action(
             name="delete_repo",
             execute=delete_repo,
             description="Delete the current repo",
             tags=["github", "write"],
+            preconditions=["create_repo"],
         ),
         # --- Stripe ---------------------------------------------------------
+        # Dependency chain: create_customer -> create_payment_intent -> confirm -> refund
         Action(
             name="create_customer",
             execute=create_customer,
@@ -124,24 +136,28 @@ def build_actions() -> list[Action]:
             description="Create a $10 PaymentIntent for the current customer",
             tags=["stripe", "write"],
             expected_status=[201],
+            preconditions=["create_customer"],
         ),
         Action(
             name="confirm_payment",
             execute=confirm_payment,
             description="Confirm the current PaymentIntent",
             tags=["stripe", "write"],
+            preconditions=["create_payment_intent"],
         ),
         Action(
             name="create_refund",
             execute=create_refund,
             description="Issue a refund (2× original amount) — probes over-refund bug",
             tags=["stripe", "write"],
+            preconditions=["confirm_payment"],  # Must confirm before refund
         ),
         Action(
             name="get_payment_intent",
             execute=get_payment_intent,
             description="Retrieve the current PaymentIntent state",
             tags=["stripe", "read"],
+            preconditions=["create_payment_intent"],
         ),
     ]
 
