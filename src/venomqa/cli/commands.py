@@ -3115,6 +3115,10 @@ def security_scan(
         sarif    - SARIF format for GitHub Code Scanning integration
         markdown - Markdown report for documentation
     """
+    # TODO: security-scan module not yet implemented
+    click.echo("security-scan: Coming soon. Use 'venomqa demo' to see VenomQA in action.", err=True)
+    sys.exit(EXIT_FAILURE)
+
     from venomqa import Client
     from venomqa.cli.output import CLIOutput, ProgressConfig
     from venomqa.domains.security import ScanConfig, SecurityScanner
