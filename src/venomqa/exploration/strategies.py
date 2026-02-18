@@ -311,6 +311,259 @@ class Weighted(BaseStrategy):
         return unexplored[-1]  # Fallback
 
 
+@dataclass
+class _MCTSNode:
+    """Internal node for Monte Carlo Tree Search.
+
+    Each node represents a (state_id, action_name) pair with statistics
+    about how many times it was visited and how much reward it accumulated.
+    """
+
+    state_id: str
+    action_name: str
+    visits: int = 0
+    reward: float = 0.0
+    children: list[_MCTSNode] = field(default_factory=list)
+    parent: _MCTSNode | None = field(default=None, repr=False)
+
+    @property
+    def value(self) -> float:
+        """Average reward per visit."""
+        if self.visits == 0:
+            return 0.0
+        return self.reward / self.visits
+
+
+class MCTS(BaseStrategy):
+    """Monte Carlo Tree Search strategy.
+
+    Uses UCB1 (Upper Confidence Bound) to balance exploration vs exploitation.
+    Nodes that led to violations (bugs) get higher reward, encouraging the
+    search to focus on bug-producing regions of the state space while still
+    exploring new areas.
+
+    The MCTS loop:
+    1. **Selection**: Walk the tree using UCB1 to pick the most promising node.
+    2. **Expansion**: If the selected node has unexplored children, pick one.
+    3. **Simulation**: (Lightweight) Evaluate the node by checking if it led
+       to new states or violations.
+    4. **Backpropagation**: Update visit counts and rewards up the tree.
+
+    Args:
+        exploration_weight: Controls exploration vs exploitation tradeoff.
+            Higher values explore more. Default sqrt(2) is theoretically optimal.
+        violation_reward: Reward given when a violation is found. Default 10.0.
+        new_state_reward: Reward for discovering a previously unseen state.
+            Default 1.0.
+        seed: Random seed for reproducibility.
+
+    Example::
+
+        strategy = MCTS(exploration_weight=1.5)
+        agent = Agent(
+            world=world,
+            actions=actions,
+            invariants=invariants,
+            strategy=strategy,
+        )
+        result = agent.explore()
+    """
+
+    def __init__(
+        self,
+        exploration_weight: float = math.sqrt(2),
+        violation_reward: float = 10.0,
+        new_state_reward: float = 1.0,
+        seed: int | None = None,
+    ) -> None:
+        self._exploration_weight = exploration_weight
+        self._violation_reward = violation_reward
+        self._new_state_reward = new_state_reward
+        self._rng = random.Random(seed)
+        # Tree: state_id -> list of child nodes
+        self._nodes: dict[str, list[_MCTSNode]] = {}
+        # Track all nodes for backpropagation
+        self._all_nodes: dict[tuple[str, str], _MCTSNode] = {}
+        self._last_picked: _MCTSNode | None = None
+        self._known_states: set[str] = set()
+        self._initialized = False
+
+    def pick(self, graph: Graph) -> tuple[State, Action] | None:
+        """Pick the next (state, action) pair using UCB1 selection.
+
+        Args:
+            graph: The current exploration graph.
+
+        Returns:
+            A (state, action) tuple to explore, or None if done.
+        """
+        # Initialize tree on first call
+        if not self._initialized:
+            self._initialized = True
+            if graph.initial_state_id:
+                initial = graph.get_state(graph.initial_state_id)
+                if initial:
+                    self._known_states.add(initial.id)
+                    self._expand_node(graph, initial.id)
+
+        # Get all unexplored pairs first
+        unexplored = graph.get_unexplored()
+        if not unexplored:
+            return None
+
+        # Build a set for fast lookup
+        unexplored_set = {(s.id, a.name) for s, a in unexplored}
+
+        # Selection: find best node via UCB1
+        best_node = self._select(graph, unexplored_set)
+
+        if best_node is None:
+            # Fallback to random unexplored
+            choice = self._rng.choice(unexplored)
+            state, action = choice
+            # Create node if needed
+            key = (state.id, action.name)
+            if key not in self._all_nodes:
+                node = _MCTSNode(state_id=state.id, action_name=action.name)
+                self._all_nodes[key] = node
+                self._nodes.setdefault(state.id, []).append(node)
+            self._last_picked = self._all_nodes[key]
+            return choice
+
+        # Resolve to actual state and action
+        state = graph.get_state(best_node.state_id)
+        action = graph.get_action(best_node.action_name)
+
+        if state and action:
+            self._last_picked = best_node
+            return (state, action)
+
+        # Shouldn't happen, but fall back
+        if unexplored:
+            return self._rng.choice(unexplored)
+        return None
+
+    def notify(self, state: State, actions: list[Action]) -> None:
+        """Notify MCTS of a new state, triggering backpropagation and expansion.
+
+        Args:
+            state: The newly observed state.
+            actions: Actions valid from this state.
+        """
+        is_new = state.id not in self._known_states
+        self._known_states.add(state.id)
+
+        # Expand this new state's children
+        if is_new:
+            for action in actions:
+                key = (state.id, action.name)
+                if key not in self._all_nodes:
+                    node = _MCTSNode(
+                        state_id=state.id,
+                        action_name=action.name,
+                        parent=self._last_picked,
+                    )
+                    self._all_nodes[key] = node
+                    self._nodes.setdefault(state.id, []).append(node)
+                    if self._last_picked:
+                        self._last_picked.children.append(node)
+
+        # Backpropagate reward for new state discovery
+        if self._last_picked and is_new:
+            self._backpropagate(self._last_picked, self._new_state_reward)
+
+    def record_violation(self) -> None:
+        """Record that the last picked action led to a violation.
+
+        Called externally (by Agent) when a violation is found, so MCTS
+        can reward the path that led to the bug.
+        """
+        if self._last_picked:
+            self._backpropagate(self._last_picked, self._violation_reward)
+
+    def _expand_node(self, graph: Graph, state_id: str) -> None:
+        """Expand a state node, creating child nodes for valid actions."""
+        state = graph.get_state(state_id)
+        if not state:
+            return
+
+        for action in graph.get_valid_actions(state):
+            key = (state_id, action.name)
+            if key not in self._all_nodes:
+                node = _MCTSNode(state_id=state_id, action_name=action.name)
+                self._all_nodes[key] = node
+                self._nodes.setdefault(state_id, []).append(node)
+
+    def _select(
+        self,
+        graph: Graph,
+        unexplored_set: set[tuple[str, str]],
+    ) -> _MCTSNode | None:
+        """Select the best unexplored node using UCB1.
+
+        Args:
+            graph: The exploration graph.
+            unexplored_set: Set of (state_id, action_name) pairs not yet explored.
+
+        Returns:
+            The best node to explore, or None if no valid node found.
+        """
+        best_node: _MCTSNode | None = None
+        best_ucb: float = -float("inf")
+
+        # Total visits across all nodes for UCB1 denominator
+        total_visits = sum(n.visits for n in self._all_nodes.values())
+        if total_visits == 0:
+            total_visits = 1
+
+        for key, node in self._all_nodes.items():
+            if key not in unexplored_set:
+                continue
+
+            ucb = self._ucb1(node, total_visits)
+            if ucb > best_ucb:
+                best_ucb = ucb
+                best_node = node
+
+        return best_node
+
+    def _ucb1(self, node: _MCTSNode, total_visits: int) -> float:
+        """Compute UCB1 score for a node.
+
+        UCB1 = (reward / visits) + C * sqrt(ln(total) / visits)
+
+        Unvisited nodes get infinite score (always explored first).
+
+        Args:
+            node: The node to score.
+            total_visits: Total visits across all nodes.
+
+        Returns:
+            UCB1 score.
+        """
+        if node.visits == 0:
+            return float("inf")
+
+        exploitation = node.value
+        exploration = self._exploration_weight * math.sqrt(
+            math.log(total_visits) / node.visits
+        )
+        return exploitation + exploration
+
+    def _backpropagate(self, node: _MCTSNode, reward: float) -> None:
+        """Propagate reward up the tree from node to root.
+
+        Args:
+            node: The leaf node where the reward originated.
+            reward: The reward value to propagate.
+        """
+        current: _MCTSNode | None = node
+        while current is not None:
+            current.visits += 1
+            current.reward += reward
+            current = current.parent
+
+
 __all__ = [
     "ExplorationStrategy",
     "Strategy",  # Backward compat alias
@@ -320,4 +573,5 @@ __all__ = [
     "Random",
     "CoverageGuided",
     "Weighted",
+    "MCTS",
 ]
