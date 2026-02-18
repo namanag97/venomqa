@@ -11,6 +11,13 @@ Example (deprecated, still works):
 """
 
 from venomqa.v1.adapters.http import HttpClient
+from venomqa.v1.adapters.resource_graph import (
+    ResourceGraph,
+    ResourceSchema,
+    ResourceType,
+    schema_from_openapi,
+)
+from venomqa.v1.adapters.sqlite import SQLiteAdapter
 from venomqa.v1.agent import Agent, Scheduler
 from venomqa.v1.agent.strategies import (
     BFS,
