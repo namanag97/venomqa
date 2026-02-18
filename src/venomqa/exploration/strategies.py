@@ -204,6 +204,10 @@ class DFS(BaseStrategy):
         for action in reversed(actions):
             self._frontier.add(state.id, action.name)
 
+    def push(self, state: State, actions: list[Action]) -> None:
+        """Backward compatibility alias for notify."""
+        self.notify(state, actions)
+
 
 class Random(BaseStrategy):
     """Random exploration strategy.
