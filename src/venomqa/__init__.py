@@ -70,7 +70,8 @@ from venomqa.v1.core.constraints import (
     StateConstraint,
     constraint,
 )
-from venomqa.v1.core.context import Context
+# Sandbox context (canonical location for World, Context, State)
+from venomqa.sandbox import Context
 
 # Coverage
 from venomqa.v1.core.coverage import DimensionAxisCoverage, DimensionCoverage
