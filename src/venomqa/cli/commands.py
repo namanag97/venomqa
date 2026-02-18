@@ -510,24 +510,13 @@ def cli(
             console.print(f"[yellow]Autonomous mode failed: {e}[/yellow]")
             console.print("[dim]Showing help instead...[/dim]\n")
 
-        # Show friendly intro
+        # Show simple intro - one clear next step
         console.print()
         console.print(Panel.fit(
             "[bold cyan]VenomQA[/bold cyan] — Find bugs that only appear in API sequences\n\n"
-            "[white]Your unit tests check endpoints one at a time.[/white]\n"
-            "[white]VenomQA tests [bold]sequences[/bold] like: create → update → delete → get[/white]\n\n"
-            "[bold]Get Started:[/bold]\n"
-            "  [green]venomqa demo[/green]              See it find a real bug (30 seconds)\n"
-            "  [green]venomqa init --with-sample[/green] Set up your project\n"
-            "  [green]venomqa doctor[/green]            Check your environment\n\n"
-            "[bold]Autonomous Mode:[/bold] (zero-config)\n"
-            "  Add docker-compose.yml + openapi.yaml to your project,\n"
-            "  then just run [green]venomqa[/green] — it does everything automatically.\n\n"
-            "[bold]API Authentication:[/bold]\n"
-            "  [green]venomqa --api-key KEY[/green]     X-API-Key header\n"
-            "  [green]venomqa --auth-token TOKEN[/green] Bearer token\n"
-            "  Or set [cyan]VENOMQA_API_KEY[/cyan] / [cyan]VENOMQA_AUTH_TOKEN[/cyan] env vars\n\n"
-            "[dim]Run 'venomqa --help' for all commands[/dim]",
+            "Your unit tests check endpoints one at a time.\n"
+            "VenomQA tests [bold]sequences[/bold] like: create → update → delete → get\n\n"
+            "[bold]Next:[/bold]  [green]venomqa demo[/green]   (30 seconds, no setup)",
             border_style="cyan",
         ))
         console.print()
