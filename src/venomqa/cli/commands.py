@@ -458,7 +458,14 @@ def cli(
                 ))
 
                 from venomqa.autonomous.runner import AutonomousRunner
-                runner = AutonomousRunner(verbose=True)
+                runner = AutonomousRunner(
+                    verbose=True,
+                    auth_token=auth_token,
+                    api_key=api_key,
+                    basic_auth=basic_auth,
+                    db_password=db_password,
+                    skip_preflight=skip_preflight,
+                )
                 result = runner.run()
 
                 # Exit with error if violations found
