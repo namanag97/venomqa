@@ -1520,26 +1520,6 @@ def init(ctx: click.Context, force: bool, base_path: str, with_sample: bool, ski
 
     console = Console()
 
-    # Run preflight checks first (unless skipped)
-    if not skip_checks:
-        console.print("\n[bold blue]Running preflight checks...[/bold blue]")
-        try:
-            from venomqa.cli.doctor import get_health_checks, run_health_checks
-
-            checks = get_health_checks()
-            # Only run essential checks
-            essential_checks = [c for c in checks if c.required or c.name in ["Docker", "Docker Compose"]]
-            passed, failed_required, failed_optional = run_health_checks(essential_checks, verbose=False)
-
-            if failed_required > 0:
-                console.print("\n[yellow]Some required dependencies are missing.[/yellow]")
-                console.print("You can still initialize the project, but some features may not work.")
-                if not click.confirm("Continue anyway?"):
-                    sys.exit(1)
-            console.print()
-        except Exception as e:
-            console.print(f"[yellow]Could not run preflight checks: {e}[/yellow]")
-
     base = Path(base_path)
 
     # Handle existing directory
