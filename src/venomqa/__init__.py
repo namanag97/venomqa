@@ -398,6 +398,7 @@ __all__ = [
     "RecordedRequest",
     "generate_journey_code",
     # Reporters
+    "Reporter",
     "ConsoleReporter",
     "MarkdownReporter",
     "JSONReporter",
