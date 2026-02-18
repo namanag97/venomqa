@@ -374,18 +374,26 @@ from datetime import datetime, timedelta
 
 time = MockTime()
 
-# Set specific time
+# Set specific time (auto-freezes)
 time.set(datetime(2024, 1, 15, 10, 30, 0))
 
-# Advance time
-time.advance(timedelta(hours=1))
+# Advance frozen time (kwargs match timedelta: days, hours, minutes, seconds, etc.)
+time.advance(hours=1)
 
-# Get current time
-now = time.now()  # 2024-01-15 11:30:00
+# Get current time — now is a property, not a method call
+now = time.now  # 2024-01-15 11:30:00
+
+# Freeze at a specific moment, then advance
+time.freeze(at=datetime(2024, 6, 1, 9, 0, 0))
+time.advance(days=7)
+print(time.now)  # 2024-06-08 09:00:00
+
+# Unfreeze to use real wall-clock time
+time.unfreeze()
 
 # Checkpoint/rollback
 cp = time.checkpoint("before_advance")
-time.advance(timedelta(days=1))
+time.advance(days=1)
 time.rollback(cp)  # Back to original time
 ```
 
