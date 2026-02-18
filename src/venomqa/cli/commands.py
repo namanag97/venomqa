@@ -2576,22 +2576,19 @@ def generate_graphql(
         - Subscription generators decorated with @subscription
         - Full type hints and docstrings
     """
-    if schema_path is None and endpoint_url is None:
-        click.echo(
-            "Error: Either --from-schema or --from-endpoint must be provided",
-            err=True,
-        )
-        sys.exit(1)
+    # GraphQL support is being redesigned for v1 architecture
+    click.echo("GraphQL action generation is not yet available in VenomQA v1.")
+    click.echo("")
+    click.echo("For now, you can write GraphQL actions manually:")
+    click.echo("  def query_users(api, context):")
+    click.echo('      return api.post("/graphql", json={"query": "{ users { id name } }"})')
+    click.echo("")
+    click.echo("Track progress: https://github.com/anthropics/venomqa/issues")
+    sys.exit(0)
 
-    if schema_path is not None and endpoint_url is not None:
-        click.echo(
-            "Error: Cannot use both --from-schema and --from-endpoint",
-            err=True,
-        )
-        sys.exit(1)
-
-    try:
-        from venomqa.graphql.codegen import generate_actions_from_schema
+    # --- Original code below (disabled until GraphQL module is restored) ---
+    if False:  # noqa: SIM223
+        pass  # Keep for future restoration
 
         schema_source: str | Path | dict[str, Any]
 
