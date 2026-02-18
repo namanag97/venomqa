@@ -342,6 +342,6 @@ Actions should be idempotent and validate responses:
 ## Next Steps
 
 - Run `venomqa doctor` to check your environment
+- Run `venomqa llm-docs` to get full API reference for AI assistants
 - Read the [API Reference](https://venomqa.dev/docs/api)
 - See [examples/](./examples/) for more complex scenarios
-- Use `venomqa llm-docs` to get AI assistant context
