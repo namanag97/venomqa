@@ -24,40 +24,15 @@ class AuthRequirement:
     scheme: str | None = None  # "bearer", "basic" (for http)
 
     def get_fix_instructions(self) -> str:
-        """Return human-readable instructions for providing this auth."""
+        """Return ONE clear command to fix auth."""
         if self.auth_type == "apiKey" and self.location == "header":
-            return (
-                f"Your API uses {self.header_name} header authentication.\n\n"
-                f"  venomqa --api-key YOUR_KEY\n\n"
-                f"Or set environment variable:\n"
-                f"  export VENOMQA_API_KEY=your-key\n\n"
-                f"Or create .env file:\n"
-                f"  echo 'VENOMQA_API_KEY=your-key' > .env"
-            )
+            return f"venomqa --api-key YOUR_KEY"
         elif self.auth_type == "http" and self.scheme == "bearer":
-            return (
-                "Your API uses Bearer token authentication.\n\n"
-                "  venomqa --auth-token YOUR_TOKEN\n\n"
-                "Or set environment variable:\n"
-                "  export VENOMQA_AUTH_TOKEN=your-token\n\n"
-                "Or create .env file:\n"
-                "  echo 'VENOMQA_AUTH_TOKEN=your-token' > .env"
-            )
+            return "venomqa --auth-token YOUR_TOKEN"
         elif self.auth_type == "http" and self.scheme == "basic":
-            return (
-                "Your API uses Basic authentication.\n\n"
-                "  venomqa --basic-auth username:password\n\n"
-                "Or set environment variable:\n"
-                "  export VENOMQA_BASIC_AUTH=username:password"
-            )
+            return "venomqa --basic-auth user:password"
         else:
-            return (
-                f"Your API uses {self.auth_type} authentication ({self.name}).\n\n"
-                "Try one of:\n"
-                "  venomqa --api-key YOUR_KEY\n"
-                "  venomqa --auth-token YOUR_TOKEN\n"
-                "  venomqa --basic-auth user:pass"
-            )
+            return "venomqa --api-key YOUR_KEY"
 
 
 def detect_auth_from_openapi(openapi_path: Path) -> list[AuthRequirement]:
