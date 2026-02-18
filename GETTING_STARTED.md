@@ -329,6 +329,7 @@ This happens when database rollback isn't working. Check:
 1. You're using `systems={"db": db}` in World
 2. The database URL is correct
 3. You have permission to run SAVEPOINT/ROLLBACK
+4. You're using `strategy=DFS()` with PostgreSQL — BFS does not work with PostgreSQL savepoints
 
 ### "Actions fail randomly"
 
