@@ -104,7 +104,7 @@ world = World(
 # Define actions
 login = Action(
     name="login",
-    execute=lambda api: api.post("/auth/login", json={
+    execute=lambda api, context: api.post("/auth/login", json={
         "email": "test@example.com",
         "password": "secret"
     }),
@@ -112,8 +112,8 @@ login = Action(
 
 create_order = Action(
     name="create_order",
-    execute=lambda api: api.post("/orders", json={"product_id": 1}),
-    preconditions=[lambda state: state.get("logged_in", False)],
+    execute=lambda api, context: api.post("/orders", json={"product_id": 1}),
+    preconditions=[lambda ctx: ctx.get("logged_in", False)],
 )
 
 # Define invariants
