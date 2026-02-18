@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from venomqa import ExplorationResult
+    from venomqa.autonomous.credentials import Credentials
 
 
 class AutonomousRunner:
@@ -18,11 +19,12 @@ class AutonomousRunner:
 
     The runner will:
     1. Discover docker-compose.yml and openapi.yaml in the current directory
-    2. Spin up isolated test containers (won't touch your real database)
-    3. Generate actions from your OpenAPI spec
-    4. Run state hypergraph exploration
-    5. Report any bugs found
-    6. Tear down containers
+    2. Run preflight checks (Docker, auth, etc.)
+    3. Spin up isolated test containers (won't touch your real database)
+    4. Generate actions from your OpenAPI spec
+    5. Run state hypergraph exploration
+    6. Report any bugs found
+    7. Tear down containers
     """
 
     def __init__(
@@ -32,12 +34,30 @@ class AutonomousRunner:
         strategy: str = "auto",  # auto, bfs, dfs, mcts, coverage
         hypergraph: bool = True,
         verbose: bool = True,
+        # Credential options (CLI overrides)
+        credentials: "Credentials | None" = None,
+        auth_token: str | None = None,
+        api_key: str | None = None,
+        basic_auth: str | None = None,
+        db_password: str | None = None,
+        # Preflight options
+        skip_preflight: bool = False,
     ) -> None:
         self.project_dir = Path(project_dir).resolve()
         self.max_steps = max_steps
         self.strategy_name = strategy
         self.hypergraph = hypergraph
         self.verbose = verbose
+
+        # Credential options
+        self._credentials = credentials
+        self._auth_token = auth_token
+        self._api_key = api_key
+        self._basic_auth = basic_auth
+        self._db_password = db_password
+
+        # Preflight options
+        self.skip_preflight = skip_preflight
 
         self._discovery = None
         self._infra = None
