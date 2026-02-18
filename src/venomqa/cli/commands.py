@@ -490,6 +490,10 @@ def cli(
             "[bold]Autonomous Mode:[/bold] (zero-config)\n"
             "  Add docker-compose.yml + openapi.yaml to your project,\n"
             "  then just run [green]venomqa[/green] — it does everything automatically.\n\n"
+            "[bold]API Authentication:[/bold]\n"
+            "  [green]venomqa --api-key KEY[/green]     X-API-Key header\n"
+            "  [green]venomqa --auth-token TOKEN[/green] Bearer token\n"
+            "  Or set [cyan]VENOMQA_API_KEY[/cyan] / [cyan]VENOMQA_AUTH_TOKEN[/cyan] env vars\n\n"
             "[dim]Run 'venomqa --help' for all commands[/dim]",
             border_style="cyan",
         ))
