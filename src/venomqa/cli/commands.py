@@ -566,6 +566,10 @@ def smoke_test(
         0 - All checks passed, API is ready
         1 - One or more checks failed
     """
+    # TODO: smoke-test module not yet implemented
+    click.echo("smoke-test: Coming soon. Use 'venomqa demo' to see VenomQA in action.", err=True)
+    sys.exit(EXIT_FAILURE)
+
     import json as json_module
 
     # --init mode: print example config and exit
