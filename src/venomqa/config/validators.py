@@ -477,10 +477,24 @@ def validate_config(config: dict[str, Any]) -> None:
         if url_error:
             errors.append(url_error)
 
-    if "db_url" in config and config["db_url"]:
-        db_error = URLValidator.validate_db_url(config["db_url"])
-        if db_error:
-            errors.append(db_error)
+    if "db_url" in config:
+        db_url = config["db_url"]
+        # Special handling for unset environment variables
+        if db_url == "" or db_url.startswith("${"):
+            errors.append({
+                "field": "db_url",
+                "message": "DATABASE_URL environment variable is not set",
+                "hint": (
+                    "Set the DATABASE_URL environment variable:\n"
+                    "  export DATABASE_URL='postgresql://user:pass@localhost:5432/dbname'\n"
+                    "\n"
+                    "Or comment out db_url in venomqa.yaml for context-only mode."
+                ),
+            })
+        elif db_url:
+            db_error = URLValidator.validate_db_url(db_url)
+            if db_error:
+                errors.append(db_error)
 
     if "docker_compose_file" in config:
         path_error = PathValidator.validate_docker_compose(config["docker_compose_file"])
