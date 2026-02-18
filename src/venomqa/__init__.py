@@ -39,6 +39,7 @@ from venomqa.v1.agent import Agent, Scheduler
 from venomqa.exploration import (
     BFS,
     DFS,
+    MCTS,
     CoverageGuided,
     ExplorationStrategy,
     Random,
