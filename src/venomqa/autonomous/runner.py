@@ -305,8 +305,8 @@ class AutonomousRunner:
             return result
 
         finally:
-            # Step 6: Cleanup
-            self._log_step(6, 6, "Cleaning up...")
+            # Step 7: Cleanup
+            self._log_step(7, 7, "Cleaning up...")
 
             if self._infra:
                 self._infra.teardown(remove_volumes=True)
