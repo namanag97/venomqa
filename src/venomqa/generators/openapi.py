@@ -950,7 +950,18 @@ Generated from: {self.spec_path.name}
 API: {self.schema.title} v{self.schema.version}
 
 This module contains action functions for each API endpoint.
-Actions receive (client, ctx) and return a Response.
+Actions receive (api, context) and return a Response.
+
+Usage:
+    from venomqa import Action, Agent, World
+    from venomqa.adapters import HttpClient
+    from .actions import list_users, create_user, get_user
+
+    actions = [
+        Action(name="list_users", execute=list_users),
+        Action(name="create_user", execute=create_user),
+        Action(name="get_user", execute=get_user),
+    ]
 """
 
 from __future__ import annotations
@@ -958,15 +969,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from venomqa.http import Client
-    from venomqa.core.context import ExecutionContext as Context
+    from venomqa.adapters import HttpClient
+    from venomqa import Context
     from httpx import Response
-
-
-def action(func):
-    """Decorator marking a function as a VenomQA action."""
-    func._is_action = True
-    return func
 
 
 '''
