@@ -319,25 +319,9 @@ def demo(port: int, verbose: bool) -> None:
 
     console.print()
 
-    # === NEXT STEPS ===
-    console.print(Panel(
-        "[bold]Ready to find bugs in YOUR API?[/bold]\n\n"
-        "1. [cyan]venomqa init --with-sample[/cyan]\n"
-        "   Creates project structure with example code\n\n"
-        "2. Edit [cyan]venomqa/venomqa.yaml[/cyan]\n"
-        "   Set your API URL and database connection\n\n"
-        "3. Write actions in [cyan]venomqa/actions/[/cyan]\n"
-        "   Define what API calls to test\n\n"
-        "4. Run [cyan]python3 venomqa/journeys/sample_journey.py[/cyan]\n"
-        "   Find bugs in YOUR API\n\n"
-        "[dim]Database required: VenomQA needs to rollback state between[/dim]\n"
-        "[dim]branches to test all sequences. Connect to your API's database.[/dim]",
-        title="Next Steps",
-        border_style="green",
-    ))
-
+    # === ONE CLEAR NEXT STEP ===
     console.print()
-    console.print("[dim]Docs: https://venomqa.dev | Help: venomqa llm-docs[/dim]")
+    console.print("[bold]Next:[/bold]  [green]venomqa init --with-sample[/green]")
     console.print()
 
     server.shutdown()
