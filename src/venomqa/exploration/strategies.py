@@ -28,7 +28,7 @@ class ExplorationStrategy(Protocol):
     - DFS: Depth-first, explores deeply before backtracking
     - Random: Random selection, good for fuzzing
     - CoverageGuided: Prioritizes least-explored actions
-    - MCTS: Monte Carlo Tree Search (coming soon)
+    - MCTS: Monte Carlo Tree Search, balances exploration/exploitation
 
     Example::
 
