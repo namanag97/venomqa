@@ -87,11 +87,60 @@ To explore both branches A and B from state S1, VenomQA must:
 
 ---
 
-## Quickstart
+## Quickstart (Zero-Config)
+
+VenomQA reads your project structure and runs automatically.
+
+**Requirements:**
+- `docker-compose.yml` — your API + database setup
+- `openapi.yaml` or `swagger.json` — your API spec
 
 ```bash
 pip install venomqa
+venomqa  # That's it. Runs autonomously.
 ```
+
+**What happens:**
+1. Reads your `docker-compose.yml` → understands your stack
+2. Spins up **isolated test containers** (won't touch your real database)
+3. Parses your OpenAPI spec → generates test actions
+4. Runs state hypergraph exploration → finds sequence bugs
+5. Reports violations → tears down containers
+
+```
+ [1/6] Discovering project structure...
+       ✓ Found docker-compose.yml
+       ✓ Found openapi.yaml (47 endpoints)
+       ✓ Detected PostgreSQL database
+
+ [2/6] Creating isolated test environment...
+       ✓ Using random ports to avoid conflicts
+
+ [3/6] Starting containers...
+       ✓ postgres: healthy (5432 → 54321)
+       ✓ api: healthy (8000 → 48000)
+
+ [4/6] Generating test actions from OpenAPI...
+       ✓ Created 47 actions
+
+ [5/6] Exploring API sequences...
+
+ ┌──────────────────── CRITICAL ────────────────────┐
+ │ no_server_errors                                  │
+ │                                                   │
+ │ Server returned 5xx error                         │
+ │                                                   │
+ │ Path: create_user → update_user → delete_user    │
+ └──────────────────────────────────────────────────┘
+
+ Summary: 45 states | 200 steps | 89% coverage | 1 bug found
+```
+
+---
+
+## Advanced: Manual Configuration
+
+For full control, configure actions and invariants manually:
 
 ### Step 1: Identify Your Database
 
@@ -99,10 +148,6 @@ pip install venomqa
 - PostgreSQL → Use `PostgresAdapter` (most common)
 - SQLite → Use `SQLiteAdapter`
 - In-memory / No database → Use `state_from_context` (limited)
-
-**CRITICAL**: Connect to the **exact same database** your API writes to:
-- If your API uses `postgresql://prod:5432/myapp`, connect VenomQA to that same URL
-- VenomQA wraps the entire exploration in a transaction and rolls back when done
 
 ### Step 2: Run Exploration
 
