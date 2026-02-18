@@ -161,10 +161,8 @@ from venomqa.v1.validation import (
     validate_response,
 )
 
-# World (sandbox with checkpoint/rollback)
-from venomqa.v1.world import World
-from venomqa.v1.world.checkpoint import Checkpoint, SystemCheckpoint
-from venomqa.v1.world.rollbackable import Rollbackable
+# World (sandbox with checkpoint/rollback) - canonical location is venomqa.sandbox
+from venomqa.sandbox import Checkpoint, Rollbackable, SystemCheckpoint, World
 
 # Type aliases
 StateID = str
