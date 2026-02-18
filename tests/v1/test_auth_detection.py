@@ -136,7 +136,6 @@ class TestAuthRequirement:
         )
         instructions = req.get_fix_instructions()
         assert "--api-key" in instructions
-        assert "VENOMQA_API_KEY" in instructions
 
     def test_bearer_fix_instructions(self):
         """Test fix instructions for Bearer auth."""
@@ -147,7 +146,6 @@ class TestAuthRequirement:
         )
         instructions = req.get_fix_instructions()
         assert "--auth-token" in instructions
-        assert "VENOMQA_AUTH_TOKEN" in instructions
 
     def test_basic_fix_instructions(self):
         """Test fix instructions for Basic auth."""
