@@ -186,28 +186,18 @@ class AutonomousRunner:
         # Check auth requirements from OpenAPI BEFORE starting anything
         auth_requirements = detect_auth_from_openapi(openapi_path)
         if auth_requirements:
-            auth_ok, fix_msg = check_auth_configured(auth_requirements, credentials)
+            auth_ok, fix_cmd = check_auth_configured(auth_requirements, credentials)
             if auth_ok:
                 self._log(
                     f"       ✓ Auth configured ({credentials.auth_type.value})",
                     "green",
                 )
             else:
-                self._log(
-                    f"       ✗ API requires authentication",
-                    "red",
-                )
+                self._log("       ✗ API requires authentication", "red")
                 self._log("")
-                if self._console:
-                    from rich.panel import Panel
-                    self._console.print(Panel(
-                        fix_msg,
-                        title="[red]Authentication Required[/red]",
-                        border_style="red",
-                    ))
-                raise RuntimeError(
-                    "API requires authentication. See above for options."
-                )
+                self._log(f"[bold]Run:[/bold]  {fix_cmd}", "")
+                self._log("")
+                raise RuntimeError("Provide authentication and try again.")
         elif credentials.has_api_auth():
             self._log(
                 f"       ✓ Auth configured ({credentials.auth_type.value})",
