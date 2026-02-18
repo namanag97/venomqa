@@ -480,8 +480,8 @@ def cli(
             if has_compose and not has_openapi:
                 console.print("[green]✓[/green] Found docker-compose.yml")
                 console.print("[red]✗[/red] Missing openapi.yaml\n")
-                console.print("[bold]Next:[/bold]  Add openapi.yaml to this directory")
-                console.print("[dim]       Export from Swagger UI, or ask your backend team[/dim]")
+                console.print("[bold]Next:[/bold]  [green]venomqa init --with-sample[/green]")
+                console.print("[dim]       Creates sample actions you can customize for your API[/dim]")
                 console.print()
                 sys.exit(EXIT_CONFIG_ERROR)
 
