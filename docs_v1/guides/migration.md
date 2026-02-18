@@ -179,7 +179,7 @@ You can use both APIs during migration:
 from venomqa import Journey as OldJourney
 
 # Convert when ready
-from venomqa.bridge.journey import adapt_journey
+from venomqa.bridge import adapt_journey
 
 old_journey = OldJourney(...)
 new_journey = adapt_journey(old_journey)
