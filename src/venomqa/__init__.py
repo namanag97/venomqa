@@ -380,6 +380,10 @@ __all__ = [
     "ResourceSchema",
     "ResourceType",
     "schema_from_openapi",
+    # Discovery
+    "OpenAPISpec",
+    "Endpoint",
+    "CrudType",
     # Generators
     "generate_actions",
     "generate_schema_and_actions",
