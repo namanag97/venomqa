@@ -333,6 +333,7 @@ __all__ = [
     "SystemCheckpoint",
     # Agent
     "Agent",
+    "ExplorationStrategy",
     "Strategy",
     "BFS",
     "DFS",
