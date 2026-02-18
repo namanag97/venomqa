@@ -393,7 +393,7 @@ def cli(ctx: click.Context, verbose: bool, config: str | None, profile: str | No
     # Skip config loading for commands that don't need it, and whenever
     # --help is requested (config errors must never block help text).
     help_requested = "--help" in sys.argv or "-h" in sys.argv
-    no_config_commands = {"init", "doctor", "smoke-test", "demo", "llm-docs"}
+    no_config_commands = {"init", "doctor", "smoke-test", "demo", "llm-docs", "generate", "generate-graphql"}
     if ctx.invoked_subcommand in no_config_commands or help_requested:
         ctx.obj["verbose"] = verbose
         setup_logging(verbose)
