@@ -22,6 +22,7 @@ from venomqa.exploration.result import ExplorationResult
 from venomqa.exploration.strategies import (
     BFS,
     DFS,
+    MCTS,
     BaseStrategy,
     CoverageGuided,
     ExplorationStrategy,
