@@ -9,8 +9,8 @@ This guide explains how to write effective Actions.
 ```python
 Action(
     name="create_order",
-    execute=lambda api: api.post("/orders", json={"product_id": 1}),
-    preconditions=[lambda state: state.observations["db"].data.get("logged_in")],
+    execute=create_order,
+    preconditions=[lambda ctx: ctx.get("user_id") is not None],
     description="Create a new order",
     tags=["orders", "critical"],
 )
@@ -26,27 +26,43 @@ Action(
 
 ## The Execute Function
 
-The `execute` function receives an `APIClient` and returns an `ActionResult`.
+The `execute` function receives an `HttpClient` and a `Context`, and returns an `ActionResult` (which is what `api.get()`, `api.post()`, etc. already return — no wrapping needed).
 
 ### Basic Pattern
 
 ```python
-def create_order(api: APIClient) -> ActionResult:
-    response = api.post("/orders", json={"product_id": 1, "quantity": 2})
-    return ActionResult.from_response(response)
+def create_order(api, context):
+    resp = api.post("/orders", json={"product_id": 1, "quantity": 2})
+    resp.expect_status(201)                       # raises if not 201
+    data = resp.expect_json_field("id", "total")  # raises if fields missing
+    context.set("order_id", data["id"])
+    context.set("order_total", data["total"])
+    return resp
 
 Action(name="create_order", execute=create_order)
 ```
 
 ### With Lambda
 
-For simple actions, use a lambda:
+For simple read-only actions that don't need to share state, use a lambda:
 
 ```python
 Action(
-    name="get_orders",
-    execute=lambda api: ActionResult.from_response(api.get("/orders")),
+    name="list_orders",
+    execute=lambda api, context: api.get("/orders"),
 )
+```
+
+### Reading Context in an Action
+
+Use `context.get()` to access values set by earlier actions in the same path:
+
+```python
+def refund_order(api, context):
+    order_id = context.get("order_id")
+    resp = api.post(f"/orders/{order_id}/refund", json={"amount": 50})
+    resp.expect_status(200, 201)  # accepts either
+    return resp
 ```
 
 ### With Request Building
@@ -54,13 +70,12 @@ Action(
 For complex requests:
 
 ```python
-def checkout(api: APIClient) -> ActionResult:
-    # Get current cart
-    cart = api.get("/cart").json()
+def checkout(api, context):
+    # Read cart ID stored by an earlier action
+    cart_id = context.get("cart_id")
 
-    # Build checkout request
-    response = api.post("/checkout", json={
-        "cart_id": cart["id"],
+    resp = api.post("/checkout", json={
+        "cart_id": cart_id,
         "shipping_address": {
             "street": "123 Main St",
             "city": "Anytown",
@@ -68,49 +83,87 @@ def checkout(api: APIClient) -> ActionResult:
         },
         "payment_method": "card",
     })
-
-    return ActionResult.from_response(response)
+    resp.expect_status(200, 201)
+    return resp
 ```
 
 ### With Authentication
 
-If your API requires authentication:
+Configure `HttpClient` with default auth headers once — all actions share the client:
 
 ```python
-def create_order_authenticated(api: APIClient) -> ActionResult:
-    # Assume token is stored after login
-    # The API client should handle this via session/cookies
-    response = api.post(
-        "/orders",
-        json={"product_id": 1},
-        headers={"Authorization": f"Bearer {api.token}"},
-    )
-    return ActionResult.from_response(response)
+from venomqa.adapters.http import HttpClient
+
+api = HttpClient(
+    base_url="http://localhost:8000",
+    headers={"Authorization": "Bearer test_token"},
+)
 ```
 
-Better: Configure the APIClient with auth once:
+If the token must be obtained dynamically (e.g. after a login action), store it in context and pass it per-request:
 
 ```python
-api = APIClient(
-    base_url="http://localhost:8000",
-    default_headers={"Authorization": "Bearer test_token"},
-)
+def login(api, context):
+    resp = api.post("/auth/login", json={
+        "email": "test@example.com",
+        "password": "secret123",
+    })
+    resp.expect_status(200)
+    context.set("token", resp.json()["token"])
+    return resp
+
+def create_order(api, context):
+    token = context.get("token")
+    resp = api.post(
+        "/orders",
+        json={"product_id": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    resp.expect_status(201)
+    context.set("order_id", resp.json()["id"])
+    return resp
+```
+
+## Validation Helpers
+
+`ActionResult` (what `api.get()` / `api.post()` return) has built-in assertion helpers. VenomQA treats `AssertionError` raised inside an action as a violation, so use these freely:
+
+```python
+resp.expect_status(201)              # raises if not 201
+resp.expect_status(200, 201, 204)    # raises if not any of these
+resp.expect_success()                # raises if not 2xx/3xx
+data = resp.expect_json()            # raises if not JSON, returns body
+data = resp.expect_json_field("id")  # raises if "id" missing, returns dict
+items = resp.expect_json_list()      # raises if not array, returns list
+resp.status_code                     # returns 0 on network error (safe)
+resp.headers                         # returns {} on network error (safe)
 ```
 
 ## Preconditions
 
 Preconditions define when an Action is valid. The Agent skips Actions whose preconditions fail.
 
-### Basic Precondition
+### Context-Based Preconditions (Most Common)
+
+Gate an action on a context key being set by an earlier action:
 
 ```python
-def is_logged_in(state: State) -> bool:
-    return state.observations.get("db", {}).data.get("logged_in", False)
-
 Action(
-    name="create_order",
-    execute=...,
-    preconditions=[is_logged_in],
+    name="refund_order",
+    execute=refund_order,
+    precondition=lambda ctx: ctx.get("order_id") is not None,
+)
+```
+
+### String Shorthand
+
+Reference another action by name — the action will only run after the named action has executed at least once:
+
+```python
+Action(
+    name="refund_order",
+    execute=refund_order,
+    preconditions=["create_order"],  # shorthand: requires create_order to have run
 )
 ```
 
@@ -121,23 +174,23 @@ All preconditions must pass:
 ```python
 Action(
     name="checkout",
-    execute=...,
+    execute=checkout,
     preconditions=[
-        is_logged_in,
-        lambda s: s.observations["db"].data.get("cart_items", 0) > 0,
-        lambda s: s.observations["db"].data.get("payment_method_set", False),
+        lambda ctx: ctx.get("user_id") is not None,
+        lambda ctx: ctx.get("cart_id") is not None,
+        lambda ctx: ctx.get("payment_method") is not None,
     ],
 )
 ```
 
 ### Preconditions from Observations
 
-Use data from any system:
+For DB-backed state checks, use data from system observations:
 
 ```python
 Action(
     name="process_next_job",
-    execute=...,
+    execute=process_next_job,
     preconditions=[
         lambda s: s.observations["queue"].data.get("pending", 0) > 0,
     ],
@@ -145,7 +198,7 @@ Action(
 
 Action(
     name="clear_cache",
-    execute=...,
+    execute=clear_cache,
     preconditions=[
         lambda s: s.observations["cache"].data.get("count", 0) > 0,
     ],
@@ -154,7 +207,7 @@ Action(
 
 ### Preconditions Based on Previous Actions
 
-If you need to check if a previous action occurred, encode it in observations:
+If you need to check DB state from a previous action, encode it in your adapter's `observe()`:
 
 ```python
 # In your database adapter's observe():
@@ -184,18 +237,29 @@ Action(
 ### CRUD Actions
 
 ```python
-# Create
-Action(name="create_user", execute=lambda api: api.post("/users", json={...}))
+def create_user(api, context):
+    resp = api.post("/users", json={"name": "Alice", "email": "alice@example.com"})
+    resp.expect_status(201)
+    context.set("user_id", resp.json()["id"])
+    return resp
 
-# Read
-Action(name="get_user", execute=lambda api: api.get("/users/1"))
-Action(name="list_users", execute=lambda api: api.get("/users"))
+def get_user(api, context):
+    user_id = context.get("user_id")
+    return api.get(f"/users/{user_id}")
 
-# Update
-Action(name="update_user", execute=lambda api: api.patch("/users/1", json={...}))
+def list_users(api, context):
+    resp = api.get("/users")
+    resp.expect_status(200)
+    context.set("users", resp.expect_json_list())
+    return resp
 
-# Delete
-Action(name="delete_user", execute=lambda api: api.delete("/users/1"))
+def update_user(api, context):
+    user_id = context.get("user_id")
+    return api.patch(f"/users/{user_id}", json={"name": "Alice Updated"})
+
+def delete_user(api, context):
+    user_id = context.get("user_id")
+    return api.delete(f"/users/{user_id}")
 ```
 
 ### Authentication Actions
@@ -203,7 +267,7 @@ Action(name="delete_user", execute=lambda api: api.delete("/users/1"))
 ```python
 Action(
     name="login",
-    execute=lambda api: api.post("/auth/login", json={
+    execute=lambda api, context: api.post("/auth/login", json={
         "email": "test@example.com",
         "password": "secret123",
     }),
@@ -212,13 +276,13 @@ Action(
 
 Action(
     name="logout",
-    execute=lambda api: api.post("/auth/logout"),
+    execute=lambda api, context: api.post("/auth/logout"),
     preconditions=[lambda s: s.observations["db"].data.get("logged_in")],
 )
 
 Action(
     name="refresh_token",
-    execute=lambda api: api.post("/auth/refresh"),
+    execute=lambda api, context: api.post("/auth/refresh"),
     preconditions=[lambda s: s.observations["db"].data.get("logged_in")],
 )
 ```
@@ -229,7 +293,9 @@ Action(
 # Order state machine: pending → paid → shipped → delivered
 Action(
     name="pay_order",
-    execute=lambda api: api.post("/orders/1/pay", json={"method": "card"}),
+    execute=lambda api, context: api.post(
+        f"/orders/{context.get('order_id')}/pay", json={"method": "card"}
+    ),
     preconditions=[
         lambda s: s.observations["db"].data.get("order_status") == "pending",
     ],
@@ -237,7 +303,7 @@ Action(
 
 Action(
     name="ship_order",
-    execute=lambda api: api.post("/orders/1/ship"),
+    execute=lambda api, context: api.post(f"/orders/{context.get('order_id')}/ship"),
     preconditions=[
         lambda s: s.observations["db"].data.get("order_status") == "paid",
     ],
@@ -245,7 +311,7 @@ Action(
 
 Action(
     name="deliver_order",
-    execute=lambda api: api.post("/orders/1/deliver"),
+    execute=lambda api, context: api.post(f"/orders/{context.get('order_id')}/deliver"),
     preconditions=[
         lambda s: s.observations["db"].data.get("order_status") == "shipped",
     ],
@@ -258,10 +324,15 @@ For actions with varying inputs, create multiple Actions or use a factory:
 
 ```python
 def make_add_to_cart_action(product_id: int) -> Action:
+    def add_to_cart(api, context):
+        resp = api.post("/cart", json={"product_id": product_id})
+        resp.expect_status(200, 201)
+        return resp
+
     return Action(
         name=f"add_product_{product_id}_to_cart",
-        execute=lambda api: api.post("/cart", json={"product_id": product_id}),
-        preconditions=[is_logged_in],
+        execute=add_to_cart,
+        preconditions=[lambda ctx: ctx.get("user_id") is not None],
     )
 
 actions = [
@@ -278,17 +349,19 @@ Include actions that should fail to test error handling:
 ```python
 Action(
     name="create_order_invalid_product",
-    execute=lambda api: api.post("/orders", json={"product_id": 99999}),
+    execute=lambda api, context: api.post("/orders", json={"product_id": 99999}),
     description="Create order with non-existent product (should fail)",
+    expected_status=[404, 422],
 )
 
 Action(
     name="checkout_empty_cart",
-    execute=lambda api: api.post("/checkout"),
+    execute=lambda api, context: api.post("/checkout"),
     preconditions=[
         lambda s: s.observations["db"].data.get("cart_items", 0) == 0,
     ],
     description="Checkout with empty cart (should fail)",
+    expect_failure=True,
 )
 ```
 
@@ -296,11 +369,20 @@ Action(
 
 If you have an OpenAPI spec, generate Actions automatically:
 
-```python
-from venomqa.generators import OpenAPIGenerator
+```bash
+venomqa scaffold openapi https://api.example.com/openapi.json \
+  --base-url https://api.example.com \
+  --output actions.py
 
-generator = OpenAPIGenerator("openapi.yaml")
-actions = generator.generate_actions()
+python3 actions.py
+```
+
+Or programmatically:
+
+```python
+from venomqa.v1.generators.openapi_actions import generate_actions
+
+actions = generate_actions("openapi.yaml", base_url="http://localhost:8000")
 
 # This creates Actions for every endpoint:
 # - POST /users → create_user
@@ -309,7 +391,7 @@ actions = generator.generate_actions()
 # - etc.
 ```
 
-You'll still need to add preconditions manually for most actions.
+You will still need to add preconditions manually for most actions.
 
 ## Best Practices
 
@@ -331,12 +413,17 @@ Each action should do one thing:
 
 ```python
 # Good: Single responsibility
-Action(name="add_to_cart", execute=lambda api: api.post("/cart", json={...}))
-Action(name="checkout", execute=lambda api: api.post("/checkout"))
+def add_to_cart(api, context):
+    resp = api.post("/cart", json={"product_id": 1})
+    resp.expect_status(200)
+    return resp
 
-# Bad: Multiple operations
-def add_and_checkout(api):
-    api.post("/cart", json={...})
+def checkout(api, context):
+    return api.post("/checkout")
+
+# Bad: Multiple operations in one action
+def add_and_checkout(api, context):
+    api.post("/cart", json={"product_id": 1})
     return api.post("/checkout")  # This should be a separate action
 ```
 
@@ -357,21 +444,25 @@ preconditions=[
 ### 4. Include Both Happy and Unhappy Paths
 
 ```python
+valid_creds = {"email": "alice@example.com", "password": "correct"}
+wrong_pw    = {"email": "alice@example.com", "password": "wrong"}
+unknown     = {"email": "nobody@example.com", "password": "x"}
+
 actions = [
     # Happy path
-    Action(name="login_valid", execute=lambda api: api.post("/login", json=valid_creds)),
+    Action(name="login_valid", execute=lambda api, ctx: api.post("/login", json=valid_creds)),
 
     # Unhappy paths
-    Action(name="login_wrong_password", execute=lambda api: api.post("/login", json=wrong_pw)),
-    Action(name="login_unknown_user", execute=lambda api: api.post("/login", json=unknown)),
-    Action(name="login_missing_fields", execute=lambda api: api.post("/login", json={})),
+    Action(name="login_wrong_password", execute=lambda api, ctx: api.post("/login", json=wrong_pw)),
+    Action(name="login_unknown_user",   execute=lambda api, ctx: api.post("/login", json=unknown)),
+    Action(name="login_missing_fields", execute=lambda api, ctx: api.post("/login", json={})),
 ]
 ```
 
 ### 5. Tag Actions for Filtering
 
 ```python
-Action(name="login", tags=["auth", "critical"])
+Action(name="login",          tags=["auth", "critical"])
 Action(name="update_profile", tags=["user", "non-critical"])
 Action(name="delete_account", tags=["user", "destructive", "critical"])
 
@@ -384,11 +475,13 @@ critical_actions = [a for a in actions if "critical" in a.tags]
 ### Check if Action Executes
 
 ```python
-def create_order(api: APIClient) -> ActionResult:
-    print(f"Executing create_order")  # Debug output
-    response = api.post("/orders", json={...})
-    print(f"Response: {response.status_code}")
-    return ActionResult.from_response(response)
+def create_order(api, context):
+    print("Executing create_order")
+    resp = api.post("/orders", json={"product_id": 1, "quantity": 2})
+    print(f"Response: {resp.status_code}")
+    resp.expect_status(201)
+    context.set("order_id", resp.json()["id"])
+    return resp
 ```
 
 ### Check Preconditions
