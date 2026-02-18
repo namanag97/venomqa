@@ -295,7 +295,7 @@ if __name__ == "__main__":
     for v in result.violations:
         print(f"\n[{v.severity.value}] {v.invariant_name}")
         print(f"  {v.message}")
-        print(f"  Path: {' -> '.join(v.path)}")
+        print(f"  Path: {' -> '.join(t.action_name for t in v.reproduction_path)}")
 ```
 
 ### Step 6: Run the exploration
