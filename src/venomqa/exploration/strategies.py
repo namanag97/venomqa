@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
-from collections import Counter
+from collections import Counter, deque
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from venomqa.exploration.frontier import QueueFrontier, StackFrontier
