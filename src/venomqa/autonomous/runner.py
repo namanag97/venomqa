@@ -209,8 +209,8 @@ class AutonomousRunner:
                     "green"
                 )
 
-            # Step 4: Generate actions from OpenAPI
-            self._log_step(4, 6, "Generating test actions from OpenAPI...")
+            # Step 5: Generate actions from OpenAPI
+            self._log_step(5, 7, "Generating test actions from OpenAPI...")
 
             from venomqa.v1.generators.openapi_actions import generate_actions
 
