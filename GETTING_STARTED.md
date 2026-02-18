@@ -280,7 +280,7 @@ agent = Agent(
             severity=Severity.HIGH,
         ),
     ],
-    strategy=BFS(),
+    strategy=DFS(),  # Use DFS with PostgreSQL (BFS doesn't work with PG savepoints)
     max_steps=100,
 )
 
