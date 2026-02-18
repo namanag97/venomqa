@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: Demo Orders API
+  description: |
+    A simple orders API with API key authentication.
+
+    **Authentication**: All endpoints (except /health) require an `X-API-Key` header.
+
+    **Planted Bug**: The refund endpoint allows refunding more than the order amount!
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check if the API is healthy (no auth required)
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+
+  /orders:
+    get:
+      summary: List all orders
+      operationId: listOrders
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          description: Unauthorized - invalid API key
+
+    post:
+      summary: Create a new order
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+      responses:
+        '200':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: Unauthorized - invalid API key
+
+  /orders/{order_id}:
+    get:
+      summary: Get an order by ID
+      operationId: getOrder
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: Unauthorized - invalid API key
+        '404':
+          description: Order not found
+
+    delete:
+      summary: Delete an order
+      operationId: deleteOrder
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: deleted
+        '401':
+          description: Unauthorized - invalid API key
+        '404':
+          description: Order not found
+
+  /orders/{order_id}/refund:
+    post:
+      summary: Refund an order
+      description: |
+        Process a partial or full refund for an order.
+
+        **BUG**: This endpoint allows refunding more than the order amount!
+      operationId: refundOrder
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+      responses:
+        '200':
+          description: Refund processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid refund amount
+        '401':
+          description: Unauthorized - invalid API key
+        '404':
+          description: Order not found
+
+  /reset:
+    post:
+      summary: Reset all data
+      description: Clears all orders (for testing purposes)
+      operationId: reset
+      responses:
+        '200':
+          description: Data reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: reset
+        '401':
+          description: Unauthorized - invalid API key
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    OrderCreate:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: number
+          format: float
+          example: 100.00
+        description:
+          type: string
+          example: "Test order"
+
+    RefundRequest:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          type: number
+          format: float
+          example: 50.00
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "order_1"
+        amount:
+          type: number
+          format: float
+          example: 100.00
+        description:
+          type: string
+          example: "Test order"
+        refunded_amount:
+          type: number
+          format: float
+          example: 0.00
+        status:
+          type: string
+          enum: [created, partially_refunded, refunded]
+          example: "created"
