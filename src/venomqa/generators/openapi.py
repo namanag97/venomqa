@@ -1336,9 +1336,12 @@ from typing import Any
         return builder
 
     def _sanitize_name(self, name: str) -> str:
-        """Convert a name to a valid Python identifier."""
+        """Convert a name to a valid Python identifier in snake_case."""
+        # Convert camelCase/PascalCase to snake_case
+        # Insert underscore before uppercase letters that follow lowercase
+        sanitized = re.sub(r"([a-z])([A-Z])", r"\1_\2", name)
         # Replace non-alphanumeric with underscore
-        sanitized = re.sub(r"[^a-zA-Z0-9]", "_", name)
+        sanitized = re.sub(r"[^a-zA-Z0-9]", "_", sanitized)
         # Remove leading digits
         sanitized = re.sub(r"^[0-9]+", "", sanitized)
         # Remove consecutive underscores
