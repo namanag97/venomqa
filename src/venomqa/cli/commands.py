@@ -371,9 +371,44 @@ Documentation: https://github.com/namanag97/venomqa
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output with detailed logging")
 @click.option("--config", "-c", type=click.Path(exists=True), help="Path to config file (default: venomqa.yaml)")
 @click.option("--profile", "-p", type=str, help="Configuration profile to use (dev, staging, prod)")
+@click.option(
+    "--auth-token",
+    envvar="VENOMQA_AUTH_TOKEN",
+    help="Bearer token for API authentication",
+)
+@click.option(
+    "--api-key",
+    envvar="VENOMQA_API_KEY",
+    help="API key for authentication (sent in X-API-Key header)",
+)
+@click.option(
+    "--basic-auth",
+    envvar="VENOMQA_BASIC_AUTH",
+    help="Basic auth credentials (user:password)",
+)
+@click.option(
+    "--db-password",
+    envvar="VENOMQA_DB_PASSWORD",
+    help="Database password override",
+)
+@click.option(
+    "--skip-preflight",
+    is_flag=True,
+    help="Skip preflight checks (Docker, auth validation, etc.)",
+)
 @click.version_option(version=None, prog_name="VenomQA", message=get_version())
 @click.pass_context
-def cli(ctx: click.Context, verbose: bool, config: str | None, profile: str | None) -> None:
+def cli(
+    ctx: click.Context,
+    verbose: bool,
+    config: str | None,
+    profile: str | None,
+    auth_token: str | None,
+    api_key: str | None,
+    basic_auth: str | None,
+    db_password: str | None,
+    skip_preflight: bool,
+) -> None:
     """Autonomous API QA agent — exhaustively explore every action sequence.
 
     Define actions (what to call) and invariants (rules that must hold), then
