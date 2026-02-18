@@ -366,12 +366,12 @@ world = World(
 
 # Actions
 actions = [
-    Action("login", lambda api: api.post("/login", json={...})),
-    Action("add_to_cart", lambda api: api.post("/cart", json={...}),
+    Action("login", lambda api, ctx: api.post("/login", json={...})),
+    Action("add_to_cart", lambda api, ctx: api.post("/cart", json={...}),
            preconditions=[logged_in]),
-    Action("checkout", lambda api: api.post("/checkout"),
+    Action("checkout", lambda api, ctx: api.post("/checkout"),
            preconditions=[cart_not_empty]),
-    Action("logout", lambda api: api.post("/logout"),
+    Action("logout", lambda api, ctx: api.post("/logout"),
            preconditions=[logged_in]),
 ]
 
