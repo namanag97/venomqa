@@ -2474,6 +2474,8 @@ def generate(
         click.echo(f"  API: {schema.title} v{schema.version}")
         click.echo(f"  Endpoints: {len(schema.endpoints)}")
         click.echo(f"  Schemas: {len(schema.schemas)}")
+        if schema.security_schemes:
+            click.echo(f"  Security: {', '.join(schema.security_schemes.keys())}")
 
         click.echo(f"\nGenerating code to: {output_dir}/")
         generated_files = generator.generate(output_dir)
