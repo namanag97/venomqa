@@ -22,7 +22,7 @@
 
 | Document | Location | Purpose |
 |----------|----------|---------|
-| [PROJECT_TRACKER.md](../PROJECT_TRACKER.md) | Root | Roadmap, issues, sprint tracking |
+| [PROJECT_TRACKER.md](archive/PROJECT_TRACKER.md) | Archive | Roadmap, issues, sprint tracking |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Root | Public contribution guide |
 | [CHANGELOG.md](../CHANGELOG.md) | Root | Version history |
 
