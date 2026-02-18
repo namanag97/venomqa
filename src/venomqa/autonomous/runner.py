@@ -198,8 +198,8 @@ class AutonomousRunner:
         self._log(f"       ✓ Using random ports to avoid conflicts", "green")
 
         try:
-            # Step 3: Start containers
-            self._log_step(3, 6, "Starting containers...")
+            # Step 4: Start containers
+            self._log_step(4, 7, "Starting containers...")
 
             endpoints = self._infra.start(timeout=120.0)
 
