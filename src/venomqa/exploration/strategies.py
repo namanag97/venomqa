@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import math
 import random
 from abc import ABC, abstractmethod
 from collections import Counter, deque
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from venomqa.exploration.frontier import QueueFrontier, StackFrontier
