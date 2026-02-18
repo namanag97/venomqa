@@ -24,7 +24,7 @@ Adapters implement the `Rollbackable` protocol, allowing VenomQA to checkpoint a
 The HTTP client for making API requests. Not rollbackable (stateless).
 
 ```python
-from venomqa.v1 import HttpClient
+from venomqa import HttpClient
 
 client = HttpClient(
     base_url="http://localhost:8000",
@@ -73,7 +73,7 @@ HttpClient(
 PostgreSQL adapter using savepoints for atomic rollback.
 
 ```python
-from venomqa.v1.adapters import PostgresAdapter
+from venomqa.adapters import PostgresAdapter
 
 db = PostgresAdapter(
     connection_string="postgresql://user:pass@localhost/testdb",
@@ -135,7 +135,7 @@ PostgresAdapter(
 Redis adapter using dump/restore for rollback.
 
 ```python
-from venomqa.v1.adapters import RedisAdapter
+from venomqa.adapters import RedisAdapter
 
 cache = RedisAdapter(
     url="redis://localhost:6379",
@@ -192,7 +192,7 @@ RedisAdapter(
 In-memory queue for testing asynchronous workflows.
 
 ```python
-from venomqa.v1.adapters import MockQueue
+from venomqa.adapters import MockQueue
 
 queue = MockQueue(name="tasks")
 
@@ -260,7 +260,7 @@ class Message:
 In-memory email capture for testing email sending.
 
 ```python
-from venomqa.v1.adapters import MockMail
+from venomqa.adapters import MockMail
 
 mail = MockMail()
 
@@ -272,8 +272,11 @@ mail.send(
 )
 
 # Check sent emails
-print(len(mail.emails))  # 1
-print(mail.emails[0].to)  # "user@example.com"
+print(mail.sent_count)  # 1
+print(mail.get_sent()[0].to)  # ["user@example.com"]
+
+# Filter by recipient
+user_emails = mail.get_sent(to="user@example.com")
 
 # Checkpoint/rollback
 cp = mail.checkpoint("before_test")
@@ -281,14 +284,36 @@ mail.send(to="other@example.com", subject="Test", body="...")
 mail.rollback(cp)  # Email removed
 ```
 
+### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `send` | `(to, subject, body, from_addr?, cc?, bcc?) -> Email` | Capture an email |
+| `get_sent` | `(to?: str) -> list[Email]` | Get sent emails, optionally filtered by recipient |
+| `get_by_subject` | `(subject: str) -> list[Email]` | Get emails by subject (contains match) |
+| `clear` | `() -> None` | Clear all sent emails |
+| `checkpoint` | `(name: str) -> SystemCheckpoint` | Save mail state |
+| `rollback` | `(checkpoint) -> None` | Restore mail state |
+| `observe` | `() -> Observation` | Get mail stats |
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `sent_count` | `int` | Number of emails sent |
+
 ### Email Class
 
 ```python
 @dataclass
 class Email:
-    to: str
+    id: str
+    to: list[str]
     subject: str
     body: str
+    from_addr: str
+    cc: list[str]
+    bcc: list[str]
     sent_at: datetime
 ```
 
@@ -296,7 +321,7 @@ class Email:
 
 ```python
 {
-    "count": 3,
+    "sent_count": 3,
     "recipients": ["user1@example.com", "user2@example.com", "user3@example.com"],
 }
 ```
@@ -308,7 +333,7 @@ class Email:
 In-memory file storage for testing uploads/downloads.
 
 ```python
-from venomqa.v1.adapters import MockStorage
+from venomqa.adapters import MockStorage
 
 storage = MockStorage()
 
@@ -344,7 +369,7 @@ class StoredFile:
 Mock time source for testing time-dependent logic.
 
 ```python
-from venomqa.v1.adapters import MockTime
+from venomqa.adapters import MockTime
 from datetime import datetime, timedelta
 
 time = MockTime()
@@ -371,7 +396,7 @@ time.rollback(cp)  # Back to original time
 Adapter for WireMock (external API mocking).
 
 ```python
-from venomqa.v1.adapters import WireMockAdapter
+from venomqa.adapters import WireMockAdapter
 
 wiremock = WireMockAdapter(url="http://localhost:8080")
 
@@ -391,8 +416,8 @@ wiremock.rollback(cp)
 Implement the `Rollbackable` protocol:
 
 ```python
-from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
-from venomqa.v1.core.state import Observation
+from venomqa.world.rollbackable import Rollbackable, SystemCheckpoint
+from venomqa.core.state import Observation
 
 class MyAdapter(Rollbackable):
     def checkpoint(self, name: str) -> SystemCheckpoint:
