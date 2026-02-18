@@ -399,12 +399,43 @@ def cli(ctx: click.Context, verbose: bool, config: str | None, profile: str | No
         setup_logging(verbose)
         return
 
-    # Show friendly intro if no command given (not just help wall)
+    # If no command given, try autonomous mode or show intro
     if ctx.invoked_subcommand is None:
+        from pathlib import Path
         from rich.console import Console
         from rich.panel import Panel
 
         console = Console()
+
+        # Check if we can run autonomously (docker-compose + openapi exist)
+        try:
+            from venomqa.autonomous.discovery import ProjectDiscovery
+            discovery = ProjectDiscovery(Path.cwd())
+
+            if discovery.has_compose_file() and discovery.has_openapi_spec():
+                # Run autonomous mode!
+                console.print()
+                console.print(Panel.fit(
+                    "[bold cyan]VenomQA[/bold cyan] — Autonomous API Testing\n\n"
+                    "Found docker-compose and OpenAPI spec.\n"
+                    "Starting autonomous exploration...",
+                    border_style="cyan",
+                ))
+
+                from venomqa.autonomous.runner import AutonomousRunner
+                runner = AutonomousRunner(verbose=True)
+                result = runner.run()
+
+                # Exit with error if violations found
+                sys.exit(EXIT_FAILURE if result.violations else EXIT_SUCCESS)
+        except ImportError:
+            pass  # Autonomous module not available, show intro
+        except Exception as e:
+            # Log error and fall through to intro
+            console.print(f"[yellow]Autonomous mode failed: {e}[/yellow]")
+            console.print("[dim]Showing help instead...[/dim]\n")
+
+        # Show friendly intro
         console.print()
         console.print(Panel.fit(
             "[bold cyan]VenomQA[/bold cyan] — Find bugs that only appear in API sequences\n\n"
@@ -414,6 +445,9 @@ def cli(ctx: click.Context, verbose: bool, config: str | None, profile: str | No
             "  [green]venomqa demo[/green]              See it find a real bug (30 seconds)\n"
             "  [green]venomqa init --with-sample[/green] Set up your project\n"
             "  [green]venomqa doctor[/green]            Check your environment\n\n"
+            "[bold]Autonomous Mode:[/bold] (zero-config)\n"
+            "  Add docker-compose.yml + openapi.yaml to your project,\n"
+            "  then just run [green]venomqa[/green] — it does everything automatically.\n\n"
             "[dim]Run 'venomqa --help' for all commands[/dim]",
             border_style="cyan",
         ))
