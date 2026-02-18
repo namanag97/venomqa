@@ -2,6 +2,21 @@
 
 Get VenomQA exploring your API in 5 minutes.
 
+## Try It First
+
+Before writing any code, see VenomQA find a real bug:
+
+```bash
+pip install venomqa
+venomqa demo
+```
+
+Then scaffold a project with working examples:
+
+```bash
+venomqa init --with-sample
+```
+
 ## Installation
 
 ```bash
@@ -16,57 +31,92 @@ pip install venomqa[postgres]
 ## Minimal Example
 
 ```python
-from venomqa import World, Agent, Action, Invariant
-from venomqa.adapters import HttpClient, PostgresAdapter
+# explore.py
+import os
+from venomqa import World, Agent, BFS, Action, Invariant, Severity
+from venomqa.adapters.http import HttpClient
+from venomqa.adapters.postgres import PostgresAdapter
 
 # 1. Create the World
+api = HttpClient("http://localhost:8000")
+db = PostgresAdapter(os.environ["DATABASE_URL"])
+
 world = World(
-    api=HttpClient("http://localhost:8000"),
+    api=api,
     systems={
-        "db": PostgresAdapter("postgres://user:pass@localhost/testdb"),
+        "db": db,
     },
 )
 
-# 2. Define Actions
-actions = [
-    Action(
-        name="list_users",
-        execute=lambda api: api.get("/users"),
-    ),
-    Action(
-        name="create_user",
-        execute=lambda api: api.post("/users", json={
-            "name": "Test User",
-            "email": "test@example.com",
-        }),
-    ),
-]
+# 2. Define Actions — signature is always (api, context)
+def list_users(api, context):
+    resp = api.get("/users")
+    resp.expect_status(200)
+    context.set("users", resp.json())
+    return resp
 
-# 3. Define Invariants
-invariants = [
-    Invariant(
-        name="user_count_consistent",
-        check=lambda world: (
-            world.systems["db"].query("SELECT COUNT(*) FROM users")[0][0]
-            == len(world.api.get("/users").json())
-        ),
-        message="Database user count must match API response",
-    ),
-]
+def create_user(api, context):
+    resp = api.post("/users", json={
+        "name": "Test User",
+        "email": "test@example.com",
+    })
+    resp.expect_status(201)
+    context.set("user_id", resp.json().get("id"))
+    return resp
+
+# 3. Define Invariants — receive a single World argument
+def user_count_consistent(world):
+    # Make a live API call to verify server state
+    resp = world.api.get("/users")
+    if resp.status_code != 200:
+        return False
+    api_count = len(resp.json())
+    db_count = world.systems["db"].query("SELECT COUNT(*) FROM users")[0][0]
+    return db_count == api_count
 
 # 4. Create Agent and Explore
-agent = Agent(world=world, actions=actions, invariants=invariants)
+agent = Agent(
+    world=world,
+    actions=[
+        Action(name="list_users",  execute=list_users),
+        Action(name="create_user", execute=create_user),
+    ],
+    invariants=[
+        Invariant(
+            name="user_count_consistent",
+            check=user_count_consistent,
+            message="Database user count must match API response",
+            severity=Severity.CRITICAL,
+        ),
+    ],
+    strategy=BFS(),
+    max_steps=200,
+)
+
 result = agent.explore()
 
 # 5. Report Results
-print(f"States explored: {result.states_visited}")
-print(f"Actions executed: {result.transitions_taken}")
-print(f"Violations found: {len(result.violations)}")
+print(f"States explored:   {result.states_visited}")
+print(f"Actions executed:  {result.transitions_taken}")
+print(f"Action coverage:   {result.action_coverage_percent:.0f}%")
+print(f"Violations found:  {len(result.violations)}")
 
 for violation in result.violations:
-    print(f"  BUG: {violation.invariant_name}")
-    print(f"       After: {violation.action.name if violation.action else 'initial'}")
-    print(f"       {violation.message}")
+    path = " → ".join(t.action_name for t in violation.reproduction_path)
+    print(f"  [{violation.severity.value.upper()}] {violation.invariant_name}: {violation.message}")
+    print(f"    Reproduction: {path}")
+```
+
+Run it directly:
+
+```bash
+python3 explore.py
+```
+
+Or via the CLI:
+
+```bash
+venomqa explore explore.py
 ```
 
 ## Step-by-Step Breakdown
@@ -79,49 +129,59 @@ The World contains all systems VenomQA can interact with:
 world = World(
     api=HttpClient("http://localhost:8000"),  # Your API
     systems={
-        "db": PostgresAdapter("postgres://..."),  # Your database
+        "db": PostgresAdapter(os.environ["DATABASE_URL"]),  # Your database
     },
 )
 ```
 
-The `api` is how VenomQA executes actions. The `systems` are what VenomQA observes and rolls back.
+The `api` is how VenomQA executes actions. The `systems` are what VenomQA observes and rolls back between exploration branches.
+
+**CRITICAL**: Connect to the **exact same database** your API writes to. VenomQA wraps the entire exploration in a transaction and rolls back when branching.
 
 ### Step 2: Define Actions
 
-Actions are things a user could do:
+Actions are things a user could do. The execute function always takes `(api, context)`:
 
 ```python
-Action(
-    name="create_user",
-    execute=lambda api: api.post("/users", json={"name": "Test"}),
-)
+def create_user(api, context):
+    resp = api.post("/users", json={"name": "Test"})
+    resp.expect_status(201)
+    context.set("user_id", resp.json().get("id"))
+    return resp
+
+Action(name="create_user", execute=create_user)
 ```
 
-Add preconditions for actions that require certain state:
+Add preconditions as a list of action names that must have run first:
 
 ```python
+def delete_user(api, context):
+    user_id = context.get("user_id")
+    return api.delete(f"/users/{user_id}")
+
 Action(
     name="delete_user",
-    execute=lambda api: api.delete("/users/1"),
-    preconditions=[
-        lambda state: state.observations["db"].data.get("user_count", 0) > 0,
-    ],
+    execute=delete_user,
+    preconditions=["create_user"],  # Only runs after create_user has succeeded
 )
 ```
 
 ### Step 3: Define Invariants
 
-Invariants are rules that must always be true:
+Invariants are rules that must always be true. They receive the `World` object:
 
 ```python
+def no_duplicate_emails(world):
+    rows = world.systems["db"].query(
+        "SELECT email, COUNT(*) FROM users GROUP BY email HAVING COUNT(*) > 1"
+    )
+    return rows == []
+
 Invariant(
     name="no_duplicate_emails",
-    check=lambda world: (
-        world.systems["db"].query(
-            "SELECT email, COUNT(*) FROM users GROUP BY email HAVING COUNT(*) > 1"
-        ) == []
-    ),
+    check=no_duplicate_emails,
     message="Each email must be unique",
+    severity=Severity.CRITICAL,
 )
 ```
 
@@ -130,15 +190,21 @@ Invariant(
 Create an Agent and call `explore()`:
 
 ```python
-agent = Agent(world=world, actions=actions, invariants=invariants)
+agent = Agent(
+    world=world,
+    actions=actions,
+    invariants=invariants,
+    strategy=BFS(),
+    max_steps=200,
+)
 result = agent.explore()
 ```
 
 The Agent will:
 - Try every action from every reachable state
-- Roll back to explore alternate paths
+- Roll back the database to explore alternate paths
 - Check all invariants after every action
-- Record any violations
+- Record any violations with the exact reproduction path
 
 ### Step 5: Report
 
@@ -148,40 +214,29 @@ The `ExplorationResult` contains everything:
 # Did we find bugs?
 if result.violations:
     for v in result.violations:
-        print(f"BUG: {v.invariant_name}")
-        print(f"  Reproduction: {v.reproduction_path}")
+        path = " → ".join(t.action_name for t in v.reproduction_path)
+        print(f"[{v.severity.value.upper()}] {v.invariant_name}: {v.message}")
+        print(f"  Reproduction: {path}")
 
 # Statistics
-print(f"Coverage: {result.coverage_percent:.1f}%")
-print(f"Time: {result.duration_ms:.0f}ms")
+print(f"Action coverage: {result.action_coverage_percent:.1f}%")
+print(f"Time:            {result.duration_ms:.0f}ms")
+print(f"Success:         {result.success}")
+```
+
+## No Database? Context-Based Mode
+
+If your API is stateless or you cannot access the database:
+
+```python
+# VenomQA tracks these context keys to distinguish states
+world = World(
+    api=HttpClient("http://localhost:8000"),
+    state_from_context=["order_id", "order_count", "user_id"],
+)
 ```
 
 ## Adding More Systems
-
-### With Redis Cache
-
-```python
-from venomqa.adapters import RedisAdapter
-
-world = World(
-    api=HttpClient("http://localhost:8000"),
-    systems={
-        "db": PostgresAdapter("postgres://..."),
-        "cache": RedisAdapter("redis://localhost:6379"),
-    },
-)
-
-# Now invariants can check cache too
-Invariant(
-    name="user_cached_after_fetch",
-    check=lambda world: (
-        # After fetching user 1, they should be in cache
-        world.systems["cache"].get("user:1") is not None
-        if world.systems["db"].query("SELECT * FROM users WHERE id=1")
-        else True
-    ),
-)
-```
 
 ### With Mock Queue
 
@@ -191,19 +246,23 @@ from venomqa.adapters import MockQueue
 world = World(
     api=HttpClient("http://localhost:8000"),
     systems={
-        "db": PostgresAdapter("postgres://..."),
-        "queue": MockQueue(),
+        "db":    PostgresAdapter(os.environ["DATABASE_URL"]),
+        "queue": MockQueue(name="tasks"),
     },
 )
 
-# Check that actions enqueue jobs
+# Check that paid orders enqueue a job
+def order_creates_job(world):
+    rows = world.systems["db"].query("SELECT * FROM orders WHERE status='paid'")
+    if not rows:
+        return True  # No paid orders yet — invariant doesn't apply
+    return world.systems["queue"].pending_count > 0
+
 Invariant(
     name="order_creates_job",
-    check=lambda world: (
-        world.systems["queue"].observe().data["pending"] > 0
-        if world.systems["db"].query("SELECT * FROM orders WHERE status='paid'")
-        else True
-    ),
+    check=order_creates_job,
+    message="Paid orders must enqueue a processing job",
+    severity=Severity.HIGH,
 )
 ```
 
@@ -215,53 +274,52 @@ from venomqa.adapters import MockMail
 world = World(
     api=HttpClient("http://localhost:8000"),
     systems={
-        "db": PostgresAdapter("postgres://..."),
+        "db":   PostgresAdapter(os.environ["DATABASE_URL"]),
         "mail": MockMail(),
     },
 )
 
-# Check that signup sends welcome email
+# Check that signup sends a welcome email
+def signup_sends_email(world):
+    rows = world.systems["db"].query("SELECT * FROM users")
+    if not rows:
+        return True  # No users yet
+    return world.systems["mail"].sent_count > 0
+
 Invariant(
     name="signup_sends_email",
-    check=lambda world: (
-        world.systems["mail"].observe().data["count"] > 0
-        if world.systems["db"].query("SELECT * FROM users")
-        else True
-    ),
+    check=signup_sends_email,
+    message="User signup must send a welcome email",
+    severity=Severity.MEDIUM,
 )
 ```
 
-## Using the DSL
-
-For simpler scenarios, use the Journey DSL:
+### With Redis Cache
 
 ```python
-from venomqa import Journey, Step, Checkpoint, Branch, Path, explore
+from venomqa.adapters.redis import RedisAdapter
 
-journey = Journey(
-    name="user_flow",
-    steps=[
-        Step("signup", lambda api: api.post("/signup", json={...})),
-        Checkpoint("after_signup"),
-        Branch(
-            from_checkpoint="after_signup",
-            paths=[
-                Path("complete_profile", [
-                    Step("add_avatar", lambda api: api.post("/avatar", ...)),
-                ]),
-                Path("skip_profile", [
-                    Step("go_to_dashboard", lambda api: api.get("/dashboard")),
-                ]),
-            ],
-        ),
-    ],
+world = World(
+    api=HttpClient("http://localhost:8000"),
+    systems={
+        "db":    PostgresAdapter(os.environ["DATABASE_URL"]),
+        "cache": RedisAdapter("redis://localhost:6379"),
+    },
 )
+```
 
-result = explore(
-    "http://localhost:8000",
-    journey,
-    db_url="postgres://...",
-)
+## Validation Helpers
+
+Use `expect_*` helpers in actions — VenomQA catches `AssertionError` as violations:
+
+```python
+resp.expect_status(201)              # raises if not 201
+resp.expect_status(200, 201, 204)    # raises if not any of these
+resp.expect_success()                # raises if not 2xx/3xx
+data = resp.expect_json()            # raises if not JSON
+data = resp.expect_json_field("id")  # raises if "id" missing, returns dict
+items = resp.expect_json_list()      # raises if not array
+resp.status_code                     # returns 0 on network error (safe)
 ```
 
 ## Running in CI
@@ -289,9 +347,11 @@ jobs:
         run: docker-compose up -d api
 
       - name: Run VenomQA
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost/mydb
         run: |
           pip install venomqa[postgres]
-          python explore.py
+          python3 explore.py
 
       - name: Upload Results
         if: always()
@@ -306,4 +366,4 @@ jobs:
 - [Writing Actions](writing-actions.md) — Define what VenomQA can do
 - [Writing Invariants](writing-invariants.md) — Define what must be true
 - [How Rollback Works](../concepts/rollback.md) — Understand the core mechanism
-- [Adapters Reference](../adapters/index.md) — Configure databases, caches, etc.
+- [Adapters Reference](../adapters/index.md) — Configure databases, caches, and mock systems
