@@ -500,63 +500,25 @@ class PreflightRunner:
 
 
 def display_preflight_report(report: PreflightReport, verbose: bool = False) -> None:
-    """Display preflight report using Rich console."""
+    """Display preflight report - simple output with one fix per failure."""
     try:
         from rich.console import Console
-        from rich.panel import Panel
-        from rich.table import Table
 
         console = Console()
 
-        table = Table(show_header=False, box=None)
-        table.add_column("Status", width=3)
-        table.add_column("Check", width=20)
-        table.add_column("Result")
-
         for check in report.checks:
             if check.result == CheckResult.PASS:
-                status = "[green]OK[/green]"
-                message = f"[green]{check.message}[/green]"
-            elif check.result == CheckResult.WARN:
-                status = "[yellow]--[/yellow]"
-                message = f"[yellow]{check.message}[/yellow]"
+                console.print(f"       [green]✓[/green] {check.name}")
             elif check.result == CheckResult.FAIL:
-                status = "[red]!![/red]"
-                message = f"[red]{check.message}[/red]"
-            else:  # SKIP
-                status = "[dim]--[/dim]"
-                message = f"[dim]{check.message}[/dim]"
-
-            table.add_row(status, check.name, message)
-
-        console.print()
-        console.print(table)
-
-        # Show fix suggestions for failures
-        if report.failed_checks:
-            console.print()
-            for check in report.failed_checks:
+                console.print(f"       [red]✗[/red] {check.name}")
                 if check.fix_suggestion:
-                    console.print(Panel(
-                        check.fix_suggestion,
-                        title=f"[red]Fix: {check.name}[/red]",
-                        border_style="red",
-                    ))
+                    console.print(f"         [bold]Fix:[/bold] {check.fix_suggestion}")
 
     except ImportError:
-        # Fallback without Rich
         for check in report.checks:
-            status = {
-                CheckResult.PASS: "[OK]",
-                CheckResult.WARN: "[WARN]",
-                CheckResult.FAIL: "[FAIL]",
-                CheckResult.SKIP: "[SKIP]",
-            }[check.result]
-            print(f"{status} {check.name}: {check.message}")
-
-        if report.failed_checks:
-            print("\nFix suggestions:")
-            for check in report.failed_checks:
+            if check.result == CheckResult.PASS:
+                print(f"  OK: {check.name}")
+            elif check.result == CheckResult.FAIL:
+                print(f"  FAIL: {check.name}")
                 if check.fix_suggestion:
-                    print(f"\n{check.name}:")
-                    print(check.fix_suggestion)
+                    print(f"    Fix: {check.fix_suggestion}")
