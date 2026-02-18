@@ -36,10 +36,22 @@ class HttpClient:
         *,
         json: Any = None,
         data: Any = None,
+        files: Any = None,
         headers: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
     ) -> ActionResult:
-        """Make an HTTP request and return ActionResult."""
+        """Make an HTTP request and return ActionResult.
+
+        Args:
+            method: HTTP method (GET, POST, PUT, PATCH, DELETE)
+            path: URL path (appended to base_url)
+            json: JSON body (dict or list)
+            data: Form data (dict)
+            files: File uploads - dict of {field: (filename, content, content_type)}
+                   Example: {"file": ("test.txt", b"content", "text/plain")}
+            headers: Additional headers
+            params: Query parameters
+        """
         url = urljoin(self.base_url + "/", path.lstrip("/"))
         merged_headers = {**self.default_headers, **(headers or {})}
 
@@ -47,7 +59,7 @@ class HttpClient:
             method=method.upper(),
             url=url,
             headers=merged_headers,
-            body=json or data,
+            body=json or data or ("[file upload]" if files else None),
         )
 
         start = time.perf_counter()
@@ -57,6 +69,7 @@ class HttpClient:
                 url=path,
                 json=json,
                 data=data,
+                files=files,
                 headers=headers,
                 params=params,
             )
