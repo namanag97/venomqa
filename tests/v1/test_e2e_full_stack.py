@@ -195,8 +195,10 @@ class MockUserAPIClient:
                     _state["deleted_users"].append(user_id)
                     return self._make_result("DELETE", path, 204, {})
                 # BUG: Double-delete returns 204 instead of 404
-                # This is an intentional planted bug for the test to find
+                # AND corrupts state by appending duplicate to deleted_users.
+                # This is an intentional planted bug for the test to find.
                 if user_id in _state["deleted_users"]:
+                    _state["deleted_users"].append(user_id)  # data corruption!
                     return self._make_result("DELETE", path, 204, {})
             return self._make_result("DELETE", path, 404, {"error": "not found"})
         return self._make_result("DELETE", path, 404)
