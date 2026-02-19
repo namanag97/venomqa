@@ -2654,17 +2654,6 @@ def generate_graphql(
         click.echo("\nUsage example:")
         click.echo(f"    from {output_dir.replace('/', '.')}.{module_name} import *")
 
-    except FileNotFoundError as e:
-        click.echo(f"Schema file not found: {e}", err=True)
-        sys.exit(1)
-    except Exception as e:
-        click.echo(f"Error generating code: {e}", err=True)
-        if ctx.obj.get("verbose"):
-            import traceback
-
-            traceback.print_exc()
-        sys.exit(1)
-
 
 # Environment management commands
 @cli.command("check-env")
