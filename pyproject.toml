@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "venomqa"
-version = "0.6.3"
+version = "0.6.4"
 description = "Stateful API testing agent — exhaustively explores every call sequence to catch bugs pytest and Schemathesis miss."
 readme = "README.md"
 license = "MIT"
