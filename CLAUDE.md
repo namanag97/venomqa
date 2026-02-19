@@ -52,6 +52,46 @@ export VENOMQA_AUTH_TOKEN=your-token
 
 ## Architecture
 
+### Minimal Working Example
+
+```python
+from venomqa import Action, Agent, BFS, Invariant, Severity, World
+from venomqa.adapters.http import HttpClient
+
+def create_order(api, context):
+    resp = api.post("/orders", json={"amount": 100})
+    context.set("order_id", resp.json()["id"])
+    return resp
+
+def refund_order(api, context):
+    order_id = context.get("order_id")
+    if order_id is None:
+        return None  # skip — precondition not met
+    return api.post(f"/orders/{order_id}/refund")
+
+no_500s = Invariant(
+    name="no_server_errors",
+    check=lambda world: world.context.get("last_status", 200) < 500,
+    severity=Severity.CRITICAL,
+)
+
+api = HttpClient(base_url="http://localhost:8000")
+# World requires state_from_context OR a systems adapter — bare World(api=api) raises ValueError
+world = World(api=api, state_from_context=["order_id"])
+
+agent = Agent(
+    world=world,
+    actions=[Action(name="create_order", execute=create_order),
+             Action(name="refund_order", execute=refund_order)],
+    invariants=[no_500s],
+    strategy=BFS(),   # BFS() takes no args — use max_steps for depth control
+    max_steps=50,
+)
+
+result = agent.explore()  # NOT .run() — that method does not exist
+print(f"States: {result.states_visited}, Violations: {result.violations}")
+```
+
 ### Import Style
 
 All imports use the top-level `venomqa` package:
