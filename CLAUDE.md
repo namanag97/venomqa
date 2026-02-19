@@ -67,9 +67,15 @@ from venomqa.adapters.postgres import PostgresAdapter
 |---------|-------------|
 | `Action` | Callable `(api, context) -> response` — one API operation |
 | `Invariant` | Rule `(world) -> bool` checked after every action |
-| `World` | Sandbox: HTTP client + rollbackable systems + context |
-| `Agent` | Orchestrates BFS/DFS exploration with checkpoints |
+| `World` | Sandbox: `World(api=api, state_from_context=[...])` or `World(api=api, systems={'db': adapter})` |
+| `Agent` | `Agent(world, actions=[...], invariants=[...], strategy=BFS(), max_steps=N)` |
 | `Context` | Key-value store: `context.set()` / `context.get()` |
+
+**Critical API rules (verified against installed package):**
+- `World` takes `api` + either `state_from_context=[...]` OR `systems={'db': adapter}` — bare `World(api=api)` raises `ValueError`
+- `actions` and `invariants` are `Agent` parameters, **not** `World` parameters
+- `BFS()` takes **no arguments** — control depth via `Agent(max_steps=N)`
+- Run exploration with `agent.explore()` — **not** `agent.run()` (does not exist)
 
 ### Module Map
 
