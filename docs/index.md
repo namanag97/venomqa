@@ -872,19 +872,19 @@ hide:
     <div class="venom-features-grid">
       <div class="venom-feature">
         <div class="venom-feature-icon">🔀</div>
-        <h3>State Graph Testing</h3>
+        <h3>State Graph Exploration</h3>
         <p>Model as nodes & edges. Auto-explore all reachable paths.</p>
       </div>
 
       <div class="venom-feature">
         <div class="venom-feature-icon">✅</div>
-        <h3>Invariants</h3>
+        <h3>Invariant Checking</h3>
         <p>Rules checked after every action. Catch consistency bugs.</p>
       </div>
 
       <div class="venom-feature">
         <div class="venom-feature-icon">💾</div>
-        <h3>Checkpoints</h3>
+        <h3>DB Checkpoint & Rollback</h3>
         <p>Save database state. Branch to test multiple paths.</p>
       </div>
 
