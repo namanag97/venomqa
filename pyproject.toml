@@ -87,6 +87,10 @@ classifiers = [
     "Topic :: Software Development :: Testing :: Acceptance",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Testing :: Unit",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Natural Language :: English",
     "Typing :: Typed",
 ]
 dependencies = [
