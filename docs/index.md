@@ -656,9 +656,9 @@ hide:
 <!-- HERO -->
 <section class="venom-hero">
   <div class="venom-container">
-    <h1>Test your <span>entire app</span>,<br>not just endpoints</h1>
+    <h1>Find <span>sequence bugs</span><br>your tests will never catch</h1>
     <p class="venom-hero-subtitle">
-      VenomQA explores all paths through your API and catches bugs that isolated tests miss.
+      VenomQA autonomously explores every API call sequence — the stateful bugs that pytest, Schemathesis, and Postman all miss.
     </p>
     <div class="venom-hero-cta">
       <a href="getting-started/quickstart/" class="venom-btn venom-btn-primary">Get Started</a>
