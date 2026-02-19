@@ -320,8 +320,11 @@ class Agent:
             from_state, action, None, InvariantTiming.PRE_ACTION
         )
 
-        # Execute action
+        # Execute action — None return means "skip this action for this state"
         action_result = self.world.act(action)
+        if action_result is None:
+            self.graph.mark_explored(from_state.id, action.name)
+            return None
 
         # Check response assertions
         self._check_response_assertions(from_state, action, action_result)
