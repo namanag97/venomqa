@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-02-19
+
+### Fixed
+
+- **`venomqa` import crash on startup** — `SchemaValidatorclaude` typo in `venomqa/__init__.py` (introduced in 0.6.1) caused `ImportError` on every import of the package. Renamed to correct `SchemaValidator`.
+
+- **`venomqa generate-graphql` syntax error** — Orphaned `except` clauses left outside their `try` block caused `SyntaxError` in `cli/commands.py`, making the CLI unimportable.
+
+### CI/CD
+
+- **Publish pipeline now runs tests before releasing** — `publish.yml` now has a `smoke-test` job (installs the built wheel and verifies all `__all__` exports) and a `test-installed` job (runs full unit suite against the wheel). `publish-pypi` is blocked until both pass.
+
+- **Fixed mypy path in CI** — `test.yml` was running `mypy venomqa/` (non-existent path in src layout), silently skipping all type checks. Corrected to `mypy src/venomqa/`.
+
+- **Added public API smoke tests** — `tests/v1/test_public_api.py` imports every name in `venomqa.__all__` and the CLI entry point, making import-level regressions immediately visible in the test run.
+
 ## [0.6.1] - 2026-02-18
 
 ### Fixed
