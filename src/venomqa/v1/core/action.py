@@ -434,12 +434,8 @@ class Action:
         else:
             result = self.execute(api)
 
-        if result is None:
-            raise TypeError(
-                f"Action '{self.name}' returned None. "
-                "Actions must return an ActionResult. "
-                "Did you forget 'return resp'?"
-            )
+        # None means "skip this action" — valid pattern for conditional actions:
+        #   if not context.get("order_id"): return None
         return result
 
     def can_execute(self, state: State) -> bool:
