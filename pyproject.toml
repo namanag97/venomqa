@@ -151,6 +151,7 @@ Repository = "https://github.com/namanag97/venomqa"
 "Source Code" = "https://github.com/namanag97/venomqa"
 "Bug Tracker" = "https://github.com/namanag97/venomqa/issues"
 Changelog = "https://github.com/namanag97/venomqa/blob/main/CHANGELOG.md"
+Discussions = "https://github.com/namanag97/venomqa/discussions"
 "Getting Started" = "https://github.com/namanag97/venomqa/blob/main/SETUP.md"
 
 [project.scripts]
