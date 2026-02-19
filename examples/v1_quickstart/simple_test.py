@@ -6,7 +6,7 @@ explore every reachable action sequence.
 Run with: python3 examples/v1_quickstart/simple_test.py
 """
 
-from venomqa.v1 import (
+from venomqa import (
     Action,
     Agent,
     BFS,
@@ -14,7 +14,7 @@ from venomqa.v1 import (
     Severity,
     World,
 )
-from venomqa.v1.adapters.http import HttpClient
+from venomqa.adapters.http import HttpClient
 
 
 # 1. Define actions — signature is always (api, context)
@@ -63,7 +63,7 @@ def order_count_valid(world):
 
 if __name__ == "__main__":
     api = HttpClient("http://localhost:8000")
-    world = World(api=api)
+    world = World(api=api, state_from_context=["token", "order_id"])
 
     agent = Agent(
         world=world,
