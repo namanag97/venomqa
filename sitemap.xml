@@ -1,183 +1,87 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://venomqa.dev/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/advanced/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/ARCHITECTURE_V2/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/changelog/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/CODE_OF_CONDUCT/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/ci-cd/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/INVARIANTS_GUIDE/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/cli-output/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/advanced/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/comparison/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/changelog/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/contributing/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/ci-cd/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/examples/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/cli-output/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/faq/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/comparison/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/plugins/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/contributing/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/roadmap/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/examples/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/advanced/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/faq/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/advanced/custom-backends/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/plugins/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/advanced/custom-reporters/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/preflight-configuration/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/advanced/performance/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/roadmap/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/advanced/testing-patterns/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/examples/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/concepts/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/examples/auth/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/concepts/branching/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/examples/checkout/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/concepts/journeys/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/examples/crud/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/concepts/ports-adapters/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/reference/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
     <url>
-         <loc>https://venomqa.dev/concepts/state/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/examples/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/examples/auth/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/examples/checkout/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/examples/crud/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/getting-started/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/getting-started/configuration/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/getting-started/installation/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/getting-started/quickstart/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/reference/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/reference/adapters/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/reference/api/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/reference/backends/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/reference/cli/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/reference/config/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/reference/reporters/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/specs/VISION/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/specs/framework-spec/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/specs/publishing/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/specs/state-chain/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/specs/state-explorer/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/tutorials/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/tutorials/ci-cd/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/tutorials/first-journey/</loc>
-         <lastmod>2026-02-14</lastmod>
-    </url>
-    <url>
-         <loc>https://venomqa.dev/tutorials/payment-flows/</loc>
-         <lastmod>2026-02-14</lastmod>
+         <loc>https://namanag97.github.io/venomqa/reference/config/</loc>
+         <lastmod>2026-02-19</lastmod>
     </url>
 </urlset>
