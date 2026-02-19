@@ -24,6 +24,51 @@ from venomqa.v1.adapters.http import HttpClient
 
 # Backwards compatibility alias
 Client = HttpClient
+# Discovery context (OpenAPI parsing)
+from venomqa.discovery import OpenAPISpec
+from venomqa.discovery.endpoint import CrudType, Endpoint
+
+# Exploration strategies (canonical location is venomqa.exploration)
+# Exploration types (canonical location is venomqa.exploration)
+from venomqa.exploration import (
+    BFS,
+    DFS,
+    MCTS,
+    CoverageGuided,
+    ExplorationResult,
+    ExplorationStrategy,
+    Graph,
+    Random,
+    Strategy,
+    Transition,
+    Weighted,
+)
+
+# Reporters (canonical location is venomqa.reporting)
+from venomqa.reporting import (
+    ConsoleReporter,
+    DimensionCoverageReporter,
+    HTMLTraceReporter,
+    JSONReporter,
+    JUnitReporter,
+    MarkdownReporter,
+    Reporter,
+)
+
+# Runtime context (service lifecycle)
+from venomqa.runtime import HealthStatus, Orchestrator, Service, ServiceType
+
+# Sandbox context (canonical location for World, Context, State)
+# World (sandbox with checkpoint/rollback) - canonical location is venomqa.sandbox
+from venomqa.sandbox import (
+    Checkpoint,
+    Context,
+    Observation,
+    Rollbackable,
+    State,
+    SystemCheckpoint,
+    World,
+)
 from venomqa.v1.adapters.resource_graph import (
     ResourceGraph,
     ResourceSchema,
@@ -34,18 +79,6 @@ from venomqa.v1.adapters.sqlite import SQLiteAdapter
 
 # Agent (exploration engine)
 from venomqa.v1.agent import Agent, Scheduler
-
-# Exploration strategies (canonical location is venomqa.exploration)
-from venomqa.exploration import (
-    BFS,
-    DFS,
-    MCTS,
-    CoverageGuided,
-    ExplorationStrategy,
-    Random,
-    Strategy,
-    Weighted,
-)
 from venomqa.v1.agent.dimension_strategy import DimensionNoveltyStrategy
 
 # Auth helpers
@@ -74,8 +107,6 @@ from venomqa.v1.core.constraints import (
     StateConstraint,
     constraint,
 )
-# Sandbox context (canonical location for World, Context, State)
-from venomqa.sandbox import Context
 
 # Coverage
 from venomqa.v1.core.coverage import DimensionAxisCoverage, DimensionCoverage
@@ -90,8 +121,6 @@ from venomqa.v1.core.dimensions import (
     UsageClass,
     UserRole,
 )
-# Exploration types (canonical location is venomqa.exploration)
-from venomqa.exploration import Graph
 from venomqa.v1.core.hyperedge import Hyperedge
 from venomqa.v1.core.hypergraph import Hypergraph
 from venomqa.v1.core.invariant import (
@@ -113,19 +142,12 @@ from venomqa.v1.core.observers import (
     latest_row,
     row_with_status,
 )
-from venomqa.exploration import ExplorationResult
-from venomqa.sandbox import Observation, State
-from venomqa.exploration import Transition
 
 # DSL (Journey definition)
 from venomqa.v1.dsl import Branch, Journey, Path, Step
 from venomqa.v1.dsl import Checkpoint as JourneyCheckpoint
 from venomqa.v1.dsl.compiler import compile as compile_journey
 from venomqa.v1.dsl.decorators import action, invariant
-
-# Discovery context (OpenAPI parsing)
-from venomqa.discovery import OpenAPISpec
-from venomqa.discovery.endpoint import CrudType, Endpoint
 
 # Generators (OpenAPI action generation)
 from venomqa.v1.generators.openapi_actions import (
@@ -151,20 +173,6 @@ from venomqa.v1.modes import (
 # Recording
 from venomqa.v1.recording import RecordedRequest, RequestRecorder, generate_journey_code
 
-# Reporters (canonical location is venomqa.reporting)
-from venomqa.reporting import (
-    ConsoleReporter,
-    DimensionCoverageReporter,
-    HTMLTraceReporter,
-    JSONReporter,
-    JUnitReporter,
-    MarkdownReporter,
-    Reporter,
-)
-
-# Runtime context (service lifecycle)
-from venomqa.runtime import HealthStatus, Orchestrator, Service, ServiceType
-
 # Setup helpers (high-level API)
 from venomqa.v1.setup import connect_to_api, connect_to_app, connect_to_protocol, setup_from_config
 
@@ -176,9 +184,6 @@ from venomqa.v1.validation import (
     matches_type,
     validate_response,
 )
-
-# World (sandbox with checkpoint/rollback) - canonical location is venomqa.sandbox
-from venomqa.sandbox import Checkpoint, Rollbackable, SystemCheckpoint, World
 
 # Type aliases
 StateID = str
@@ -245,10 +250,12 @@ def explore(
 
     if db_url:
         from venomqa.v1.adapters.postgres import PostgresAdapter
+
         systems["db"] = PostgresAdapter(db_url)
 
     if redis_url:
         from venomqa.v1.adapters.redis import RedisAdapter
+
         systems["cache"] = RedisAdapter(redis_url)
 
     # Create world
