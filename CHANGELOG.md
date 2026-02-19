@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-02-19
+
+### Fixed
+
+- **`Invariant` severity/message field order corrected** — `Invariant("name", check, Severity.CRITICAL)` was silently setting `message=Severity.CRITICAL` and leaving `severity` at the default `MEDIUM`. The field order is now `(name, check, severity, message)` so the 3rd positional arg correctly sets severity. All existing code using keyword args is unaffected.
+
 ## [0.6.2] - 2026-02-19
 
 ### Fixed
