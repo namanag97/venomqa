@@ -29,7 +29,7 @@ jobs:
       - name: Build package
         run: python -m build
 
-      - name: Check package
+      - name: Check package metadata
         run: twine check dist/*
 
       - name: Upload build artifacts
@@ -39,8 +39,84 @@ jobs:
           path: dist/
           retention-days: 7
 
-  publish-pypi:
+  # Install the built wheel in a clean environment and verify:
+  #   1. The package imports without errors
+  #   2. Every name in __all__ is actually present (catches renamed/typo'd imports)
+  #   3. The CLI entry point loads
+  # This is the gate that catches broken __init__.py edits before they hit PyPI.
+  smoke-test:
     needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install wheel
+        run: pip install dist/*.whl
+
+      - name: Verify package imports
+        run: |
+          python -c "
+          import venomqa
+
+          # Check every public export actually exists
+          missing = [n for n in venomqa.__all__ if not hasattr(venomqa, n)]
+          if missing:
+              raise ImportError(f'Missing exports: {missing}')
+          print(f'All {len(venomqa.__all__)} public exports verified')
+
+          # Check CLI loads
+          from venomqa.cli import main
+          from venomqa.cli.commands import cli
+          assert callable(main)
+          print('CLI imports OK')
+
+          print(f'venomqa {venomqa.__version__} smoke test passed')
+          "
+
+  # Run the full unit test suite against the installed wheel (not editable install).
+  # Catches test failures that only appear in the packaged form.
+  test-installed:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install wheel with dev dependencies
+        run: |
+          pip install dist/*.whl
+          pip install pytest pytest-asyncio
+
+      - name: Run unit tests
+        run: |
+          pytest tests/v1/ \
+            --ignore=tests/v1/test_postgres.py \
+            --ignore=tests/v1/test_jsonplaceholder.py \
+            -q --tb=short
+
+  publish-pypi:
+    needs: [build, smoke-test, test-installed]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
