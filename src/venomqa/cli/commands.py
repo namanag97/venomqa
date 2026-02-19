@@ -425,6 +425,12 @@ def cli(
     """
     ctx.ensure_object(dict)
 
+    # Start background update check — result shown after command completes
+    from venomqa.cli.update_check import UpdateChecker
+    _update_checker = UpdateChecker()
+    _update_checker.start()
+    ctx.call_on_close(_update_checker.show_if_available)
+
     # Skip config loading for commands that don't need it, and whenever
     # --help is requested (config errors must never block help text).
     help_requested = "--help" in sys.argv or "-h" in sys.argv
