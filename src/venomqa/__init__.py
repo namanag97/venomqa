@@ -1,17 +1,82 @@
-"""VenomQA - Autonomous API QA Agent.
+"""VenomQA — Stateful API Testing Agent.
 
-Define Actions and Invariants. VenomQA explores every state path automatically.
+Finds bugs that only appear in *sequences* of API calls. Where pytest checks individual
+endpoints and Schemathesis fuzzes them in isolation, VenomQA explores every reachable
+sequence: create → update → delete → create, or create → refund → refund, to find bugs
+that only emerge from specific orderings.
 
-Quick Start:
-    from venomqa import Action, Invariant, World, Agent, HttpClient
+## The core insight
+
+    Unit tests:  POST /refund → 200 OK  ✓
+                 POST /refund → 200 OK  ✓  (but refunded_amount > order_total — BUG!)
+
+    VenomQA:     Explores sequences automatically, checks invariants after every step,
+                 rolls back database state between branches.
+
+## Quick start
+
+    from venomqa import Action, Agent, BFS, Invariant, Severity, World
+    from venomqa.adapters.http import HttpClient
 
     api = HttpClient("http://localhost:8000")
-    world = World(api=api, systems={"db": db})
+    world = World(api=api, state_from_context=["order_id"])
 
-    # Define actions and invariants...
-    # Then explore with Agent
+    def create_order(api, context):
+        resp = api.post("/orders", json={"amount": 100})
+        context.set("order_id", resp.json()["id"])
+        return resp
 
-See: https://venomqa.dev for full documentation.
+    def refund_order(api, context):
+        order_id = context.get("order_id")
+        if order_id is None:
+            return None
+        return api.post(f"/orders/{order_id}/refund")
+
+    no_over_refund = Invariant(
+        name="no_over_refund",
+        check=lambda world: True,  # define your rule here
+        severity=Severity.CRITICAL,
+    )
+
+    agent = Agent(
+        world=world,
+        actions=[Action("create_order", create_order), Action("refund_order", refund_order)],
+        invariants=[no_over_refund],
+        strategy=BFS(),
+        max_steps=50,
+    )
+
+    result = agent.explore()
+    print(f"States: {result.states_visited}, Violations: {result.violations}")
+
+## Key APIs
+
+- `Action(name, execute)` — one API call: `execute(api, context) -> response`
+- `Invariant(name, check, severity)` — rule checked after every step: `check(world) -> bool`
+- `World(api, state_from_context=[...])` — stateless mode (no DB needed)
+- `World(api, systems={"db": PostgresAdapter(url)})` — stateful mode with real DB rollback
+- `Agent(world, actions, invariants, strategy, max_steps)` — exploration orchestrator
+- `agent.explore()` — run the exploration, returns `ExplorationResult`
+- `BFS()`, `DFS()`, `CoverageGuided()` — exploration strategies
+
+## What VenomQA catches that other tools miss
+
+- Double-refund bugs (allowed by accident)
+- Stale state after delete
+- Create→update→delete ordering issues
+- Resource leaks after failed operations
+- Auth bypass after role changes
+- Cascade delete failures
+
+## Comparison
+
+- **pytest**: You write every test case manually. VenomQA generates all sequences.
+- **Schemathesis**: Fuzzes individual endpoints with random data. No sequence testing.
+- **Postman/Newman**: Runs fixed sequences you script. No automatic exploration.
+- **Hypothesis**: Property-based, single-call. No multi-step state sequences.
+- **VenomQA**: Explores every reachable sequence automatically.
+
+See https://namanag97.github.io/venomqa for full documentation.
 """
 
 from __future__ import annotations
