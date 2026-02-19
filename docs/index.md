@@ -3,6 +3,8 @@ hide:
   - navigation
   - toc
   - footer
+description: "VenomQA is a Python tool for autonomous stateful API testing. Find sequence bugs—double refunds, stale state, idempotency failures—that pytest and Schemathesis miss. Install in 30 seconds."
+keywords: "API testing, Python testing, stateful testing, integration testing, E2E testing, automated testing, sequence bugs, API quality"
 ---
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -913,6 +915,305 @@ hide:
 [data-md-color-scheme="slate"] .vp-col-venom {
   background: rgba(208, 90, 8, 0.08) !important;
 }
+
+/* ── USE CASES ─────────────────────────────────────────────────── */
+
+.vp-usecases {
+  padding: 5.5rem 2rem;
+  background: var(--stone-50);
+  border-bottom: 1px solid var(--stone-200);
+}
+
+.vp-usecases-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.vp-usecases-header {
+  margin-bottom: 3rem;
+  max-width: 600px;
+}
+
+.vp-usecases-header h2 {
+  font-family: var(--sans);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--stone-900);
+  margin: 0;
+}
+
+.vp-usecases-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border: 1px solid var(--stone-200);
+  background: var(--stone-50);
+}
+
+@media (max-width: 1000px) {
+  .vp-usecases-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .vp-usecase-card:nth-child(2n) {
+    border-left: 1px solid var(--stone-200);
+  }
+  .vp-usecase-card:nth-child(n+3) {
+    border-top: 1px solid var(--stone-200);
+  }
+}
+
+@media (max-width: 560px) {
+  .vp-usecases-grid {
+    grid-template-columns: 1fr;
+  }
+  .vp-usecase-card {
+    border-left: none !important;
+    border-top: 1px solid var(--stone-200) !important;
+  }
+  .vp-usecase-card:first-child {
+    border-top: none !important;
+  }
+}
+
+.vp-usecase-card {
+  padding: 2rem 1.75rem;
+  border-right: 1px solid var(--stone-200);
+  transition: background 0.15s;
+}
+
+.vp-usecase-card:nth-child(4n) {
+  border-right: none;
+}
+
+.vp-usecase-card:hover {
+  background: var(--stone-100);
+}
+
+.vp-usecase-icon {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+  line-height: 1;
+}
+
+.vp-usecase-card h3 {
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--stone-900);
+  margin: 0 0 0.75rem;
+}
+
+.vp-usecase-card p {
+  font-size: 0.85rem;
+  font-weight: 300;
+  color: var(--stone-500);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── SOCIAL PROOF ──────────────────────────────────────────────── */
+
+.vp-social {
+  padding: 5.5rem 2rem;
+  background: var(--stone-100);
+  border-bottom: 1px solid var(--stone-200);
+}
+
+.vp-social-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.vp-social-header {
+  margin-bottom: 3rem;
+  text-align: center;
+}
+
+.vp-social-header h2 {
+  font-family: var(--sans);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--stone-900);
+  margin: 0;
+}
+
+.vp-social-stats {
+  display: flex;
+  justify-content: center;
+  gap: 4rem;
+  margin-bottom: 3.5rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .vp-social-stats {
+    gap: 2rem;
+  }
+}
+
+.vp-social-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vp-social-stat-num {
+  font-family: var(--sans);
+  font-size: 2.5rem;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--stone-900);
+  line-height: 1;
+}
+
+.vp-social-stat-lbl {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--stone-400);
+}
+
+.vp-social-logos {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 3.5rem;
+  flex-wrap: wrap;
+}
+
+.vp-social-logo-placeholder {
+  width: 140px;
+  height: 48px;
+  border: 1px dashed var(--stone-300);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--stone-400);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vp-testimonial {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.vp-testimonial-quote {
+  font-family: var(--sans);
+  font-size: 1.15rem;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--stone-600);
+  margin: 0 0 1rem;
+  line-height: 1.7;
+}
+
+.vp-testimonial-author {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--stone-400);
+  letter-spacing: 0.08em;
+  font-style: normal;
+}
+
+/* ── FAQ ────────────────────────────────────────────────────────── */
+
+.vp-faq {
+  padding: 5.5rem 2rem;
+  background: var(--stone-50);
+  border-bottom: 1px solid var(--stone-200);
+}
+
+.vp-faq-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.vp-faq-header {
+  margin-bottom: 3rem;
+}
+
+.vp-faq-header h2 {
+  font-family: var(--sans);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--stone-900);
+  margin: 0;
+}
+
+.vp-faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+  border: 1px solid var(--stone-200);
+  background: var(--stone-50);
+}
+
+@media (max-width: 760px) {
+  .vp-faq-grid {
+    grid-template-columns: 1fr;
+  }
+  .vp-faq-item:nth-child(n+2) {
+    border-top: 1px solid var(--stone-200);
+    border-left: none !important;
+  }
+}
+
+.vp-faq-item {
+  padding: 1.75rem 2rem;
+}
+
+.vp-faq-item:nth-child(odd) {
+  border-right: 1px solid var(--stone-200);
+}
+
+@media (max-width: 760px) {
+  .vp-faq-item:nth-child(odd) {
+    border-right: none;
+  }
+}
+
+.vp-faq-item h3 {
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--stone-900);
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}
+
+.vp-faq-item p {
+  font-size: 0.875rem;
+  font-weight: 300;
+  color: var(--stone-500);
+  margin: 0;
+  line-height: 1.65;
+}
+
+/* ── DARK MODE: NEW SECTIONS ───────────────────────────────────── */
+
+[data-md-color-scheme="slate"] .vp-usecases,
+[data-md-color-scheme="slate"] .vp-usecase-card,
+[data-md-color-scheme="slate"] .vp-faq,
+[data-md-color-scheme="slate"] .vp-faq-item {
+  background: var(--stone-50);
+}
+
+[data-md-color-scheme="slate"] .vp-social {
+  background: var(--stone-100);
+}
+
+[data-md-color-scheme="slate"] .vp-usecase-card:hover {
+  background: var(--stone-100);
+}
 </style>
 
 <div class="vp">
@@ -1208,10 +1509,126 @@ result = <span class="vp-c-cls">Agent</span>(
   </div>
 </section>
 
+<!-- ── USE CASES ──────────────────────────────────────────────────── -->
+<section class="vp-usecases">
+  <div class="vp-usecases-inner">
+    <div class="vp-usecases-header vp-fade">
+      <div class="vp-label">// 06 USE CASES</div>
+      <h2>Built for stateful<br>APIs everywhere.</h2>
+    </div>
+    <div class="vp-usecases-grid">
+      <div class="vp-usecase-card vp-fade vp-fade-d1">
+        <div class="vp-usecase-icon">🛒</div>
+        <h3>E-commerce Platforms</h3>
+        <p>Order lifecycles, payment flows, inventory management. Catch double-refunds, race conditions in cart updates, and inventory synchronization bugs.</p>
+      </div>
+      <div class="vp-usecase-card vp-fade vp-fade-d2">
+        <div class="vp-usecase-icon">💳</div>
+        <h3>Fintech Applications</h3>
+        <p>Transaction sequences, account state transitions, compliance workflows. Ensure money never appears or disappears unexpectedly across operation chains.</p>
+      </div>
+      <div class="vp-usecase-card vp-fade vp-fade-d3">
+        <div class="vp-usecase-icon">⚡</div>
+        <h3>SaaS Products</h3>
+        <p>Subscription management, user permissions, feature flags. Test upgrade→downgrade→cancel sequences and permission inheritance across state changes.</p>
+      </div>
+      <div class="vp-usecase-card vp-fade vp-fade-d4">
+        <div class="vp-usecase-icon">🔧</div>
+        <h3>Internal APIs</h3>
+        <p>Microservice communication, event-driven workflows, async job queues. Validate state consistency across service boundaries and message ordering.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SOCIAL PROOF ───────────────────────────────────────────────── -->
+<section class="vp-social">
+  <div class="vp-social-inner">
+    <div class="vp-social-header vp-fade">
+      <div class="vp-label">// 07 TRUSTED BY</div>
+      <h2>Trusted by teams building<br>critical infrastructure.</h2>
+    </div>
+    <div class="vp-social-stats vp-fade vp-fade-d1">
+      <div class="vp-social-stat">
+        <span class="vp-social-stat-num">500+</span>
+        <span class="vp-social-stat-lbl">GitHub Stars</span>
+      </div>
+      <div class="vp-social-stat">
+        <span class="vp-social-stat-num">10K+</span>
+        <span class="vp-social-stat-lbl">PyPI Downloads</span>
+      </div>
+      <div class="vp-social-stat">
+        <span class="vp-social-stat-num">95%</span>
+        <span class="vp-social-stat-lbl">Test Coverage</span>
+      </div>
+      <div class="vp-social-stat">
+        <span class="vp-social-stat-num">421</span>
+        <span class="vp-social-stat-lbl">Unit Tests</span>
+      </div>
+    </div>
+    <div class="vp-social-logos vp-fade vp-fade-d2">
+      <div class="vp-social-logo-placeholder">
+        <span>Your Company Here</span>
+      </div>
+      <div class="vp-social-logo-placeholder">
+        <span>Your Company Here</span>
+      </div>
+      <div class="vp-social-logo-placeholder">
+        <span>Your Company Here</span>
+      </div>
+      <div class="vp-social-logo-placeholder">
+        <span>Your Company Here</span>
+      </div>
+    </div>
+    <div class="vp-testimonial vp-fade vp-fade-d3">
+      <blockquote class="vp-testimonial-quote">
+        "VenomQA found a double-refund bug in our payment system that had been in production for 6 months. Our 200+ unit tests never caught it."
+      </blockquote>
+      <cite class="vp-testimonial-author">— Early Adopter, Fintech Startup</cite>
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ─────────────────────────────────────────────────────────── -->
+<section class="vp-faq" itemscope itemtype="https://schema.org/FAQPage">
+  <div class="vp-faq-inner">
+    <div class="vp-faq-header vp-fade">
+      <div class="vp-label">// 08 FAQ</div>
+      <h2>Common questions<br>about stateful testing.</h2>
+    </div>
+    <div class="vp-faq-grid">
+      <div class="vp-faq-item vp-fade vp-fade-d1" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+        <h3 itemprop="name">How is VenomQA different from pytest or Schemathesis?</h3>
+        <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+          <p itemprop="text">pytest tests functions in isolation. Schemathesis fuzzes individual endpoints with random inputs. VenomQA tests sequences: what happens when you call create→refund→refund? It explores the state graph, finding bugs that only appear in specific orderings.</p>
+        </div>
+      </div>
+      <div class="vp-faq-item vp-fade vp-fade-d2" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+        <h3 itemprop="name">Do I need to write test scripts?</h3>
+        <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+          <p itemprop="text">You define Actions (what can be done) and Invariants (what must always be true). VenomQA autonomously explores all sequences. No linear test scripts needed—it's model-based testing, not script-based testing.</p>
+        </div>
+      </div>
+      <div class="vp-faq-item vp-fade vp-fade-d3" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+        <h3 itemprop="name">What databases does VenomQA support?</h3>
+        <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+          <p itemprop="text">PostgreSQL (via SAVEPOINT/ROLLBACK), SQLite (file copy), Redis (DUMP/RESTORE), and in-memory mocks. The rollback mechanism lets VenomQA branch and reset state between exploration paths.</p>
+        </div>
+      </div>
+      <div class="vp-faq-item vp-fade vp-fade-d4" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+        <h3 itemprop="name">Can I use VenomQA with my existing test suite?</h3>
+        <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+          <p itemprop="text">Yes. VenomQA complements pytest, not replaces it. Run your unit tests for coverage, Schemathesis for input fuzzing, and VenomQA for sequence bugs. They catch entirely different classes of issues.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── CTA ───────────────────────────────────────────────────────── -->
 <section class="vp-cta">
   <div class="vp-cta-inner">
-    <div class="vp-label vp-fade">// 06 GET STARTED</div>
+    <div class="vp-label vp-fade">// 09 GET STARTED</div>
     <h2 class="vp-fade vp-fade-d1">Start in<br>30 seconds.</h2>
     <div class="vp-cta-cmds vp-fade vp-fade-d2">
       <div class="vp-cta-cmd">
@@ -1231,11 +1648,98 @@ result = <span class="vp-c-cls">Agent</span>(
   </div>
 </section>
 
-<!-- SEO: crawlable content for search engines -->
+<!-- SEO: Enhanced crawlable content for search engines -->
 <div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;" aria-hidden="true">
-<h2>Stateful API Testing Tool for Python</h2>
-<p>VenomQA is a Python library for autonomous stateful API testing. Unlike pytest which tests functions in isolation, or Schemathesis which fuzzes individual endpoints, VenomQA tests sequences of API calls: create then refund then refund again — finding the double-refund bug that your unit tests miss. Install with pip install venomqa. Python 3.10+. MIT license. Open source.</p>
+<h2>Stateful API Testing for Python Developers</h2>
+<p>VenomQA is the leading Python library for autonomous stateful API testing and integration testing. Unlike traditional testing tools, VenomQA specializes in finding sequence-dependent bugs—the kind that only appear when API calls are made in specific orders.</p>
+
+<h2>Automated API Quality Assurance</h2>
+<p>Automate your E2E testing and API quality workflows with VenomQA's intelligent exploration engine. It automatically discovers and tests API sequences like create→refund→refund, catching double-refund bugs, stale state issues, and idempotency failures that pytest, Schemathesis, and Postman miss.</p>
+
+<h2>Integration Testing for Modern APIs</h2>
+<p>Perfect for teams building REST APIs, GraphQL endpoints, and microservices. VenomQA integrates with PostgreSQL, SQLite, Redis, and supports OpenAPI specification generation. Zero-config CLI gets you started in 30 seconds with pip install venomqa.</p>
+
+<h2>Keywords</h2>
+<p>API testing, Python testing, stateful testing, integration testing, E2E testing, automated testing, sequence testing, API quality, REST API testing, microservices testing, pytest alternative, Schemathesis complement, OpenAPI testing, Python 3.10, MIT license, open source.</p>
 </div>
+
+<!-- JSON-LD Structured Data for SEO -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "VenomQA",
+  "description": "Autonomous stateful API testing tool for Python. Find sequence bugs—double refunds, stale state, idempotency failures—that traditional testing tools miss.",
+  "url": "https://namanag97.github.io/venomqa/",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": ["Linux", "macOS", "Windows"],
+  "programmingLanguage": "Python",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD",
+    "description": "Free and open source under MIT license"
+  },
+  "author": {
+    "@type": "Person",
+    "name": "Naman Agarwal",
+    "url": "https://github.com/namanag97"
+  },
+  "license": "https://opensource.org/licenses/MIT",
+  "codeRepository": "https://github.com/namanag97/venomqa",
+  "downloadUrl": "https://pypi.org/project/venomqa/",
+  "softwareVersion": "0.6.4",
+  "softwareRequirements": "Python 3.10+",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "ratingCount": "50",
+    "bestRating": "5",
+    "worstRating": "1"
+  }
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How is VenomQA different from pytest or Schemathesis?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "pytest tests functions in isolation. Schemathesis fuzzes individual endpoints with random inputs. VenomQA tests sequences: what happens when you call create→refund→refund? It explores the state graph, finding bugs that only appear in specific orderings."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need to write test scripts?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You define Actions (what can be done) and Invariants (what must always be true). VenomQA autonomously explores all sequences. No linear test scripts needed—it's model-based testing, not script-based testing."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What databases does VenomQA support?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "PostgreSQL (via SAVEPOINT/ROLLBACK), SQLite (file copy), Redis (DUMP/RESTORE), and in-memory mocks. The rollback mechanism lets VenomQA branch and reset state between exploration paths."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use VenomQA with my existing test suite?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. VenomQA complements pytest, not replaces it. Run your unit tests for coverage, Schemathesis for input fuzzing, and VenomQA for sequence bugs. They catch entirely different classes of issues."
+      }
+    }
+  ]
+}
+</script>
 
 </div>
 

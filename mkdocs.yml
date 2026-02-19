@@ -10,31 +10,32 @@ edit_uri: edit/main/docs/
 # Copyright
 copyright: Copyright &copy; 2024 Naman Agarwal
 
-# Theme configuration
+# Theme configuration - Swiss/Meridian Design
 theme:
   name: material
   language: en
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep purple
-      accent: purple
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep purple
-      accent: purple
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   font:
-    text: Inter
-    code: JetBrains Mono
+    text: Geist
+    code: Geist Mono
   icon:
     repo: fontawesome/brands/github
-    logo: material/snake
+    logo: material/bug-check
+  favicon: assets/favicon.svg
   features:
     - navigation.instant
     - navigation.instant.prefetch
@@ -77,6 +78,11 @@ nav:
     - Your First Journey: tutorials/first-journey.md
     - Testing Payment Flows: tutorials/payment-flows.md
     - CI/CD Integration: tutorials/ci-cd.md
+  - Examples:
+    - examples/index.md
+    - CRUD Operations: examples/crud.md
+    - Authentication Flows: examples/auth.md
+    - E-commerce Checkout: examples/checkout.md
   - Reference:
     - reference/index.md
     - API Reference: reference/api.md
@@ -85,17 +91,22 @@ nav:
     - Database Backends: reference/backends.md
     - Adapters: reference/adapters.md
     - Reporters: reference/reporters.md
-  - Examples:
-    - examples/index.md
-    - CRUD Operations: examples/crud.md
-    - Authentication Flows: examples/auth.md
-    - E-commerce Checkout: examples/checkout.md
   - Advanced:
     - advanced/index.md
     - Custom Reporters: advanced/custom-reporters.md
     - Custom Backends: advanced/custom-backends.md
     - Performance: advanced/performance.md
     - Testing Patterns: advanced/testing-patterns.md
+  - Blog:
+    - blog/index.md
+    - "2024-02": 
+      - "Math of State Exploration": blog/2024-01-15-math-of-state-exploration.md
+      - "Why Sequence Bugs Hide": blog/2024-01-20-why-sequence-bugs-hide.md
+      - "State Machines in API Testing": blog/2024-01-25-state-machines-in-api-testing.md
+      - "Property-Based Testing Comparison": blog/2024-02-01-property-based-testing-comparison.md
+      - "API Testing Tools Compared": blog/2024-02-05-api-testing-tools-comparison.md
+      - "Database Rollback Testing": blog/2024-02-10-database-rollback-testing.md
+      - "CI/CD API Testing": blog/2024-02-15-ci-cd-api-testing.md
   - Community:
     - FAQ: faq.md
     - Comparison: comparison.md
@@ -103,6 +114,7 @@ nav:
     - Changelog: changelog.md
     - Roadmap: roadmap.md
   - Specifications:
+    - specs/index.md
     - Framework Spec: specs/framework-spec.md
     - State Chain: specs/state-chain.md
     - State Explorer: specs/state-explorer.md
@@ -188,16 +200,9 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/venomqa/venomqa
+      link: https://github.com/namanag97/venomqa
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/venomqa/
-    - icon: fontawesome/brands/discord
-      link: https://discord.gg/venomqa
-  analytics:
-    provider: google
-    property: G-XXXXXXXXXX
-  version:
-    provider: mike
   generator: false
 
 extra_css:

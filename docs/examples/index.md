@@ -1,192 +1,192 @@
 # Examples
 
-Real-world examples of VenomQA usage patterns.
-
-## Quick Links
-
-<div class="feature-grid" markdown>
-
-<div class="feature-card" markdown>
-
-### [CRUD Operations](crud.md)
-
-Test create, read, update, delete operations with proper validation.
-
-</div>
-
-<div class="feature-card" markdown>
-
-### [Authentication Flows](auth.md)
-
-Login, registration, password reset, and token refresh patterns.
-
-</div>
-
-<div class="feature-card" markdown>
-
-### [E-commerce Checkout](checkout.md)
-
-Complete checkout flow with multiple payment methods.
-
-</div>
-
-</div>
+Real-world VenomQA examples using the exploration API.
 
 ## Example Categories
 
-| Category | Description |
-|----------|-------------|
-| [CRUD Operations](crud.md) | Basic CRUD with validation |
-| [Authentication](auth.md) | Auth flows and security testing |
-| [E-commerce](checkout.md) | Shopping cart and checkout |
+<div class="grid cards" markdown>
+
+-   :material-database:{ .lg .middle } __CRUD Operations__
+
+    ---
+
+    Complete create→read→update→delete testing with invariants for idempotency, consistency, and state transitions.
+
+    [:octicons-arrow-right-24: CRUD Example](crud.md)
+
+-   :material-shield-account:{ .lg .middle } __Authentication Flows__
+
+    ---
+
+    Login, logout, token refresh, session management, multi-user scenarios, and permission boundary testing.
+
+    [:octicons-arrow-right-24: Auth Example](auth.md)
+
+-   :material-cart:{ .lg .middle } __E-commerce Checkout__
+
+    ---
+
+    Cart management, payment processing, refunds, order state transitions, and inventory validation.
+
+    [:octicons-arrow-right-24: Checkout Example](checkout.md)
+
+</div>
+
+## Core Pattern
+
+All examples follow the same structure:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. Define Actions    →  What API calls can be made        │
+│  2. Define Invariants →  What rules must always hold       │
+│  3. Create World      →  API client + state management     │
+│  4. Run Agent         →  Autonomous exploration            │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ## Minimal Example
 
-The simplest possible journey:
+The simplest exploration setup:
 
 ```python
-from venomqa import Journey, Step
+from venomqa import Action, Agent, BFS, Invariant, Severity, World
+from venomqa.adapters.http import HttpClient
 
-journey = Journey(
-    name="health_check",
-    steps=[
-        Step(
-            name="check_api",
-            action=lambda c, ctx: c.get("/health"),
-        ),
+def create_item(api, context):
+    resp = api.post("/items", json={"name": "test"})
+    context.set("item_id", resp.json()["id"])
+    return resp
+
+def delete_item(api, context):
+    item_id = context.get("item_id")
+    if item_id is None:
+        return None  # Skip — no item to delete
+    return api.delete(f"/items/{item_id}")
+
+api = HttpClient("http://localhost:8000")
+world = World(api=api, state_from_context=["item_id"])
+
+agent = Agent(
+    world=world,
+    actions=[
+        Action("create_item", create_item),
+        Action("delete_item", delete_item),
     ],
+    invariants=[
+        Invariant("no_500s", lambda w: w.context.get("last_status", 200) < 500, Severity.CRITICAL),
+    ],
+    strategy=BFS(),
+    max_steps=50,
 )
+
+result = agent.explore()
+print(f"States: {result.states_visited}, Violations: {len(result.violations)}")
 ```
 
-Run it:
+## Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Action** | One API operation: `(api, context) -> response` |
+| **Invariant** | Rule checked after every action: `(world) -> bool` |
+| **World** | Sandbox with `api` client and `context` store |
+| **Agent** | Orchestrates exploration with a strategy |
+| **BFS()** | Breadth-first exploration of all sequences |
+
+## Why These Patterns Work
+
+### Actions Are Stateless Functions
+
+Each action is a pure function of the current state. It receives `api` to make calls and `context` to read/write shared data:
+
+```python
+def update_item(api, context):
+    item_id = context.get("item_id")
+    if item_id is None:
+        return None  # Precondition not met — skip this action
+    return api.put(f"/items/{item_id}", json={"name": "updated"})
+```
+
+Returning `None` tells the agent to skip — the precondition wasn't met.
+
+### Invariants Are Checked After Every Step
+
+Unlike unit tests that assert at the end, VenomQA invariants run after *every single action*:
+
+```python
+def no_negative_balance(world):
+    balance = world.context.get("balance", 0)
+    return balance >= 0
+
+invariant = Invariant("positive_balance", no_negative_balance, Severity.CRITICAL)
+```
+
+If `create → refund → refund` makes the balance negative, the invariant fires after the second refund.
+
+### Context Tracks State Between Actions
+
+Use `context.set()` to save values and `context.get()` to retrieve them:
+
+```python
+def create_order(api, context):
+    resp = api.post("/orders", json={"amount": 100})
+    context.set("order_id", resp.json()["id"])
+    context.set("order_amount", resp.json()["amount"])
+    return resp
+
+def refund_order(api, context):
+    order_id = context.get("order_id")
+    amount = context.get("order_amount", 0)
+    return api.post(f"/orders/{order_id}/refund", json={"amount": amount})
+```
+
+### Exploration Tries All Sequences
+
+With BFS, the agent explores:
+
+- `create → read → delete`
+- `create → delete → read` (should fail)
+- `create → update → delete`
+- `create → update → update → delete`
+
+Every path through the state graph gets tested.
+
+## Running Examples
+
+Each example page includes a complete, runnable Python file. To run:
 
 ```bash
-venomqa run health_check
-```
+# 1. Start your API server (or use the mock servers included)
+python -m your_api_server
 
-## Common Patterns
+# 2. Run the example
+python examples/crud/test_crud.py
 
-### Context Sharing
-
-```python
-def create_user(client, context):
-    response = client.post("/api/users", json={"name": "John"})
-    context["user_id"] = response.json()["id"]
-    return response
-
-def get_user(client, context):
-    return client.get(f"/api/users/{context['user_id']}")
-
-journey = Journey(
-    name="user_flow",
-    steps=[
-        Step(name="create", action=create_user),
-        Step(name="retrieve", action=get_user),
-    ],
-)
-```
-
-### Authentication
-
-```python
-def login(client, context):
-    response = client.post("/api/auth/login", json={
-        "email": "test@example.com",
-        "password": "secret",
-    })
-    if response.status_code == 200:
-        client.set_auth_token(response.json()["token"])
-    return response
-
-def protected_action(client, context):
-    return client.get("/api/protected")
-
-journey = Journey(
-    name="auth_flow",
-    steps=[
-        Step(name="login", action=login),
-        Step(name="access", action=protected_action),
-    ],
-)
-```
-
-### Error Testing
-
-```python
-journey = Journey(
-    name="error_handling",
-    steps=[
-        Step(
-            name="unauthorized",
-            action=lambda c, ctx: c.get("/api/admin"),
-            expect_failure=True,
-        ),
-        Step(
-            name="not_found",
-            action=lambda c, ctx: c.get("/api/users/999999"),
-            expect_failure=True,
-        ),
-    ],
-)
-```
-
-### Branching
-
-```python
-from venomqa import Journey, Step, Checkpoint, Branch, Path
-
-journey = Journey(
-    name="payment_test",
-    steps=[
-        Step(name="setup", action=setup_order),
-        Checkpoint(name="ready_to_pay"),
-        Branch(
-            checkpoint_name="ready_to_pay",
-            paths=[
-                Path(name="card", steps=[
-                    Step(name="pay", action=pay_with_card),
-                ]),
-                Path(name="wallet", steps=[
-                    Step(name="pay", action=pay_with_wallet),
-                ]),
-            ],
-        ),
-    ],
-)
+# 3. Or use the CLI
+venomqa run examples/crud/
 ```
 
 ## Project Structure
 
-Recommended project layout:
+Recommended layout for your QA suite:
 
 ```
-my-tests/
-├── venomqa.yaml              # Configuration
-├── docker-compose.qa.yml     # Test infrastructure
-├── journeys/
-│   ├── __init__.py
-│   ├── auth/
-│   │   ├── __init__.py
-│   │   ├── login.py
-│   │   └── registration.py
-│   ├── checkout/
-│   │   ├── __init__.py
-│   │   └── payment.py
-│   └── admin/
-│       ├── __init__.py
-│       └── users.py
+qa/
 ├── actions/
 │   ├── __init__.py
-│   ├── auth.py               # Reusable auth actions
-│   └── users.py              # Reusable user actions
-└── reports/
-    └── (generated)
+│   ├── items.py      # Item CRUD actions
+│   └── users.py      # User management actions
+├── invariants/
+│   ├── __init__.py
+│   └── rules.py      # Domain invariants
+├── test_items.py     # Item exploration
+├── test_users.py     # User exploration
+└── test_checkout.py  # Checkout flow exploration
 ```
 
-## More Examples
+## Next Steps
 
-See the [examples directory](https://github.com/venomqa/venomqa/tree/main/examples) for complete working examples:
-
-- `quickstart/` - Getting started examples
-- `fastapi-example/` - Testing a FastAPI application
-- `test-server/` - Example test server
+- [CRUD Operations](crud.md) — Learn the fundamental patterns
+- [Authentication Flows](auth.md) — Multi-user stateful testing
+- [E-commerce Checkout](checkout.md) — Complex state machines
