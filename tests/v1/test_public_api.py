@@ -65,3 +65,47 @@ def test_version_present():
     assert hasattr(venomqa, "__version__")
     assert isinstance(venomqa.__version__, str)
     assert venomqa.__version__  # non-empty
+
+
+def test_core_api_works():
+    """Agent.explore() runs without error using the correct minimal API.
+
+    This test exists specifically to catch documentation/API drift — i.e. cases
+    where CLAUDE.md or examples reference a wrong constructor signature or a
+    method that doesn't exist (e.g. agent.run() vs agent.explore()).
+    """
+    from unittest.mock import MagicMock
+
+    from venomqa import Action, Agent, BFS, Invariant, Severity, World
+
+    call_count = {"n": 0}
+
+    def increment(api, context):
+        call_count["n"] += 1
+        context.set("count", call_count["n"])
+        return MagicMock(status_code=200)
+
+    inv = Invariant(
+        name="non_negative",
+        check=lambda world: world.context.get("count", 0) >= 0,
+        severity=Severity.CRITICAL,
+    )
+
+    # World requires state_from_context OR systems — bare World(api=api) raises ValueError
+    world = World(api=MagicMock(), state_from_context=["count"])
+
+    # actions/invariants go on Agent, not World; BFS() takes no arguments
+    agent = Agent(
+        world=world,
+        actions=[Action(name="increment", execute=increment)],
+        invariants=[inv],
+        strategy=BFS(),
+        max_steps=10,
+    )
+
+    # Method is .explore(), NOT .run()
+    result = agent.explore()
+
+    assert isinstance(result.states_visited, int)
+    assert isinstance(result.violations, list)
+    assert result.violations == [], f"Unexpected violations: {result.violations}"
