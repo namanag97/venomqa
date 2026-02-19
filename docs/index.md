@@ -912,8 +912,8 @@ hide:
 <!-- CTA -->
 <section class="venom-cta">
   <div class="venom-container">
-    <h2>Ready to find hidden bugs?</h2>
-    <p>Try it now — no configuration needed</p>
+    <h2>Ready to find sequence bugs automatically?</h2>
+    <p>pip install venomqa — finds bugs in 30 seconds, no configuration needed</p>
 
     <div class="venom-install-box">
       <code>pip install venomqa && venomqa demo</code>
