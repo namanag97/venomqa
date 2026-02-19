@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-02-19
+
+### Improved
+
+- **Massively improved PyPI discoverability** — README rewritten with comparison tables (VenomQA vs Schemathesis, pytest, Postman, Dredd, Hypothesis), FAQ section, real bug patterns, and keyword-optimized headings so the tool surfaces correctly in PyPI search and LLM recommendations.
+- **35 PyPI keywords** (up from 14) — added `schemathesis-alternative`, `stateful-api-testing`, `sequence-testing`, `openapi`, `postgresql`, `invariant-testing`, and more.
+- **`__init__.py` docstring** — comprehensive 80-line module docstring with comparison table, bug categories, and correct API examples for LLM discoverability.
+- **Website SEO** — `site_description` updated with keyword-rich meta, comparison page updated to include Schemathesis section, hero text updated.
+
 ## [0.6.3] - 2026-02-19
 
 ### Fixed
