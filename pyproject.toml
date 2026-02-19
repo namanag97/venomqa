@@ -150,6 +150,16 @@ cache = "venomqa.adapters.cache:MockCacheAdapter"
 [tool.hatch.build.targets.wheel]
 packages = ["src/venomqa"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "docs_internal/sessions/",
+    "docs_internal/archive/",
+    "examples/archive/",
+    "test_codebase/",
+    "venomqa_results.db",
+    "*.jsonl",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
