@@ -311,7 +311,7 @@ for _subpkg in _V1_ONLY_SUBPACKAGES:
             pass
 
 
-__version__ = "0.6.1"
+__version__ = "0.6.2"
 __author__ = "Naman Agarwal"
 __license__ = "MIT"
 
