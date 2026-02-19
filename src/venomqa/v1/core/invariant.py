@@ -60,8 +60,8 @@ class Invariant:
 
     name: str
     check: Callable[[World], bool | str]
-    message: str = ""
     severity: Severity = Severity.MEDIUM
+    message: str = ""
     timing: InvariantTiming = InvariantTiming.POST_ACTION
 
     def __hash__(self) -> int:
