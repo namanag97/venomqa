@@ -17,20 +17,56 @@ maintainers = [
     { name = "Naman Agarwal", email = "naman@venomqa.dev" }
 ]
 keywords = [
-    "testing",
-    "qa",
-    "api-testing",
-    "e2e-testing",
-    "end-to-end",
-    "stateful-testing",
-    "journey-testing",
-    "integration-testing",
-    "state-management",
+    # Core value prop
+    "stateful-api-testing",
+    "sequence-testing",
+    "autonomous-testing",
+    "api-qa",
+    "exhaustive-testing",
+    # Problem space
+    "state-machine-testing",
+    "state-graph",
+    "property-based-testing",
+    "invariant-testing",
+    "model-based-testing",
+    # Comparison / alternatives
+    "schemathesis-alternative",
+    "postman-alternative",
+    "dredd-alternative",
+    # Technical approach
+    "bfs-exploration",
+    "rollback-testing",
+    "database-rollback",
     "checkpoint",
     "branch-exploration",
-    "test-automation",
-    "http-testing",
+    # What it tests
     "rest-api",
+    "api-testing",
+    "http-testing",
+    "integration-testing",
+    "e2e-testing",
+    "end-to-end",
+    "regression-testing",
+    "api-automation",
+    # Database support
+    "postgresql",
+    "sqlite",
+    "redis",
+    # Spec formats
+    "openapi",
+    "swagger",
+    "openapi-testing",
+    # Framework keywords
+    "qa-framework",
+    "test-automation",
+    "bug-hunting",
+    "qa-agent",
+    "ai-testing",
+    # Existing keywords (keep)
+    "testing",
+    "qa",
+    "stateful-testing",
+    "journey-testing",
     "graphql-testing",
 ]
 classifiers = [
