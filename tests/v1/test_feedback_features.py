@@ -11,14 +11,14 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.core.invariant import Severity, Violation
+from venomqa.core.result import ExplorationResult
+from venomqa.core.state import Observation, State
+from venomqa.core.transition import Transition
+from venomqa.world import World
 
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import Severity, Violation
-from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.core.state import Observation, State
-from venomqa.v1.core.transition import Transition
-from venomqa.v1.world import World
+from venomqa.core.graph import Graph
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -162,7 +162,7 @@ class TestConsoleReporterDedup:
     def _report(self, result: ExplorationResult) -> str:
         import io
 
-        from venomqa.v1.reporters.console import ConsoleReporter
+        from venomqa.reporters.console import ConsoleReporter
         buf = io.StringIO()
         ConsoleReporter(color=False, file=buf).report(result)
         return buf.getvalue()
@@ -193,7 +193,7 @@ class TestJSONReporterUniqueViolations:
     def test_unique_violations_key_present(self):
         import json
 
-        from venomqa.v1.reporters.json import JSONReporter
+        from venomqa.reporters.json import JSONReporter
         violations = [_make_violation("inv", "act", path_len=i + 1) for i in range(5)]
         result = _make_result(violations)
         data = json.loads(JSONReporter().report(result))
@@ -207,7 +207,7 @@ class TestJSONReporterUniqueViolations:
 class TestWorldTeardown:
 
     def test_teardown_called_after_explore(self):
-        from venomqa.v1 import BFS, Agent
+        from venomqa import BFS, Agent
 
         called: list[tuple] = []
 
@@ -232,7 +232,7 @@ class TestWorldTeardown:
         assert len(called) == 1, "teardown must be called exactly once"
 
     def test_teardown_receives_api_and_context(self):
-        from venomqa.v1 import BFS, Agent
+        from venomqa import BFS, Agent
 
         received: list[dict] = []
 
@@ -263,7 +263,7 @@ class TestWorldTeardown:
         world.run_teardown()  # must not raise
 
     def test_teardown_errors_do_not_crash_explore(self):
-        from venomqa.v1 import BFS, Agent
+        from venomqa import BFS, Agent
 
         def bad_cleanup(api, context):
             raise RuntimeError("cleanup error")
@@ -331,7 +331,7 @@ class TestStateFromContext:
 
     def test_states_visited_gt_1_without_db_adapter(self):
         """Core use case: get states_visited > 1 from pure HTTP responses."""
-        from venomqa.v1 import BFS, Agent
+        from venomqa import BFS, Agent
 
         api = _make_mock_api()
         world = World(api=api, state_from_context=["item_id"])
@@ -368,7 +368,7 @@ class TestStateFromContext:
         """state_from_context suppresses the 'no systems registered' warning."""
         import warnings
 
-        from venomqa.v1 import BFS, Agent
+        from venomqa import BFS, Agent
 
         api = _make_mock_api()
         world = World(api=api, state_from_context=["x"])
@@ -397,12 +397,12 @@ class TestStateFromContext:
 class TestScaffoldURLSupport:
 
     def test_raises_value_error_on_connection_failure(self):
-        from venomqa.v1.cli.scaffold import load_spec
+        from venomqa.cli.scaffold import load_spec
         with pytest.raises(ValueError, match="Could not fetch spec"):
             load_spec("http://localhost:19999/openapi.json")  # nothing listening here
 
     def test_loads_json_from_url(self):
-        from venomqa.v1.cli.scaffold import load_spec
+        from venomqa.cli.scaffold import load_spec
 
         fake_spec = {
             "openapi": "3.0.0",

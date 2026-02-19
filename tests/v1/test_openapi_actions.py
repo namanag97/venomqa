@@ -1,14 +1,12 @@
 """Tests for OpenAPI action generator."""
 
 import pytest
-
-from venomqa.v1.generators.openapi_actions import (
-    EndpointInfo,
+from venomqa.generators.openapi_actions import (
+    _infer_operation_type,
+    _singularize,
     generate_actions,
     generate_schema_and_actions,
     parse_openapi_endpoints,
-    _infer_operation_type,
-    _singularize,
 )
 
 
@@ -211,7 +209,7 @@ class TestActionExecution:
 
             def get(self, url):
                 self.calls.append(("GET", url))
-                from venomqa.v1.core.action import ActionResult, HTTPRequest, HTTPResponse
+                from venomqa.core.action import ActionResult, HTTPRequest, HTTPResponse
 
                 return ActionResult.from_response(
                     HTTPRequest("GET", url),
@@ -220,7 +218,7 @@ class TestActionExecution:
 
             def post(self, url, json=None):
                 self.calls.append(("POST", url, json))
-                from venomqa.v1.core.action import ActionResult, HTTPRequest, HTTPResponse
+                from venomqa.core.action import ActionResult, HTTPRequest, HTTPResponse
 
                 return ActionResult.from_response(
                     HTTPRequest("POST", url),
@@ -229,7 +227,7 @@ class TestActionExecution:
 
             def delete(self, url):
                 self.calls.append(("DELETE", url))
-                from venomqa.v1.core.action import ActionResult, HTTPRequest, HTTPResponse
+                from venomqa.core.action import ActionResult, HTTPRequest, HTTPResponse
 
                 return ActionResult.from_response(
                     HTTPRequest("DELETE", url),
@@ -240,7 +238,7 @@ class TestActionExecution:
 
     @pytest.fixture
     def mock_context(self):
-        from venomqa.v1.core.context import Context
+        from venomqa.core.context import Context
 
         return Context()
 

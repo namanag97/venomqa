@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from venomqa.v1.core.constraints import (
+from venomqa.core.constraints import (
     AnonHasNoRole,
     AuthHasRole,
     FreeCannotExceedUsage,
     constraint,
 )
-from venomqa.v1.core.dimensions import (
+from venomqa.core.dimensions import (
     AuthStatus,
     CountClass,
     EntityStatus,
@@ -16,9 +16,9 @@ from venomqa.v1.core.dimensions import (
     UsageClass,
     UserRole,
 )
-from venomqa.v1.core.hyperedge import Hyperedge
-from venomqa.v1.core.hypergraph import Hypergraph
-from venomqa.v1.core.state import Observation, State
+from venomqa.core.hyperedge import Hyperedge
+from venomqa.core.hypergraph import Hypergraph
+from venomqa.core.state import Observation, State
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -321,9 +321,10 @@ class TestDimensionNoveltyStrategy:
     """Test the dimension-aware exploration strategy."""
 
     def test_picks_from_unexplored(self):
-        from venomqa.v1.agent.dimension_strategy import DimensionNoveltyStrategy
-        from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-        from venomqa.v1.core.graph import Graph
+        from venomqa.agent.dimension_strategy import DimensionNoveltyStrategy
+        from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+
+        from venomqa.core.graph import Graph
 
         def dummy(api):
             return ActionResult.from_response(
@@ -345,9 +346,10 @@ class TestDimensionNoveltyStrategy:
         assert a.name == "dummy"
 
     def test_falls_back_to_bfs_when_no_hypergraph(self):
-        from venomqa.v1.agent.dimension_strategy import DimensionNoveltyStrategy
-        from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-        from venomqa.v1.core.graph import Graph
+        from venomqa.agent.dimension_strategy import DimensionNoveltyStrategy
+        from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+
+        from venomqa.core.graph import Graph
 
         def dummy(api):
             return ActionResult.from_response(
@@ -364,10 +366,11 @@ class TestDimensionNoveltyStrategy:
         assert result is not None
 
     def test_returns_none_when_all_explored(self):
-        from venomqa.v1.agent.dimension_strategy import DimensionNoveltyStrategy
-        from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-        from venomqa.v1.core.graph import Graph
-        from venomqa.v1.core.transition import Transition
+        from venomqa.agent.dimension_strategy import DimensionNoveltyStrategy
+        from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+        from venomqa.core.transition import Transition
+
+        from venomqa.core.graph import Graph
 
         def dummy(api):
             return ActionResult.from_response(
@@ -389,8 +392,8 @@ class TestDimensionNoveltyStrategy:
         assert result is None
 
     def test_enqueue_and_push_are_noops(self):
-        from venomqa.v1.agent.dimension_strategy import DimensionNoveltyStrategy
-        from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+        from venomqa.agent.dimension_strategy import DimensionNoveltyStrategy
+        from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
 
         def dummy(api):
             return ActionResult.from_response(
@@ -413,20 +416,20 @@ class TestAgentWithHypergraph:
     """Integration: Agent populates the Hypergraph during exploration."""
 
     def _make_world(self):
-        from venomqa.v1.world import World
+        from venomqa.world import World
         return World(api=None, state_from_context=[])
 
     def _ok(self):
-        from venomqa.v1.core.action import ActionResult, HTTPRequest, HTTPResponse
+        from venomqa.core.action import ActionResult, HTTPRequest, HTTPResponse
         return ActionResult.from_response(HTTPRequest("GET", "/"), HTTPResponse(200))
 
     def test_hypergraph_populated_after_exploration(self):
-        from venomqa.v1 import Agent
+        from venomqa import Agent
 
         def dummy(api):
             return self._ok()
 
-        from venomqa.v1.core.action import Action
+        from venomqa.core.action import Action
         action = Action(name="dummy", execute=dummy)
 
         world = self._make_world()
@@ -437,8 +440,9 @@ class TestAgentWithHypergraph:
         assert agent.hypergraph.node_count >= 1
 
     def test_dimension_coverage_attached_to_result(self):
-        from venomqa.v1 import Agent
-        from venomqa.v1.core.action import Action
+        from venomqa.core.action import Action
+
+        from venomqa import Agent
 
         def dummy(api):
             return self._ok()
@@ -453,8 +457,9 @@ class TestAgentWithHypergraph:
         assert result.dimension_coverage.total_states == agent.hypergraph.node_count
 
     def test_no_hypergraph_by_default(self):
-        from venomqa.v1 import Agent
-        from venomqa.v1.core.action import Action
+        from venomqa.core.action import Action
+
+        from venomqa import Agent
 
         def dummy(api):
             return self._ok()
@@ -469,9 +474,10 @@ class TestAgentWithHypergraph:
 
     def test_observation_dimensions_extracted(self):
         """When actions return states with known dimension keys, they appear in hg."""
-        from venomqa.v1 import Agent
-        from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-        from venomqa.v1.world import World
+        from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+        from venomqa.world import World
+
+        from venomqa import Agent
 
         # Use a MockStorage that we can manually seed observations through
         # Actually, we just need the world to have observations with dimension keys.

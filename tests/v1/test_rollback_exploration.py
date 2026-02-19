@@ -6,7 +6,7 @@ by using checkpoint/rollback.
 """
 
 
-from venomqa.v1 import (
+from venomqa import (
     BFS,
     DFS,
     Action,
@@ -19,7 +19,7 @@ from venomqa.v1 import (
     Severity,
     World,
 )
-from venomqa.v1.adapters import MockMail, MockQueue, MockStorage
+from venomqa.adapters import MockMail, MockQueue, MockStorage
 
 
 class MockApi:

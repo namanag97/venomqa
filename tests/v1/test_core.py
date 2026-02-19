@@ -2,13 +2,13 @@
 
 
 import pytest
+from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.core.invariant import Invariant, Severity, Violation
+from venomqa.core.result import ExplorationResult
+from venomqa.core.state import Observation, State
+from venomqa.core.transition import Transition
 
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-from venomqa.v1.core.graph import Graph
-from venomqa.v1.core.invariant import Invariant, Severity, Violation
-from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.core.state import Observation, State
-from venomqa.v1.core.transition import Transition
+from venomqa.core.graph import Graph
 
 
 class TestObservation:

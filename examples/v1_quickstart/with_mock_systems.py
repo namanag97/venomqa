@@ -4,12 +4,12 @@ This example shows how to use mock adapters for testing
 without external dependencies.
 """
 
-from venomqa.v1 import (
+from venomqa import (
     World, Agent, BFS,
     Action, ActionResult, HTTPRequest, HTTPResponse,
     Invariant, Severity,
 )
-from venomqa.v1.adapters import MockQueue, MockMail, MockStorage
+from venomqa.adapters import MockQueue, MockMail, MockStorage
 
 
 class MockApi:

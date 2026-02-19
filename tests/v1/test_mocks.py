@@ -3,11 +3,10 @@
 from datetime import datetime
 
 import pytest
-
-from venomqa.v1.adapters.mock_mail import MockMail
-from venomqa.v1.adapters.mock_queue import MockQueue
-from venomqa.v1.adapters.mock_storage import MockStorage
-from venomqa.v1.adapters.mock_time import MockTime
+from venomqa.adapters.mock_mail import MockMail
+from venomqa.adapters.mock_queue import MockQueue
+from venomqa.adapters.mock_storage import MockStorage
+from venomqa.adapters.mock_time import MockTime
 
 
 class TestMockQueue:

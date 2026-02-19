@@ -1,13 +1,13 @@
 """Test VenomQA v1 against JSONPlaceholder API."""
 
 import httpx
+from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.core.invariant import Invariant, Severity
+from venomqa.core.state import Observation
+from venomqa.world import World
+from venomqa.world.rollbackable import Rollbackable, SystemCheckpoint
 
-from venomqa.v1 import BFS, Agent
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-from venomqa.v1.core.invariant import Invariant, Severity
-from venomqa.v1.core.state import Observation
-from venomqa.v1.world import World
-from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
+from venomqa import BFS, Agent
 
 BASE_URL = "https://jsonplaceholder.typicode.com"
 

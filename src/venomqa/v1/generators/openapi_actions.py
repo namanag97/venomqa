@@ -9,17 +9,15 @@ This module parses OpenAPI specs and generates Action objects with:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 from venomqa.v1.adapters.resource_graph import (
     ResourceSchema,
-    ResourceType,
     schema_from_openapi,
 )
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-
+from venomqa.v1.core.action import Action, ActionResult, HTTPRequest
 
 OperationType = Literal["create", "read", "update", "delete", "list", "action"]
 

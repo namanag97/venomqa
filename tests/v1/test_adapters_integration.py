@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import json
 
-from venomqa.v1 import (
+from venomqa.adapters.mock_mail import MockMail
+from venomqa.adapters.mock_queue import MockQueue
+from venomqa.adapters.mock_storage import MockStorage
+from venomqa.adapters.mock_time import MockTime
+
+from venomqa import (
     Action,
     ActionResult,
     Agent,
@@ -14,10 +19,6 @@ from venomqa.v1 import (
     Severity,
     World,
 )
-from venomqa.v1.adapters.mock_mail import MockMail
-from venomqa.v1.adapters.mock_queue import MockQueue
-from venomqa.v1.adapters.mock_storage import MockStorage
-from venomqa.v1.adapters.mock_time import MockTime
 
 # ---------------------------------------------------------------------------
 # Helpers

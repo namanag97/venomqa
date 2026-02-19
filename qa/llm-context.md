@@ -27,7 +27,7 @@ Python 3.10+ required.
 
 ## Core imports (v1 API)
 
-    from venomqa.v1 import (
+    from venomqa import (
         Action,
         ActionResult,
         Invariant,
@@ -39,12 +39,12 @@ Python 3.10+ required.
         BFS, DFS, Random, CoverageGuided, Weighted,
         ExplorationResult,
     )
-    from venomqa.v1.adapters.http import HttpClient
-    from venomqa.v1.adapters.postgres import PostgresAdapter   # optional
-    from venomqa.v1.adapters.redis import RedisAdapter         # optional
-    from venomqa.v1.reporters.console import ConsoleReporter
-    from venomqa.v1.reporters.html_trace import HTMLTraceReporter
-    from venomqa.v1.reporters.json import JSONReporter
+    from venomqa.adapters.http import HttpClient
+    from venomqa.adapters.postgres import PostgresAdapter   # optional
+    from venomqa.adapters.redis import RedisAdapter         # optional
+    from venomqa.reporters.console import ConsoleReporter
+    from venomqa.reporters.html_trace import HTMLTraceReporter
+    from venomqa.reporters.json import JSONReporter
 
 ---
 
@@ -238,17 +238,17 @@ Accessing context from outside actions/invariants:
 ## Reporters
 
     # Console (prints to stdout)
-    from venomqa.v1.reporters.console import ConsoleReporter
+    from venomqa.reporters.console import ConsoleReporter
     ConsoleReporter().report(result)
 
     # HTML (D3 force graph — returns str, write to file yourself)
-    from venomqa.v1.reporters.html_trace import HTMLTraceReporter
+    from venomqa.reporters.html_trace import HTMLTraceReporter
     html_str = HTMLTraceReporter().report(result)
     with open("trace.html", "w") as f:
         f.write(html_str)
 
     # JSON
-    from venomqa.v1.reporters.json import JSONReporter
+    from venomqa.reporters.json import JSONReporter
     json_str = JSONReporter().report(result)
 
 DO NOT call HTMLTraceReporter().report(result, path="trace.html") —
@@ -279,7 +279,7 @@ PostgreSQL (uses SAVEPOINT — entire run is one uncommitted transaction):
 Redis (DUMP + FLUSHALL + RESTORE per rollback):
     RedisAdapter("redis://localhost:6379")
 
-In-memory mocks (queue, mail, storage) — import from venomqa.v1.adapters.*
+In-memory mocks (queue, mail, storage) — import from venomqa.adapters.*
 
 Custom mock server: subclass MockHTTPServer, implement 3 methods:
     get_state_snapshot() -> dict
@@ -318,8 +318,8 @@ Custom mock server: subclass MockHTTPServer, implement 3 methods:
 
 ## Minimal working example (copy-paste ready)
 
-    from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
-    from venomqa.v1.adapters.http import HttpClient
+    from venomqa import Action, Invariant, Agent, World, BFS, Severity
+    from venomqa.adapters.http import HttpClient
 
     def create_item(api, context):
         resp = api.post("/items", json={"name": "widget"})

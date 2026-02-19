@@ -28,9 +28,10 @@ Usage:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from venomqa.v1.world import World
@@ -118,7 +119,7 @@ def connect_to_app(
     db_dependency: Callable,
     db_url: str,
     async_mode: bool = False,
-) -> "World":
+) -> World:
     """Connect VenomQA to an in-process application (FastAPI, Starlette).
 
     This is the RECOMMENDED setup for full SAVEPOINT rollback support.
@@ -196,7 +197,7 @@ def connect_to_app(
 def connect_to_protocol(
     api_url: str,
     control_prefix: str = "/venomqa",
-) -> "World":
+) -> World:
     """Connect VenomQA to an API that implements the VenomQA Control Protocol.
 
     Use this for APIs written in ANY language (Node.js, Go, Java, etc.)
@@ -252,7 +253,7 @@ def connect_to_api(
     api_url: str,
     db_url: str | None = None,
     state_keys: list[str] | None = None,
-) -> "World":
+) -> World:
     """Connect VenomQA to an external HTTP API.
 
     Use this when:
@@ -329,7 +330,7 @@ def setup_from_config(
     config_path: str = "venomqa/venomqa.yaml",
     app: Any = None,
     db_dependency: Callable | None = None,
-) -> "World":
+) -> World:
     """Set up VenomQA from a configuration file.
 
     Reads venomqa.yaml and creates the appropriate World.
@@ -342,8 +343,9 @@ def setup_from_config(
     Returns:
         A configured World instance
     """
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     config_file = Path(config_path)
     if not config_file.exists():

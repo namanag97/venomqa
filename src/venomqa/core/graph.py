@@ -48,9 +48,6 @@ Example:
 
 from __future__ import annotations
 
-# Re-export v1 Graph for new-style imports: from venomqa.core.graph import Graph
-from venomqa.v1.core.graph import Graph  # noqa: F401
-
 import logging
 import time
 from collections import defaultdict
@@ -59,6 +56,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Protocol
+
+# Re-export v1 Graph for new-style imports: from venomqa.core.graph import Graph
+from venomqa.v1.core.graph import Graph  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

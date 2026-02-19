@@ -14,17 +14,17 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from venomqa.v1 import (
+from venomqa import (
     Agent,
     BFS,
     Action,
     Invariant,
     Severity,
 )
-from venomqa.v1.world import World
-from venomqa.v1.adapters import HttpClient
-from venomqa.v1.core.state import Observation
-from venomqa.v1.world.rollbackable import Rollbackable
+from venomqa.world import World
+from venomqa.adapters import HttpClient
+from venomqa.core.state import Observation
+from venomqa.world.rollbackable import Rollbackable
 
 
 # Configuration

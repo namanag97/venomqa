@@ -17,14 +17,6 @@ from __future__ import annotations
 import importlib
 import sys
 
-# Main reporters (from v1)
-from venomqa.v1.reporters.console import ConsoleReporter
-from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
-from venomqa.v1.reporters.html_trace import HTMLTraceReporter
-from venomqa.v1.reporters.json import JSONReporter as V1JSONReporter
-from venomqa.v1.reporters.junit import JUnitReporter as V1JUnitReporter
-from venomqa.v1.reporters.markdown import MarkdownReporter as V1MarkdownReporter
-
 # Legacy reporters
 from venomqa.reporters.base import BaseReporter
 from venomqa.reporters.dashboard import DashboardReporter
@@ -35,6 +27,14 @@ from venomqa.reporters.junit import JUnitReporter
 from venomqa.reporters.markdown import MarkdownReporter
 from venomqa.reporters.sarif import SARIFReporter
 from venomqa.reporters.slack import SlackReporter
+
+# Main reporters (from v1)
+from venomqa.v1.reporters.console import ConsoleReporter
+from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
+from venomqa.v1.reporters.html_trace import HTMLTraceReporter
+from venomqa.v1.reporters.json import JSONReporter as V1JSONReporter
+from venomqa.v1.reporters.junit import JUnitReporter as V1JUnitReporter
+from venomqa.v1.reporters.markdown import MarkdownReporter as V1MarkdownReporter
 
 # Submodule aliasing: allow `from venomqa.reporters.console import ConsoleReporter` etc.
 _V1_REPORTER_SUBMODULES = [

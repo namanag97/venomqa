@@ -21,23 +21,8 @@ import sys
 from collections.abc import Callable
 
 # =============================================================================
-# Main adapters (from v1) - the recommended imports
-# =============================================================================
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.mock_mail import Email, MockMail
-from venomqa.v1.adapters.mock_queue import Message, MockQueue
-from venomqa.v1.adapters.mock_storage import MockStorage, StoredFile
-from venomqa.v1.adapters.mock_time import MockTime
-from venomqa.v1.adapters.mysql import MySQLAdapter
-from venomqa.v1.adapters.postgres import PostgresAdapter
-from venomqa.v1.adapters.redis import RedisAdapter
-from venomqa.v1.adapters.sqlite import SQLiteAdapter
-from venomqa.v1.adapters.wiremock import WireMockAdapter as V1WireMockAdapter
-
-# =============================================================================
 # Legacy adapters (backwards compatibility)
 # =============================================================================
-
 # Real adapters (for integration tests - may require optional dependencies)
 from venomqa.adapters.asyncio_concurrency import AsyncConcurrencyAdapter
 
@@ -53,6 +38,20 @@ from venomqa.adapters.smtp_mock import SMTPMockAdapter
 from venomqa.adapters.storage import LocalFileAdapter, MockStorageAdapter
 from venomqa.adapters.threading_concurrency import ThreadingConcurrencyAdapter
 from venomqa.adapters.time import MockTimeAdapter, SystemTimeAdapter
+
+# =============================================================================
+# Main adapters (from v1) - the recommended imports
+# =============================================================================
+from venomqa.v1.adapters.http import HttpClient
+from venomqa.v1.adapters.mock_mail import Email, MockMail
+from venomqa.v1.adapters.mock_queue import Message, MockQueue
+from venomqa.v1.adapters.mock_storage import MockStorage, StoredFile
+from venomqa.v1.adapters.mock_time import MockTime
+from venomqa.v1.adapters.mysql import MySQLAdapter
+from venomqa.v1.adapters.postgres import PostgresAdapter
+from venomqa.v1.adapters.redis import RedisAdapter
+from venomqa.v1.adapters.sqlite import SQLiteAdapter
+from venomqa.v1.adapters.wiremock import WireMockAdapter as V1WireMockAdapter
 
 # Redis-dependent adapters
 try:

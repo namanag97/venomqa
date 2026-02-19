@@ -5,11 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-from venomqa.v1.core.context import Context
-from venomqa.v1.core.state import Observation
-from venomqa.v1.world import World
+from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.core.state import Observation
+from venomqa.world import World
 
 
 def _make_http_result(status: int = 200) -> ActionResult:
@@ -211,7 +209,7 @@ class TestWorldMultiClient:
 
     def test_clients_accessible_in_invariant_via_world(self) -> None:
         """Invariants receive world and can read world.clients directly."""
-        from venomqa.v1.core.invariant import Invariant, Severity
+        from venomqa.core.invariant import Invariant, Severity
 
         api = self._make_fake_client("default")
         viewer = self._make_fake_client("viewer")

@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import pytest
-
-from venomqa.v1.cli.scaffold import (
+from venomqa.cli.scaffold import (
     EndpointDef,
+    _infer_tag,
+    _sanitize_name,
     generate_actions_code,
     parse_openapi,
-    _sanitize_name,
-    _infer_tag,
 )
-
 
 # ─── Minimal OpenAPI fixtures ──────────────────────────────────────────────
 
@@ -186,7 +184,7 @@ class TestGenerateActionsCode:
 
     def test_contains_venomqa_imports(self):
         code = generate_actions_code(self._parse())
-        assert "from venomqa.v1 import" in code
+        assert "from venomqa import" in code
 
     def test_contains_action_functions(self):
         code = generate_actions_code(self._parse())

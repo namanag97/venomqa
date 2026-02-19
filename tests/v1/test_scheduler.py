@@ -7,10 +7,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-
-from venomqa.v1.agent.scheduler import RunResult, ScheduledRun, Scheduler
-from venomqa.v1.core.result import ExplorationResult
-from venomqa.v1.core.graph import Graph
+from venomqa.agent.scheduler import RunResult, Scheduler
+from venomqa.core.result import ExplorationResult
 
 
 def _make_agent_factory(success: bool = True, violations: int = 0, states: int = 3):

@@ -17,9 +17,6 @@ from __future__ import annotations
 import importlib
 import sys
 
-# Main generator (from v1)
-from venomqa.v1.generators.openapi_actions import generate_actions, generate_schema_and_actions
-
 # Legacy generators
 from venomqa.generators.openapi import (
     EndpointInfo,
@@ -35,6 +32,9 @@ from venomqa.generators.openapi import (
     ResponseInfo,
     SchemaInfo,
 )
+
+# Main generator (from v1)
+from venomqa.v1.generators.openapi_actions import generate_actions, generate_schema_and_actions
 
 # Submodule aliasing: allow `from venomqa.generators.openapi_actions import generate_actions`
 _V1_GENERATOR_SUBMODULES = ["openapi_actions"]

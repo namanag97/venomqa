@@ -20,3 +20,4 @@ reports/
 .pytype/
 .hypothesis/
 site/
+docs_internal/sessions/

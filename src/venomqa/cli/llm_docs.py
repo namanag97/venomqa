@@ -83,7 +83,7 @@ Python 3.10+ required.
 
 ## Core imports (v1 API)
 
-    from venomqa.v1 import (
+    from venomqa import (
         Action,
         ActionResult,
         Invariant,
@@ -95,13 +95,13 @@ Python 3.10+ required.
         BFS, DFS, Random, CoverageGuided, Weighted,
         ExplorationResult,
     )
-    from venomqa.v1.adapters.http import HttpClient
-    from venomqa.v1.adapters.postgres import PostgresAdapter   # optional
-    from venomqa.v1.adapters.redis import RedisAdapter         # optional
+    from venomqa.adapters.http import HttpClient
+    from venomqa.adapters.postgres import PostgresAdapter   # optional
+    from venomqa.adapters.redis import RedisAdapter         # optional
     # reporters — importable from top-level or submodule (both work)
-    from venomqa.v1 import ConsoleReporter, JSONReporter, HTMLTraceReporter, MarkdownReporter, JUnitReporter
+    from venomqa import ConsoleReporter, JSONReporter, HTMLTraceReporter, MarkdownReporter, JUnitReporter
     # or equivalently:
-    # from venomqa.v1.reporters.console import ConsoleReporter
+    # from venomqa.reporters.console import ConsoleReporter
 
 ---
 
@@ -346,17 +346,17 @@ question: "have we tried every action at least once?"
 ## Reporters
 
     # Console (prints to stdout)
-    from venomqa.v1.reporters.console import ConsoleReporter
+    from venomqa.reporters.console import ConsoleReporter
     ConsoleReporter().report(result)
 
     # HTML (D3 force graph — returns str, write to file yourself)
-    from venomqa.v1.reporters.html_trace import HTMLTraceReporter
+    from venomqa.reporters.html_trace import HTMLTraceReporter
     html_str = HTMLTraceReporter().report(result)
     with open("trace.html", "w") as f:
         f.write(html_str)
 
     # JSON
-    from venomqa.v1.reporters.json import JSONReporter
+    from venomqa.reporters.json import JSONReporter
     json_str = JSONReporter().report(result)
 
 DO NOT call HTMLTraceReporter().report(result, path="trace.html") —
@@ -391,15 +391,15 @@ Headers / auth:
 ## Rollbackable adapters
 
 PostgreSQL (uses SAVEPOINT — entire run is one uncommitted transaction):
-    from venomqa.v1.adapters.postgres import PostgresAdapter
+    from venomqa.adapters.postgres import PostgresAdapter
     PostgresAdapter("postgresql://user:pass@localhost/mydb")
 
 Redis (DUMP + FLUSHALL + RESTORE per rollback):
-    from venomqa.v1.adapters.redis import RedisAdapter
+    from venomqa.adapters.redis import RedisAdapter
     RedisAdapter("redis://localhost:6379")
 
 In-memory mocks (for unit testing without real services):
-    from venomqa.v1.adapters import MockQueue, MockMail, MockStorage, MockTime
+    from venomqa.adapters import MockQueue, MockMail, MockStorage, MockTime
 
     queue   = MockQueue(name="tasks")
     mail    = MockMail()
@@ -447,7 +447,7 @@ In-memory mocks (for unit testing without real services):
     # Observe in invariant: world.systems["queue"].pending_count
 
 Custom mock server: subclass MockHTTPServer, implement 3 methods:
-    from venomqa.v1.adapters.mock_http_server import MockHTTPServer
+    from venomqa.adapters.mock_http_server import MockHTTPServer
 
     class MyMock(MockHTTPServer):
         def get_state_snapshot(self) -> dict: ...
@@ -527,7 +527,7 @@ Custom mock server: subclass MockHTTPServer, implement 3 methods:
 14. CRITICAL - No database connection (most common setup error):
    BAD:  world = World(api=HttpClient("http://localhost:8000"))
          # No database → VenomQA can't rollback → only ONE linear path tested
-   GOOD: from venomqa.v1.adapters.postgres import PostgresAdapter
+   GOOD: from venomqa.adapters.postgres import PostgresAdapter
          world = World(
              api=HttpClient("http://localhost:8000"),
              systems={"db": PostgresAdapter("postgresql://user:pass@localhost/mydb")}
@@ -547,9 +547,9 @@ CRITICAL: You must connect to your database OR use state_from_context.
 ### Option A: With PostgreSQL (recommended)
 
     import os
-    from venomqa.v1 import Action, Invariant, Agent, World, DFS, Severity
-    from venomqa.v1.adapters.http import HttpClient
-    from venomqa.v1.adapters.postgres import PostgresAdapter
+    from venomqa import Action, Invariant, Agent, World, DFS, Severity
+    from venomqa.adapters.http import HttpClient
+    from venomqa.adapters.postgres import PostgresAdapter
 
     # Actions MUST validate responses — use expect_* helpers!
     def create_item(api, context):

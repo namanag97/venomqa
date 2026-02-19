@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
+from venomqa.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
+from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.core.invariant import Invariant, Severity
+from venomqa.core.transition import Transition
+from venomqa.world import World
 
-from venomqa.v1.auth import ApiKeyAuth, AuthHttpClient, BearerTokenAuth, MultiRoleAuth
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-from venomqa.v1.core.context import Context
-from venomqa.v1.core.invariant import Invariant, Severity, Violation
-from venomqa.v1.core.transition import Transition
-from venomqa.v1.world import World
-
+from venomqa.core.context import Context
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -239,7 +237,7 @@ class TestWorldAuthIntegration:
         assert not isinstance(world.api, AuthHttpClient)
 
     def test_auth_token_injected_in_explore(self):
-        from venomqa.v1 import Agent, BFS
+        from venomqa import BFS, Agent
 
         captured_headers: list = []
         raw = _fake_client(captured_headers)
@@ -273,7 +271,7 @@ class TestPathShrinking:
         return _ar()
 
     def _make_transition(self, action_name: str) -> Transition:
-        from venomqa.v1.core.state import Observation, State
+        from venomqa.core.state import Observation, State
         s1 = State.create({"s": Observation(system="s", data={"v": 1})})
         s2 = State.create({"s": Observation(system="s", data={"v": 2})})
         return Transition.create(
@@ -284,7 +282,7 @@ class TestPathShrinking:
         )
 
     def test_shrink_false_by_default(self):
-        from venomqa.v1 import Agent, BFS
+        from venomqa import BFS, Agent
 
         world = World(api=MagicMock())
         agent = Agent(world=world, actions=[], strategy=BFS())
@@ -292,9 +290,9 @@ class TestPathShrinking:
 
     def test_short_path_not_shrunk(self):
         """A 1-step path cannot be shortened."""
-        from venomqa.v1 import Agent, BFS
-        from venomqa.v1.adapters.mock_queue import MockQueue
-        from venomqa.v1.adapters.mock_storage import MockStorage
+        from venomqa.adapters.mock_queue import MockQueue
+
+        from venomqa import BFS, Agent
 
         queue = MockQueue("q")
         world = World(api=MagicMock(), systems={"q": queue})
@@ -324,7 +322,7 @@ class TestPathShrinking:
             assert len(v.reproduction_path) <= 1
 
     def test_shrink_true_param_accepted(self):
-        from venomqa.v1 import Agent, BFS
+        from venomqa import BFS, Agent
 
         world = World(api=MagicMock())
         agent = Agent(world=world, actions=[], strategy=BFS(), shrink=True)
@@ -332,8 +330,9 @@ class TestPathShrinking:
 
     def test_shrink_reduces_path_length(self):
         """Integration: shrinking must produce a path no longer than original."""
-        from venomqa.v1 import Agent, BFS
-        from venomqa.v1.adapters.mock_storage import MockStorage
+        from venomqa.adapters.mock_storage import MockStorage
+
+        from venomqa import BFS, Agent
 
         storage = MockStorage(bucket="b")
         world = World(api=MagicMock(), systems={"s": storage}, state_from_context=["step"])
@@ -422,9 +421,10 @@ MINI_SPEC: dict = {
 
 class TestOpenAPISchemaInvariant:
 
-    def _make_inv(self) -> "OpenAPISchemaInvariant":
-        from venomqa.v1.invariants.openapi import OpenAPISchemaInvariant
+    def _make_inv(self) -> OpenAPISchemaInvariant:
         from unittest.mock import patch
+
+        from venomqa.invariants.openapi import OpenAPISchemaInvariant
         with patch("venomqa.v1.cli.scaffold.load_spec", return_value=MINI_SPEC):
             return OpenAPISchemaInvariant(spec_path="fake.yaml")
 
@@ -477,8 +477,9 @@ class TestOpenAPISchemaInvariant:
         assert inv.check(world) is True
 
     def test_ignore_paths_skips_validation(self):
-        from venomqa.v1.invariants.openapi import OpenAPISchemaInvariant
         from unittest.mock import patch
+
+        from venomqa.invariants.openapi import OpenAPISchemaInvariant
         with patch("venomqa.v1.cli.scaffold.load_spec", return_value=MINI_SPEC):
             inv = OpenAPISchemaInvariant(spec_path="fake.yaml", ignore_paths=["/users"])
         ar = _ar("POST", "http://localhost/users", 201, {})  # missing required
@@ -486,7 +487,7 @@ class TestOpenAPISchemaInvariant:
         assert inv.check(world) is True  # ignored
 
     def test_raises_without_spec_url_or_path(self):
-        from venomqa.v1.invariants.openapi import OpenAPISchemaInvariant
+        from venomqa.invariants.openapi import OpenAPISchemaInvariant
         with pytest.raises(ValueError, match="spec_url= or spec_path="):
             OpenAPISchemaInvariant()
 
@@ -520,8 +521,9 @@ class TestOpenAPISchemaInvariant:
                 }
             },
         }
-        from venomqa.v1.invariants.openapi import OpenAPISchemaInvariant
         from unittest.mock import patch
+
+        from venomqa.invariants.openapi import OpenAPISchemaInvariant
         with patch("venomqa.v1.cli.scaffold.load_spec", return_value=spec):
             inv = OpenAPISchemaInvariant(spec_path="fake.yaml")
 
@@ -533,7 +535,7 @@ class TestOpenAPISchemaInvariant:
 
     def test_world_last_action_result_set_by_act(self):
         """world.last_action_result is populated after world.act()."""
-        from venomqa.v1.core.action import Action
+        from venomqa.core.action import Action
 
         called_with = []
 

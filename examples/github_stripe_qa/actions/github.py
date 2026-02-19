@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 
-from venomqa.v1.core.action import ActionResult
+from venomqa.core.action import ActionResult
 
 
 def create_user(api, context) -> ActionResult:  # type: ignore[no-untyped-def]

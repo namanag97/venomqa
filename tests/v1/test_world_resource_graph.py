@@ -1,15 +1,13 @@
 """Tests for World + ResourceGraph integration."""
 
 import pytest
-
-from venomqa.v1.adapters.resource_graph import (
+from venomqa.adapters.resource_graph import (
     ResourceGraph,
     ResourceSchema,
     ResourceType,
 )
-from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
-from venomqa.v1.core.context import Context
-from venomqa.v1.world import World
+from venomqa.core.action import Action, ActionResult, HTTPRequest, HTTPResponse
+from venomqa.world import World
 
 
 class MockHttpClient:

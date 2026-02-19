@@ -62,7 +62,13 @@ for _submod in _V1_CORE_SUBMODULES:
 from venomqa.v1.core.action import Action, ActionResult, HTTPRequest, HTTPResponse  # noqa: E402
 from venomqa.v1.core.context import Context  # noqa: E402
 from venomqa.v1.core.graph import Graph  # noqa: E402
-from venomqa.v1.core.invariant import Invariant, InvariantTiming, ResponseAssertion, Severity as V1Severity, Violation  # noqa: E402
+from venomqa.v1.core.invariant import (  # noqa: E402
+    Invariant,
+    InvariantTiming,
+    ResponseAssertion,
+    Violation,
+)
+from venomqa.v1.core.invariant import Severity as V1Severity
 from venomqa.v1.core.result import ExplorationResult  # noqa: E402
 from venomqa.v1.core.state import Observation, State  # noqa: E402
 from venomqa.v1.core.transition import Transition  # noqa: E402

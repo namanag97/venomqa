@@ -1,16 +1,14 @@
 """Tests for ResourceGraph adapter."""
 
 import pytest
-
-from venomqa.v1.adapters.resource_graph import (
-    Resource,
+from venomqa.adapters.resource_graph import (
     ResourceGraph,
     ResourceSchema,
     ResourceSnapshot,
     ResourceType,
-    schema_from_openapi,
     _parse_path_segments,
     _singularize,
+    schema_from_openapi,
 )
 
 

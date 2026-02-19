@@ -287,9 +287,10 @@ RECOMMENDATION:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from venomqa.v1.world import World
@@ -343,7 +344,7 @@ class TestingMode(ABC):
         ...
 
     @abstractmethod
-    def create_world(self) -> "World":
+    def create_world(self) -> World:
         """Create and configure the World for this mode."""
         ...
 
@@ -388,7 +389,7 @@ class InProcessMode(TestingMode):
     def supports_full_rollback(self) -> bool:
         return True
 
-    def create_world(self) -> "World":
+    def create_world(self) -> World:
         from venomqa.v1.setup import connect_to_app
 
         return connect_to_app(
@@ -432,7 +433,7 @@ class FullSystemMode(TestingMode):
         # or async workflow side effects
         return False
 
-    def create_world(self) -> "World":
+    def create_world(self) -> World:
         from venomqa.v1.setup import connect_to_api
 
         return connect_to_api(
@@ -468,7 +469,7 @@ class ProtocolMode(TestingMode):
     def supports_full_rollback(self) -> bool:
         return True  # Protocol enables SAVEPOINT control
 
-    def create_world(self) -> "World":
+    def create_world(self) -> World:
         from venomqa.v1.setup import connect_to_protocol
 
         return connect_to_protocol(

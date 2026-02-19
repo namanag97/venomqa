@@ -1,6 +1,6 @@
 """State observers for the mock GitHub and Stripe servers.
 
-Both observers extend MockHTTPServer (from venomqa.v1.adapters.mock_http_server)
+Both observers extend MockHTTPServer (from venomqa.adapters.mock_http_server)
 which gives them REAL checkpoint/rollback support by directly snapshotting and
 restoring the module-level _state dicts — no HTTP round-trips required.
 
@@ -18,8 +18,8 @@ from typing import Any
 import mock_github
 import mock_stripe
 
-from venomqa.v1.adapters.mock_http_server import MockHTTPServer
-from venomqa.v1.core.state import Observation
+from venomqa.adapters.mock_http_server import MockHTTPServer
+from venomqa.core.state import Observation
 
 
 class GitHubObserver(MockHTTPServer):

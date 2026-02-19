@@ -1,0 +1,68 @@
+# VenomQA Configuration
+# Documentation: https://venomqa.dev/docs/configuration
+
+# ============================================================================
+# WHY DATABASE ACCESS IS REQUIRED
+# ============================================================================
+#
+# Your API stores state in a database. When VenomQA explores different action
+# sequences, it needs to ROLLBACK that database between branches so each path
+# starts from the same state.
+#
+# Example: To test both "create -> update" AND "create -> delete", VenomQA:
+#   1. Runs create_user (database now has user row)
+#   2. Runs update_user, checks invariants
+#   3. ROLLBACK database (user row removed)
+#   4. Runs delete_user from same starting point
+#
+# Connect to the SAME database your API writes to:
+#   $ export DATABASE_URL="postgresql://user:pass@localhost:5432/yourdb"
+# ============================================================================
+
+# Target API configuration
+base_url: "http://localhost:8000"
+timeout: 30
+
+# REQUIRED for state exploration - set this to your API's database
+# db_url: "postgresql://user:pass@localhost:5432/testdb"
+db_url: "${DATABASE_URL}"  # Uses environment variable
+
+# Test execution settings
+verbose: false
+fail_fast: false
+capture_logs: true
+log_lines: 50
+
+# Report settings
+report_dir: "reports"
+
+# Docker Compose file for test infrastructure
+docker_compose_file: "docker-compose.qa.yml"
+
+# Notifications configuration (optional)
+# notifications:
+#   channels:
+#     - type: slack
+#       name: slack-qa
+#       webhook_url: ${SLACK_WEBHOOK}
+#       on: [failure, recovery]
+#     - type: discord
+#       name: discord-qa
+#       webhook_url: ${DISCORD_WEBHOOK}
+#       on: [failure]
+
+# Port configurations for dependency injection (optional)
+ports: []
+  # - name: database
+  #   adapter_type: postgres
+  #   config:
+  #     host: localhost
+  #     port: 5432
+  #     database: test_db
+  # - name: time
+  #   adapter_type: controllable_time
+  # - name: cache
+  #   adapter_type: redis
+  #   config:
+  #     host: localhost
+  #     port: 6379

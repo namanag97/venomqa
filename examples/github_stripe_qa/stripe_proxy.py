@@ -8,8 +8,8 @@ reconstruct from just the base_url, avoiding the unpicklable internals.
 
 from __future__ import annotations
 
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.core.action import ActionResult
+from venomqa.adapters.http import HttpClient
+from venomqa.core.action import ActionResult
 
 
 class StripeProxy:

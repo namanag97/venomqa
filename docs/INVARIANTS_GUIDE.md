@@ -38,7 +38,7 @@ def refund_cannot_exceed_payment(world):
 ### Step 3: Register with Severity
 
 ```python
-from venomqa.v1 import Invariant, Severity
+from venomqa import Invariant, Severity
 
 Invariant(
     name="refund_cannot_exceed_payment",

@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 import httpx
 from datetime import datetime
 
-from venomqa.v1 import (
+from venomqa import (
     Agent,
     BFS,
     CoverageGuided,
@@ -37,9 +37,9 @@ from venomqa.v1 import (
     Invariant,
     Severity,
 )
-from venomqa.v1.core.state import Observation
-from venomqa.v1.world import World
-from venomqa.v1.world.rollbackable import Rollbackable, SystemCheckpoint
+from venomqa.core.state import Observation
+from venomqa.world import World
+from venomqa.world.rollbackable import Rollbackable, SystemCheckpoint
 
 
 # Configuration

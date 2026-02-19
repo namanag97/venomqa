@@ -46,7 +46,7 @@ def get_user(api, context):
 ## Invariants
 
 ```python
-from venomqa.v1 import Invariant, Severity
+from venomqa import Invariant, Severity
 
 def user_id_is_set(world):          # receives World, not (state, ctx)
     return world.context.has("user_id")
@@ -62,8 +62,8 @@ Invariant(
 ## Run an exploration
 
 ```python
-from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
-from venomqa.v1.adapters.http import HttpClient
+from venomqa import Action, Invariant, Agent, World, BFS, Severity
+from venomqa.adapters.http import HttpClient
 from actions.my_actions import create_user, get_user
 
 agent = Agent(

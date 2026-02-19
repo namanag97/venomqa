@@ -45,11 +45,12 @@ Usage:
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
+    pass
 
 try:
     from starlette.testclient import TestClient
@@ -280,7 +281,7 @@ class SharedPostgresAdapter:
     def _setup_sync(self) -> None:
         """Set up synchronous SQLAlchemy connection."""
         from sqlalchemy import create_engine, event
-        from sqlalchemy.orm import Session, sessionmaker
+        from sqlalchemy.orm import sessionmaker
 
         self._engine = create_engine(self.url)
         self._connection = self._engine.connect()

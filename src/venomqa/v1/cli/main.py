@@ -165,7 +165,7 @@ def main(args: list[str] | None = None) -> int:
 
 def cmd_explore(args: Any) -> int:
     """Run exploration command."""
-    from venomqa.v1 import BFS, CoverageGuided, DFS, Random, Weighted, explore
+    from venomqa.v1 import BFS, DFS, CoverageGuided, Random, Weighted, explore
     from venomqa.v1.agent.dimension_strategy import DimensionNoveltyStrategy
 
     # Load journey from file
@@ -394,7 +394,7 @@ def cmd_replay(args: Any) -> int:
         return 1
 
     # Print preamble
-    print(f"\n=== VenomQA Replay ===")
+    print("\n=== VenomQA Replay ===")
     print(f"Violation #{idx}: [{violation.get('severity','?').upper()}] {violation.get('invariant','?')}")
     print(f"Message:  {violation.get('message','')}")
     print(f"Path:     {' -> '.join(path_actions)}")
@@ -443,7 +443,7 @@ def cmd_replay(args: Any) -> int:
 
         if is_last:
             print()
-            print(f"[Replay complete — violation should have triggered on this step]")
+            print("[Replay complete — violation should have triggered on this step]")
         elif interactive:
             try:
                 input("\n  Press Enter for next step (Ctrl-C to quit)...")

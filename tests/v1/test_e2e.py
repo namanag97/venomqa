@@ -1,7 +1,7 @@
 """End-to-end exploration tests."""
 
 
-from venomqa.v1 import (
+from venomqa import (
     BFS,
     DFS,
     Action,
@@ -16,7 +16,7 @@ from venomqa.v1 import (
     Step,
     World,
 )
-from venomqa.v1.adapters import MockMail, MockQueue
+from venomqa.adapters import MockMail, MockQueue
 
 
 class MockHttpClient:
@@ -344,7 +344,7 @@ class TestInvariantViolation:
 class TestJourneyIntegration:
     def test_journey_compilation_and_exploration(self):
         """Test that Journey DSL compiles and runs correctly."""
-        from venomqa.v1.dsl.compiler import compile
+        from venomqa.dsl.compiler import compile
 
         api = MockHttpClient()
         world = World(api=api, state_from_context=[])

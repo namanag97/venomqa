@@ -5,16 +5,15 @@ from __future__ import annotations
 import io
 
 import pytest
-
-from venomqa.v1.core.coverage import DimensionAxisCoverage, DimensionCoverage
-from venomqa.v1.core.dimensions import (
+from venomqa.core.coverage import DimensionAxisCoverage, DimensionCoverage
+from venomqa.core.dimensions import (
     BUILTIN_DIMENSIONS,
     AuthStatus,
     UserRole,
 )
-from venomqa.v1.core.hyperedge import Hyperedge
-from venomqa.v1.core.hypergraph import Hypergraph
-from venomqa.v1.reporters.dimension_report import DimensionCoverageReporter
+from venomqa.core.hyperedge import Hyperedge
+from venomqa.core.hypergraph import Hypergraph
+from venomqa.reporters.dimension_report import DimensionCoverageReporter
 
 
 def edge(**dims) -> Hyperedge:

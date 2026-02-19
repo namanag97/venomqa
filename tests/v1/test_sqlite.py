@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import sqlite3
-
 import pytest
-
-from venomqa.v1.adapters.sqlite import SQLiteAdapter
+from venomqa.adapters.sqlite import SQLiteAdapter
 
 
 @pytest.fixture

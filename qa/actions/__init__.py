@@ -5,7 +5,7 @@ Actions are plain functions with signature (api, context).
   - context  : Context     — use .get(key) / .set(key, val) — NOT context[key]
 
 Example:
-    from venomqa.v1 import Action
+    from venomqa import Action
 
     def add_to_cart(api, context):
         product_id = context.get("product_id")

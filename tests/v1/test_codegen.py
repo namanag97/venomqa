@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
-from venomqa.v1.recording.codegen import generate_journey_code
-from venomqa.v1.recording.recorder import RecordedRequest
+from venomqa.recording.codegen import generate_journey_code
+from venomqa.recording.recorder import RecordedRequest
 
 
 def _make_request(

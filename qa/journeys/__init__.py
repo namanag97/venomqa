@@ -4,8 +4,8 @@ Define actions and invariants, then run Agent.explore() to exhaustively
 test every reachable state sequence — no linear test scripts needed.
 
 Example:
-    from venomqa.v1 import Action, Invariant, Agent, World, BFS, Severity
-    from venomqa.v1.adapters.http import HttpClient
+    from venomqa import Action, Invariant, Agent, World, BFS, Severity
+    from venomqa.adapters.http import HttpClient
 
     def create_item(api, context):
         resp = api.post("/items", json={"name": "test"})

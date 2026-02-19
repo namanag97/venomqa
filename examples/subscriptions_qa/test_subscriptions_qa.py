@@ -36,13 +36,13 @@ import uvicorn
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from venomqa.v1 import Action, Agent, BFS, Invariant, Severity, World
-from venomqa.v1.adapters import MockMail, MockQueue, MockStorage, MockTime
-from venomqa.v1.adapters.http import HttpClient
-from venomqa.v1.adapters.postgres import PostgresAdapter
-from venomqa.v1.adapters.redis import RedisAdapter
-from venomqa.v1.reporters.console import ConsoleReporter
-from venomqa.v1.reporters.json import JSONReporter
+from venomqa import Action, Agent, BFS, Invariant, Severity, World
+from venomqa.adapters import MockMail, MockQueue, MockStorage, MockTime
+from venomqa.adapters.http import HttpClient
+from venomqa.adapters.postgres import PostgresAdapter
+from venomqa.adapters.redis import RedisAdapter
+from venomqa.reporters.console import ConsoleReporter
+from venomqa.reporters.json import JSONReporter
 
 from server import create_app
 

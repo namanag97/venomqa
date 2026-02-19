@@ -34,7 +34,7 @@ Invariants defined here:
 
 from __future__ import annotations
 
-from venomqa.v1.core.invariant import Invariant, Severity
+from venomqa.core.invariant import Invariant, Severity
 
 
 # ---------------------------------------------------------------------------

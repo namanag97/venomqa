@@ -22,7 +22,7 @@ def db_url():
 
 @pytest.fixture
 def adapter(db_url):
-    from venomqa.v1.adapters.postgres import PostgresAdapter
+    from venomqa.adapters.postgres import PostgresAdapter
 
     adapter = PostgresAdapter(db_url, observe_tables=["test_table"])
     adapter.connect()
