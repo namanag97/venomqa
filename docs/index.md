@@ -864,6 +864,113 @@ hide:
   </div>
 </section>
 
+<!-- COMPARISON TABLE -->
+<section class="venom-matrix">
+  <div class="venom-container">
+
+    <div class="venom-matrix-header">
+      <p class="venom-matrix-label">TOOL COMPARISON</p>
+      <h2 class="venom-matrix-title">The only tool that tests sequences</h2>
+      <p class="venom-matrix-subtitle">Other tools test endpoints in isolation. VenomQA tests what happens <em>between</em> them.</p>
+    </div>
+
+    <div class="venom-table-wrap">
+      <table class="venom-compare-table">
+        <thead>
+          <tr>
+            <th>Capability</th>
+            <th class="venom-col-highlight">VenomQA</th>
+            <th>Schemathesis</th>
+            <th>pytest</th>
+            <th>Postman</th>
+            <th>Hypothesis</th>
+            <th>Dredd</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Sequence / ordering bugs</td>
+            <td class="venom-col-highlight venom-yes">✓ Only tool</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+          </tr>
+          <tr>
+            <td>DB rollback &amp; branching</td>
+            <td class="venom-col-highlight venom-yes">✓ Only tool</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+          </tr>
+          <tr>
+            <td>Autonomous exploration</td>
+            <td class="venom-col-highlight venom-yes">✓ Sequences</td>
+            <td class="venom-partial">~ Per endpoint</td>
+            <td class="venom-no">✗ Manual</td>
+            <td class="venom-no">✗ Manual</td>
+            <td class="venom-partial">~ Per function</td>
+            <td class="venom-no">✗</td>
+          </tr>
+          <tr>
+            <td>OpenAPI / Swagger</td>
+            <td class="venom-col-highlight venom-yes">✓</td>
+            <td class="venom-yes">✓</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-yes">✓</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-yes">✓</td>
+          </tr>
+          <tr>
+            <td>Fuzz / random inputs</td>
+            <td class="venom-col-highlight venom-no">✗</td>
+            <td class="venom-yes">✓ Best-in-class</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-yes">✓ Best-in-class</td>
+            <td class="venom-no">✗</td>
+          </tr>
+          <tr>
+            <td>Contract compliance</td>
+            <td class="venom-col-highlight venom-no">✗</td>
+            <td class="venom-yes">✓</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-partial">~</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-yes">✓ Best-in-class</td>
+          </tr>
+          <tr>
+            <td>Zero test writing</td>
+            <td class="venom-col-highlight venom-yes">✓</td>
+            <td class="venom-yes">✓</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-no">✗</td>
+            <td class="venom-yes">✓</td>
+          </tr>
+          <tr>
+            <td>Python native</td>
+            <td class="venom-col-highlight venom-yes">✓</td>
+            <td class="venom-yes">✓</td>
+            <td class="venom-yes">✓</td>
+            <td class="venom-no">✗ JS/GUI</td>
+            <td class="venom-yes">✓</td>
+            <td class="venom-no">✗ JS</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="venom-matrix-note">
+      <strong>Recommended stack:</strong> Use <strong>Schemathesis</strong> to fuzz individual endpoints + <strong>VenomQA</strong> to find sequence bugs. They catch completely different bugs.
+    </div>
+
+  </div>
+</section>
+
 <!-- FEATURES -->
 <section class="venom-features">
   <div class="venom-container">
