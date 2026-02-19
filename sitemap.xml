@@ -61,6 +61,82 @@
          <lastmod>2026-02-19</lastmod>
     </url>
     <url>
+         <loc>https://namanag97.github.io/venomqa/advanced/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/advanced/custom-backends/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/advanced/custom-reporters/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/advanced/performance/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/advanced/testing-patterns/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/blog/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/blog/2024-01-15-math-of-state-exploration/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/blog/2024-01-20-why-sequence-bugs-hide/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/blog/2024-01-25-state-machines-in-api-testing/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/blog/2024-02-01-property-based-testing-comparison/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/blog/2024-02-05-api-testing-tools-comparison/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/blog/2024-02-10-database-rollback-testing/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/blog/2024-02-15-ci-cd-api-testing/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/concepts/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/concepts/branching/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/concepts/journeys/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/concepts/ports-adapters/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/concepts/state/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/concepts/theory/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
          <loc>https://namanag97.github.io/venomqa/examples/</loc>
          <lastmod>2026-02-19</lastmod>
     </url>
@@ -77,11 +153,83 @@
          <lastmod>2026-02-19</lastmod>
     </url>
     <url>
+         <loc>https://namanag97.github.io/venomqa/getting-started/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/getting-started/configuration/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/getting-started/installation/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/getting-started/quickstart/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
          <loc>https://namanag97.github.io/venomqa/reference/</loc>
          <lastmod>2026-02-19</lastmod>
     </url>
     <url>
+         <loc>https://namanag97.github.io/venomqa/reference/adapters/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/reference/api/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/reference/backends/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/reference/cli/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
          <loc>https://namanag97.github.io/venomqa/reference/config/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/reference/reporters/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/specs/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/specs/framework-spec/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/specs/publishing/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/specs/state-chain/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/specs/state-explorer/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/tutorials/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/tutorials/ci-cd/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/tutorials/first-journey/</loc>
+         <lastmod>2026-02-19</lastmod>
+    </url>
+    <url>
+         <loc>https://namanag97.github.io/venomqa/tutorials/payment-flows/</loc>
          <lastmod>2026-02-19</lastmod>
     </url>
 </urlset>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://namanag97.github.io/venomqa/sitemap.xml
