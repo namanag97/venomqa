@@ -461,6 +461,130 @@ hide:
 }
 
 /* ══════════════════════════════════════════════════════════════
+   COMPARISON TABLE
+   ══════════════════════════════════════════════════════════════ */
+
+.venom-matrix {
+  background: var(--venom-bg);
+  padding: 5rem 2rem;
+}
+
+.venom-matrix-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.venom-matrix-label {
+  font-family: var(--venom-font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--venom-primary);
+  margin: 0 0 0.75rem;
+}
+
+.venom-matrix-title {
+  font-size: 2rem;
+  margin: 0 0 0.75rem;
+}
+
+.venom-matrix-subtitle {
+  color: var(--venom-text-muted);
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.venom-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--venom-border);
+  max-width: 960px;
+  margin: 0 auto 2rem;
+}
+
+.venom-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: var(--venom-surface);
+}
+
+.venom-compare-table th {
+  padding: 0.875rem 1rem;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--venom-text-muted);
+  border-bottom: 2px solid var(--venom-border);
+  white-space: nowrap;
+}
+
+.venom-compare-table th:first-child {
+  text-align: left;
+}
+
+.venom-compare-table td {
+  padding: 0.75rem 1rem;
+  text-align: center;
+  border-bottom: 1px solid var(--venom-border);
+  color: var(--venom-text-muted);
+  font-size: 0.875rem;
+}
+
+.venom-compare-table td:first-child {
+  text-align: left;
+  font-weight: 500;
+  color: var(--venom-text);
+}
+
+.venom-compare-table tr:last-child td {
+  border-bottom: none;
+}
+
+.venom-col-highlight {
+  background: color-mix(in srgb, var(--venom-primary) 6%, var(--venom-surface));
+  border-left: 2px solid var(--venom-primary) !important;
+  border-right: 2px solid var(--venom-primary) !important;
+  font-weight: 600 !important;
+}
+
+.venom-compare-table thead .venom-col-highlight {
+  color: var(--venom-primary) !important;
+  border-top: 2px solid var(--venom-primary);
+}
+
+.venom-compare-table tr:last-child .venom-col-highlight {
+  border-bottom: 2px solid var(--venom-primary) !important;
+}
+
+.venom-yes {
+  color: var(--venom-success) !important;
+}
+
+.venom-no {
+  color: var(--venom-border) !important;
+}
+
+.venom-partial {
+  color: var(--venom-warning) !important;
+}
+
+.venom-matrix-note {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 1rem 1.5rem;
+  background: var(--venom-bg-alt);
+  border-radius: 8px;
+  border: 1px solid var(--venom-border);
+  font-size: 0.95rem;
+  color: var(--venom-text-muted);
+  line-height: 1.6;
+}
+
+/* ══════════════════════════════════════════════════════════════
    HOW IT WORKS - 3 Steps
    ══════════════════════════════════════════════════════════════ */
 
